@@ -1,0 +1,27 @@
+﻿{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "galeria-online",
+  "main": "server/worker.js",
+  "compatibility_date": "2026-10-01",
+  // El cliente compilado (vite build) se sirve como archivos estáticos.
+  // /ws/* (salas) y /api/* (cuentas) van siempre al Worker.
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/ws/*", "/api/*"]
+  },
+  // Cuentas con permisos de admin en todas las salas (IDs separados por coma).
+  // 747ec0adf3e01ea1 = "xvvave"
+  "vars": { "ADMIN_IDS": "747ec0adf3e01ea1" },
+  "durable_objects": {
+    "bindings": [
+      { "name": "ROOMS", "class_name": "Room" },
+      { "name": "ACCOUNTS", "class_name": "Accounts" }
+    ]
+  },
+  // Plan gratuito de Cloudflare: los Durable Objects tienen que usar SQLite.
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["Room"] },
+    { "tag": "v2", "new_sqlite_classes": ["Accounts"] }
+  ]
+}

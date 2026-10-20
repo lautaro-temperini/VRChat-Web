@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#120d2b" />
+  <title>Galería Online</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@400;600;800&display=swap" rel="stylesheet" />
+</head>
+<body>
+  <div id="app"></div>
+
+  <!-- Logo reutilizable -->
+  <svg width="0" height="0" style="position:absolute">
+    <symbol id="logo" viewBox="0 0 48 48">
+      <rect x="5" y="7" width="38" height="34" rx="9" transform="skewX(-8)" style="fill:var(--primary)" />
+      <rect x="12" y="13" width="24" height="22" rx="4" transform="skewX(-8)" style="fill:var(--bg)" />
+      <path d="M17 31l6-8 4 5 3-3 4 6z" style="fill:var(--accent)" />
+      <circle cx="28.5" cy="18.5" r="2.6" style="fill:var(--accent-2)" />
+    </symbol>
+  </svg>
+
+  <div id="hud" class="pill">
+    <svg class="mark"><use href="#logo" /></svg>
+    <span class="dot" id="status-dot"></span>
+    <span id="status">Sala <b id="room-name"></b></span>
+    <span class="afk-badge" id="my-afk">AFK</span>
+  </div>
+
+  <div id="topbar">
+    <button id="btn-cam" class="pill" title="Cambiar cámara">3ª persona</button>
+    <button id="btn-mic" class="pill" title="Mantené apretado para hablar (V)" data-state="off"><span class="lbl">Hablar</span> <kbd>V</kbd></button>
+    <button id="btn-media" class="pill" title="Silenciar la música y la pantalla de la sala (M)"><span class="lbl">Sala</span> <kbd>M</kbd></button>
+    <button id="btn-mundi" class="pill" title="Mundi: salas y mapas"><span class="lbl">Mundi</span></button>
+    <button id="btn-look" class="pill" title="Editar personaje (P)"><span class="lbl">Personaje</span> <kbd>P</kbd></button>
+    <button id="btn-inv" class="pill" title="Inventario (I)"><span class="lbl">Inventario</span> <kbd>I</kbd></button>
+    <button id="btn-friends" class="pill" title="Amigos (F)"><span class="lbl">Amigos</span> <kbd>F</kbd><b class="count" id="friends-count" hidden></b></button>
+    <button id="btn-settings" class="pill icon" title="Ajustes" aria-label="Ajustes">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v2.4M12 18.8v2.4M4.2 7.5l2 1.2M17.8 15.3l2 1.2M4.2 16.5l2-1.2M17.8 8.7l2-1.2"/></svg>
+    </button>
+  </div>
+
+  <div id="crosshair"></div>
+  <div id="stamina"><div class="fill"></div></div>
+  <div id="toasts"></div>
+  <div id="prompt"><kbd>E</kbd><span id="prompt-text"></span></div>
+  <div id="hint" class="pill">Click: mirar · WASD moverse · Shift correr · Espacio saltar/trepar · C agacharse · E usar · Rueda: cámara · V hablar · Tab sala · Esc menú · Enter chat</div>
+
+  <div id="chat">
+    <div id="messages"></div>
+    <form id="chat-form" autocomplete="off">
+      <input id="chat-input" maxlength="300" placeholder="Escribí un mensaje… (Enter envía, Esc sale)" />
+    </form>
+  </div>
+
+  <div id="touch">
+    <div id="stick"><div class="knob"></div></div>
+    <button id="btn-use" class="round">Usar</button>
+    <button id="btn-crouch" class="round">Agachar</button>
+    <button id="btn-jump" class="round big">Saltar</button>
+    <button id="btn-chat" class="round">Chat</button>
+  </div>
+
+  <!-- Entrada: invitado / iniciar sesión / crear cuenta -->
+  <div id="auth" class="overlay">
+    <form id="auth-form" class="card" autocomplete="on">
+      <div class="brand">
+        <svg class="mark big"><use href="#logo" /></svg>
+        <div>
+          <h1 class="display">Galería Online</h1>
+          <p class="sub">Un museo para pasar el rato con amigos.</p>
+        </div>
+      </div>
+      <div class="tabs" id="auth-tabs">
+        <button type="button" class="tab" data-tab="guest">Invitado</button>
+        <button type="button" class="tab" data-tab="login">Iniciar sesión</button>
+        <button type="button" class="tab" data-tab="register">Crear cuenta</button>
+      </div>
+      <label class="field only-guest">Tu nombre
+        <input id="auth-name" maxlength="20" placeholder="¿Cómo te llamás?" />
+      </label>
+      <label class="field no-guest">Usuario
+        <input id="auth-user" maxlength="20" autocomplete="username" placeholder="tu_usuario" />
+      </label>
+      <label class="field no-guest">Contraseña
+        <input id="auth-pass" type="password" maxlength="200" autocomplete="current-password" placeholder="Mínimo 6 caracteres" />
+      </label>
+      <p class="note only-guest">Tu personaje queda guardado en este navegador. Cuando quieras, creás una cuenta para no perderlo y usarlo en otros dispositivos.</p>
+      <p class="note only-upgrade">Tu personaje de invitado pasa a esta cuenta.</p>
+      <p class="error" id="auth-error"></p>
+      <button class="cta" id="auth-submit">Entrar</button>
+      <button type="button" class="link" id="auth-cancel">Volver</button>
+    </form>
+  </div>
+
+  <aside id="editor" class="panel">
+    <h1 class="display">Tu personaje</h1>
+    <div class="tabs">
+      <button class="tab active">Básico</button>
+      <button class="tab" disabled title="Sliders de cara y cuerpo">Avanzado <small>pronto</small></button>
+    </div>
+    <label class="field">Nombre
+      <input id="name" maxlength="20" placeholder="¿Cómo te llamás?" />
+    </label>
+    <label class="field">Sobre mí
+      <textarea id="bio" maxlength="280" rows="3" placeholder="Contá algo de vos: qué música te gusta, qué hacés…"></textarea>
+    </label>
+    <div id="swatches"></div>
+    <label class="field">Altura <span id="height-val"></span>
+      <input id="height" type="range" min="1.55" max="1.95" step="0.01" />
+    </label>
+    <label class="field">Contextura
+      <input id="build" type="range" min="0.85" max="1.2" step="0.01" />
+    </label>
+    <div id="account"></div>
+    <button id="btn-enter" class="cta">Guardar</button>
+  </aside>
+
+  <aside id="settings" class="panel">
+    <h1 class="display">Menú</h1>
+    <div class="tabs" id="menu-tabs">
+      <button class="tab active" data-mtab="general">General</button>
+      <button class="tab" data-mtab="audio">Audio</button>
+      <button class="tab" data-mtab="controls">Controles</button>
+    </div>
+    <div class="mtab" data-mtab="general">
+      <label class="field">Sensibilidad del mouse <span id="sens-val"></span>
+        <input id="sens" type="range" min="0.2" max="3" step="0.05" />
+      </label>
+      <div class="field">Calidad gráfica
+        <div class="seg" id="quality-seg">
+          <button data-q="high">Alta</button>
+          <button data-q="low">Baja</button>
+        </div>
+      </div>
+      <button class="act" id="btn-logout-menu">Salir de la cuenta</button>
+    </div>
+    <div class="mtab" data-mtab="audio" hidden>
+      <label class="check"><input type="checkbox" id="voice-enabled" /> Chat de voz activado</label>
+      <label class="field">Volumen general <span id="vol-master-val"></span>
+        <input id="vol-master" type="range" min="0" max="1" step="0.05" />
+      </label>
+      <label class="field">Voces <span id="vol-voices-val"></span>
+        <input id="vol-voices" type="range" min="0" max="1.5" step="0.05" />
+      </label>
+      <label class="field">Música y pantalla de la sala <span id="vol-media-val"></span>
+        <input id="vol-media" type="range" min="0" max="1.5" step="0.05" />
+      </label>
+      <p class="meta">Para hablar, mantené apretada la <b>V</b>. La <b>M</b> silencia la música y la pantalla de la sala.</p>
+    </div>
+    <div class="mtab keys" data-mtab="controls" hidden>
+      <dl>
+        <dt>WASD</dt><dd>Moverse</dd>
+        <dt>Shift</dt><dd>Correr (gasta stamina)</dd>
+        <dt>Espacio</dt><dd>Saltar · contra algo bajo, trepar</dd>
+        <dt>C / Ctrl</dt><dd>Agacharse</dd>
+        <dt>E · click</dt><dd>Usar / ver lo que apuntás</dd>
+        <dt>Rueda</dt><dd>Acercar la cámara → 1ª persona → zoom</dd>
+        <dt>V (mantener)</dt><dd>Hablar</dd>
+        <dt>M</dt><dd>Silenciar música / pantalla de la sala</dd>
+        <dt>Tab</dt><dd>Jugadores e info de la sala</dd>
+        <dt>Esc</dt><dd>Este menú</dd>
+        <dt>P · I · F</dt><dd>Personaje · Inventario · Amigos</dd>
+        <dt>Enter</dt><dd>Chat · /ayuda para ver comandos</dd>
+      </dl>
+    </div>
+    <button id="btn-settings-close" class="cta">Volver al juego</button>
+  </aside>
+
+  <!-- Tab: jugadores e info de la sala -->
+  <aside id="roompanel" class="panel wide">
+    <h1 class="display" id="rp-title">Sala</h1>
+    <p class="meta" id="rp-meta"></p>
+    <div id="rp-settings"></div>
+    <h2 class="sub-h">Jugadores</h2>
+    <div id="rp-players"></div>
+    <div id="rp-bans"></div>
+    <button class="cta" data-close-panel>Cerrar</button>
+  </aside>
+
+  <!-- Mundi: salas -->
+  <aside id="mundi" class="panel">
+    <h1 class="display">Mundi</h1>
+    <p class="meta">Elegí a dónde ir. También podés escribir en el chat <b>/ir museo</b>, <b>/ir mi sala</b> o <b>/ir nombre</b>.</p>
+    <div id="mundi-list"></div>
+    <button class="cta" data-close-panel>Cerrar</button>
+  </aside>
+
+  <!-- Expulsado / baneado -->
+  <div id="kicked" class="overlay">
+    <div class="card kicked-card">
+      <h1 class="display" id="kicked-title">Te sacaron de la sala</h1>
+      <p class="meta" id="kicked-text"></p>
+      <button class="cta" id="kicked-go">Ir al Museo</button>
+    </div>
+  </div>
+  <!-- Ficha de una obra -->
+  <div id="inspect" class="overlay">
+    <div class="sheet">
+      <button class="close" data-close aria-label="Cerrar">✕</button>
+      <div class="media"><img id="inspect-img" alt="" /></div>
+      <div class="info">
+        <p class="kicker" id="inspect-kicker"></p>
+        <h1 class="display" id="inspect-title"></h1>
+        <p class="meta" id="inspect-meta"></p>
+        <p id="inspect-desc"></p>
+        <a id="inspect-link" class="linkcard" target="_blank" rel="noopener noreferrer">
+          <img id="link-img" alt="" />
+          <span class="lc-text">
+            <span class="lc-site" id="link-site"></span>
+            <b id="link-title">Cargando vista previa…</b>
+            <span id="link-desc"></span>
+          </span>
+        </a>
+        <p class="hint-close"><kbd>E</kbd> o <kbd>Esc</kbd> para cerrar</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Perfil de otro jugador -->
+  <div id="profile" class="overlay">
+    <div class="sheet small">
+      <button class="close" data-close aria-label="Cerrar">✕</button>
+      <div class="profile-head">
+        <img id="profile-img" alt="" />
+        <div>
+          <h1 class="display" id="profile-name"></h1>
+          <p class="meta" id="profile-user"></p>
+          <span class="afk-badge" id="profile-afk">AFK</span>
+        </div>
+      </div>
+      <div class="actions" id="profile-actions">
+        <button class="act" id="act-friend">Agregar amigo</button>
+        <button class="act" id="act-trade">Intercambiar</button>
+        <button class="act" id="act-visit">Visitar su sala</button>
+      </div>
+      <div class="tabs" id="profile-tabs">
+        <button class="tab active" data-ptab="about">Perfil</button>
+        <button class="tab" data-ptab="gallery">Galería</button>
+      </div>
+      <div class="ptab" data-ptab="about">
+        <p id="profile-bio"></p>
+        <p class="meta" id="profile-since"></p>
+      </div>
+      <div class="ptab" data-ptab="gallery" hidden>
+        <div id="profile-gallery" class="gallery"></div>
+      </div>
+      <p class="hint-close"><kbd>E</kbd> o <kbd>Esc</kbd> para cerrar</p>
+    </div>
+  </div>
+
+  <!-- Inventario -->
+  <aside id="inventory" class="panel">
+    <h1 class="display">Inventario</h1>
+    <p class="meta">Tocá un objeto para ponértelo o sacártelo. Uno por lugar del cuerpo.</p>
+    <div id="inv-grid" class="items"></div>
+    <button class="cta" data-close-panel>Listo</button>
+  </aside>
+
+  <!-- Amigos y salas -->
+  <aside id="friends" class="panel">
+    <h1 class="display">Amigos</h1>
+    <div class="rooms">
+      <button class="act" id="go-museum">Museo</button>
+      <button class="act" id="go-home">Mi sala</button>
+    </div>
+    <div id="friends-list"></div>
+    <button class="cta" data-close-panel>Listo</button>
+  </aside>
+
+  <!-- Intercambio -->
+  <div id="trade" class="overlay">
+    <div class="sheet trade-sheet">
+      <h1 class="display">Intercambio con <span id="trade-name"></span></h1>
+      <div class="trade-cols">
+        <section>
+          <h2>Vos ofrecés <span class="ready-tag" id="trade-you-ready">Listo</span></h2>
+          <div id="trade-you" class="items small"></div>
+          <h3>Tu inventario (tocá para ofrecer)</h3>
+          <div id="trade-inv" class="items small"></div>
+        </section>
+        <section>
+          <h2><span id="trade-them-name"></span> ofrece <span class="ready-tag" id="trade-them-ready">Listo</span></h2>
+          <div id="trade-them" class="items small"></div>
+        </section>
+      </div>
+      <p class="meta" id="trade-status">Si alguno cambia su oferta, los dos tienen que volver a confirmar.</p>
+      <div class="trade-buttons">
+        <button class="act" id="trade-cancel">Cancelar</button>
+        <button class="cta" id="trade-ready">Estoy listo</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pantalla compartida en grande -->
+  <div id="screenview" class="overlay">
+    <div class="sheet screen-sheet">
+      <button class="close" data-close aria-label="Cerrar">✕</button>
+      <div id="screen-slot"></div>
+      <p class="meta" id="screen-who"></p>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

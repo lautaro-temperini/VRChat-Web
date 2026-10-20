@@ -1,0 +1,21 @@
+{
+  "name": "galeria-online",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently -k -n server,client -c magenta,cyan \"npm:dev:server\" \"npm:dev:client\"",
+    "dev:client": "vite",
+    "dev:server": "node scripts/dev-server.js",
+    "build": "vite build",
+    "deploy": "vite build && wrangler deploy"
+  },
+  "dependencies": {
+    "three": "^0.186.1"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.6",
+    "vite": "^8.3.4",
+    "wrangler": "^4.151.3"
+  }
+}
