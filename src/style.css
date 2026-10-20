@@ -352,7 +352,9 @@ body.trading #trade, body.viewing #screenview { display: flex; }
   .trade-cols { grid-template-columns: 1fr; }
 }
 /* ---------- Menú, panel de sala, Mundi, expulsado ---------- */
-body.roompanel #roompanel, body.mundi #mundi, body.kicked #kicked { display: flex; }
+body.roompanel #roompanel, body.mundi #mundi, body.kicked #kicked, body.gestures #gestures { display: flex; }
+.gesture-list { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.gesture-list .act { padding: 12px; }
 .panel.wide { width: min(460px, calc(100vw - 32px)); }
 .sub-h { font: 400 16px var(--display); text-transform: uppercase; letter-spacing: .5px; margin: 6px 0 0; color: var(--muted); }
 .check { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 14px; cursor: pointer; }

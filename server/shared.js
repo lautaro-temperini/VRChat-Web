@@ -29,6 +29,14 @@ export function cleanEquip(list) {
 }
 
 // rulos y coleta son del personaje anterior: se siguen aceptando para no perder lo guardado
+// Gestos: comandos del chat (/saludar…) y menú de la R. loop = se repite hasta que te movés
+export const EMOTES = {
+  saludar: { name: 'Saludar', dur: 2.4 },
+  aplaudir: { name: 'Aplaudir', dur: 3 },
+  senalar: { name: 'Señalar', dur: 2.2 },
+  bailar: { name: 'Bailar', loop: true },
+};
+
 export const HAIR_STYLES = ['corto', 'largo', 'rapado', 'rodete', 'rulos', 'coleta'];
 export const TOPS = ['remera', 'buzo'];
 export const BODIES = ['masc', 'fem'];

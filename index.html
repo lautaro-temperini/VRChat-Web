@@ -33,7 +33,8 @@
     <button id="btn-cam" class="pill" title="Cambiar cámara">3ª persona</button>
     <button id="btn-mic" class="pill" title="Mantené apretado para hablar (V)" data-state="off"><span class="lbl">Hablar</span> <kbd>V</kbd></button>
     <button id="btn-media" class="pill" title="Silenciar la música y la pantalla de la sala (M)"><span class="lbl">Sala</span> <kbd>M</kbd></button>
-    <button id="btn-mundi" class="pill" title="Mundi: salas y mapas"><span class="lbl">Mundi</span></button>
+    <button id="btn-mundi" class="pill" title="Mundi: salas y mapas (Y)"><span class="lbl">Mundi</span> <kbd>Y</kbd></button>
+    <button id="btn-gestures" class="pill" title="Gestos (R)"><span class="lbl">Gestos</span> <kbd>R</kbd></button>
     <button id="btn-look" class="pill" title="Editar personaje (P)"><span class="lbl">Personaje</span> <kbd>P</kbd></button>
     <button id="btn-inv" class="pill" title="Inventario (I)"><span class="lbl">Inventario</span> <kbd>I</kbd></button>
     <button id="btn-friends" class="pill" title="Amigos (F)"><span class="lbl">Amigos</span> <kbd>F</kbd><b class="count" id="friends-count" hidden></b></button>
@@ -160,7 +161,9 @@
         <dt>Rueda</dt><dd>Acercar la cámara → 1ª persona → zoom</dd>
         <dt>V (mantener)</dt><dd>Hablar</dd>
         <dt>M</dt><dd>Silenciar música / pantalla de la sala</dd>
-        <dt>Tab</dt><dd>Jugadores e info de la sala</dd>
+        <dt>Tab (mantener)</dt><dd>Jugadores e info de la sala</dd>
+        <dt>Y</dt><dd>Mundi: salas y mapas</dd>
+        <dt>R</dt><dd>Gestos</dd>
         <dt>Esc</dt><dd>Este menú</dd>
         <dt>P · I · F</dt><dd>Personaje · Inventario · Amigos</dd>
         <dt>Enter</dt><dd>Chat · /ayuda para ver comandos</dd>
@@ -185,6 +188,14 @@
     <h1 class="display">Mundi</h1>
     <p class="meta">Elegí a dónde ir. También podés escribir en el chat <b>/ir museo</b>, <b>/ir mi sala</b> o <b>/ir nombre</b>.</p>
     <div id="mundi-list"></div>
+    <button class="cta" data-close-panel>Cerrar</button>
+  </aside>
+
+  <!-- R: gestos -->
+  <aside id="gestures" class="panel">
+    <h1 class="display">Gestos</h1>
+    <p class="meta">También con el chat: <b>/saludar</b>, <b>/aplaudir</b>, <b>/señalar</b>, <b>/bailar</b>. El baile sigue hasta que te movés.</p>
+    <div id="gesture-list" class="gesture-list"></div>
     <button class="cta" data-close-panel>Cerrar</button>
   </aside>
 

@@ -24,7 +24,8 @@ export class PlayerController {
     this.avatar = avatar;
     this.world = world;
     this.dom = dom;
-    this.enabled = false;  // false = vitrina (editor de personaje)
+    this.enabled = false;  // false = vitrina (editor de personaje antes de entrar)
+    this.showcase = false; // vitrina con el editor abierto: se apaga al empezar a moverse
     this.typing = false;   // true mientras se escribe en el chat
     this.paused = false;   // true con un panel abierto (obra, perfil, ajustes)
     this.mode = 'third';
@@ -324,7 +325,9 @@ export class PlayerController {
     this.landing = damp(this.landing, 0, 6, dt);
 
     // Hacia dónde mira el cuerpo
-    if (!this.enabled) this.bodyYaw += dt * 0.5; // vitrina: el personaje gira
+    if (this.showcase && (this.speed > 0.3 || !this.grounded)) this.showcase = false;
+    const vitrina = !this.enabled || this.showcase;
+    if (vitrina) this.bodyYaw += dt * 0.5; // vitrina: el personaje gira
     else if (this.sitting || this.mantle) { /* fijo */ }
     else if (this.mode === 'first') this.bodyYaw = this.yaw + Math.PI;
     else if (this.speed > 0.3) this.bodyYaw += angleDiff(this.bodyYaw, Math.atan2(this.vel.x, this.vel.y)) * Math.min(1, dt * 14);
@@ -335,7 +338,7 @@ export class PlayerController {
     av.root.position.copy(p);
     av.root.rotation.y = this.bodyYaw;
     av.update(dt, { speed: this.speed, pose: this.pose, turn: this.turn, landing: this.landing });
-    av.root.visible = !(this.enabled && this.mode === 'first');
+    av.root.visible = vitrina || this.mode !== 'first';
 
     this.updateCamera(dt);
   }
@@ -345,7 +348,7 @@ export class PlayerController {
     const low = this.pose === POSE.crouch || this.pose === POSE.sit;
     const sprintKick = THREE.MathUtils.clamp((this.speed - 5.2) / 1.5, 0, 1) * 6;
     let fov;
-    if (!this.enabled) {
+    if (!this.enabled || this.showcase) {
       // Cámara de vitrina para el editor de personaje
       cam.position.set(p.x - 1.9, p.y + 1.2 * s, p.z + 0.55);
       cam.lookAt(p.x, p.y + 0.95 * s, p.z + 0.5);

@@ -16,6 +16,7 @@ import { api, session } from './net/api.js';
 import { RTC } from './net/rtc.js';
 import { createSocial } from './ui/social.js';
 import { toast } from './ui/toast.js';
+import { EMOTES } from '../server/shared.js';
 import { UI_ICONS } from './ui/icons.js';
 import { createRoomPanel } from './ui/roompanel.js';
 import { Ground } from './world/ground.js';
@@ -109,7 +110,7 @@ ctrl.onModeChange = (mode) => {
 };
 // Íconos en la barra superior (en pantallas chicas se ven solo los íconos)
 $('btn-cam').innerHTML = `<span class="lbl">3ª persona</span>`;
-for (const [id, icon] of [['btn-mic', 'mic'], ['btn-media', 'music'], ['btn-mundi', 'globe'], ['btn-look', 'user'], ['btn-inv', 'bag'], ['btn-friends', 'friends']]) {
+for (const [id, icon] of [['btn-mic', 'mic'], ['btn-media', 'music'], ['btn-mundi', 'globe'], ['btn-gestures', 'hand'], ['btn-look', 'user'], ['btn-inv', 'bag'], ['btn-friends', 'friends']]) {
   $(id).insertAdjacentHTML('afterbegin', UI_ICONS[icon]);
 }
 $('btn-cam').onclick = () => ctrl.setMode(ctrl.mode === 'first' ? 'third' : 'first');
@@ -123,9 +124,9 @@ for (const b of document.querySelectorAll('button.pill:not(.icon)')) {
 
 // ---------- Estado de la interfaz ----------
 // Un solo panel/superposición abierto a la vez. Mientras hay uno, el jugador no se mueve.
-const OVERLAYS = ['editing', 'settings', 'inspecting', 'profiling', 'auth', 'inventory', 'friends', 'trading', 'viewing', 'roompanel', 'mundi', 'kicked'];
+const OVERLAYS = ['editing', 'settings', 'inspecting', 'profiling', 'auth', 'inventory', 'friends', 'trading', 'viewing', 'roompanel', 'mundi', 'gestures', 'kicked'];
 // Paneles que no frenan al personaje (se puede seguir caminando con WASD)
-const NON_BLOCKING = ['inventory'];
+const NON_BLOCKING = ['inventory', 'friends', 'roompanel', 'editing', 'gestures'];
 function openOverlay(cls) {
   document.exitPointerLock?.();
   for (const c of OVERLAYS) body.classList.toggle(c, c === cls);
@@ -138,7 +139,9 @@ function closeOverlays() {
 }
 const overlayOpen = () => OVERLAYS.some((c) => body.classList.contains(c));
 function refreshState() {
-  ctrl.enabled = joined && !body.classList.contains('editing') && !body.classList.contains('auth');
+  // Antes de entrar, el editor muestra el personaje en vitrina; ya adentro se puede caminar con el editor abierto
+  ctrl.enabled = joined && !body.classList.contains('auth');
+  if (!body.classList.contains('editing')) ctrl.showcase = false;
   ctrl.paused = OVERLAYS.some((c) => body.classList.contains(c) && !NON_BLOCKING.includes(c)) || ctrl.typing;
   body.classList.toggle('playing', ctrl.enabled && !ctrl.paused);
 }
@@ -255,6 +258,7 @@ function openEditor() {
   renderSwatches();
   renderAccount();
   openOverlay('editing');
+  ctrl.showcase = joined; // vitrina hasta que el personaje se mueva
 }
 
 async function saveProfile() {
@@ -362,7 +366,6 @@ const roomPanel = createRoomPanel({
   ui: { openOverlay, closeOverlays, isOpen: (cls) => body.classList.contains(cls) },
   openProfile: (r) => openProfile(r),
 });
-function toggleRoomPanel() { body.classList.contains('roompanel') ? closeOverlays() : roomPanel.open(); }
 
 // Objetos en el suelo
 const ground = new Ground(scene);
@@ -424,7 +427,24 @@ function openMundi() {
   for (const f of social.friends.friends) add(`Sala de ${f.name}`, f.room ? social.roomLabel(f.room).replace(/^En /, `${f.name} está en `) : 'Su sala personal', `u-${f.id}`);
   openOverlay('mundi');
 }
-$('btn-mundi').onclick = () => (body.classList.contains('mundi') ? closeOverlays() : openMundi());
+const toggleMundi = () => (body.classList.contains('mundi') ? closeOverlays() : openMundi());
+$('btn-mundi').onclick = toggleMundi;
+
+// ---------- Gestos (R / comandos del chat) ----------
+function gesture(name) {
+  if (!joined || !EMOTES[name]) return;
+  me.gesture(name);
+  net.send({ t: 'emote', e: name });
+}
+for (const [id, g] of Object.entries(EMOTES)) {
+  const b = document.createElement('button');
+  b.className = 'act';
+  b.textContent = g.name;
+  b.onclick = () => { closeOverlays(); gesture(id); };
+  $('gesture-list').append(b);
+}
+const toggleGestures = () => (body.classList.contains('gestures') ? closeOverlays() : openOverlay('gestures'));
+$('btn-gestures').onclick = toggleGestures;
 
 // Expulsado / baneado
 function showKicked(title, text) {
@@ -549,6 +569,7 @@ net
   .on('afk', ({ id, v }) => remotes.get(id)?.setAfk(v))
   .on('look', ({ id, name: n, look: l, equip }) => { const r = remotes.get(id); if (r) { r.setLook(l, equip); r.setName(n); } })
   .on('mic', ({ id, v }) => remotes.get(id)?.setMic(v))
+  .on('emote', ({ id, e }) => remotes.get(id)?.avatar.gesture(e))
   .on('rtc', (m) => rtc.onSignal(m.from, m.data))
   .on('screen', (m) => {
     if (m.busy) return toast(`Ya está compartiendo ${remotes.get(m.id)?.name ?? 'otra persona'}. Esperá a que termine.`);
@@ -637,7 +658,15 @@ function command(text) {
   switch (cmd.toLowerCase()) {
     case 'ayuda':
     case 'help':
-      system('/salas: ver salas · /ir museo · /ir mi sala · /ir <amigo> (va a donde está, o a su sala)');
+      system('Comandos: /salas (ver salas) · /ir museo · /ir mi sala · /ir <amigo> (va a donde está, o a su sala)');
+      system('Gestos: /saludar · /aplaudir · /señalar · /bailar (hasta que te movés) · también con la R');
+      break;
+    case 'saludar':
+    case 'aplaudir':
+    case 'señalar':
+    case 'senalar':
+    case 'bailar':
+      gesture(cmd.toLowerCase().replace('ñ', 'n'));
       break;
     case 'salas':
       system(`Salas: Museo · Tu sala${friends.length ? ' · ' + friends.map((f) => `Sala de ${f.name}${f.room ? `  (${social.roomLabel(f.room).toLowerCase()})` : ''}`).join(' · ') : ''}`);
@@ -825,9 +854,13 @@ addEventListener('keydown', (e) => {
     else if (joined) openMenu();
     return;
   }
+  // Tab: la lista de jugadores se ve mientras se mantiene apretada
   if (e.code === 'Tab' && joined && !body.classList.contains('auth') && !body.classList.contains('kicked')) {
     e.preventDefault();
-    if (!inField) toggleRoomPanel();
+    if (!inField && !e.repeat && !body.classList.contains('roompanel')) {
+      tabHeld = { relock: document.pointerLockElement === renderer.domElement };
+      roomPanel.open();
+    }
     return;
   }
   if (inField || body.classList.contains('auth') || body.classList.contains('kicked')) return;
@@ -855,10 +888,27 @@ addEventListener('keydown', (e) => {
     body.classList.contains('inventory') ? closeOverlays() : social.openInventory();
   } else if (e.code === 'KeyF') {
     body.classList.contains('friends') ? closeOverlays() : social.openFriends();
+  } else if (e.code === 'KeyY') {
+    toggleMundi();
+  } else if (e.code === 'KeyR') {
+    toggleGestures();
   }
 });
-addEventListener('keyup', (e) => { if (e.code === 'KeyV') talk(false); });
-addEventListener('blur', () => talk(false)); // si la ventana pierde el foco con la V apretada
+let tabHeld = null;
+function releaseTab() {
+  if (!tabHeld) return;
+  const { relock } = tabHeld;
+  tabHeld = null;
+  if (!body.classList.contains('roompanel')) return; // ya se abrió otra cosa desde la lista (un perfil, etc.)
+  closeOverlays();
+  // Si estaba jugando con el mouse capturado, lo vuelve a capturar
+  if (relock && ctrl.enabled && !ctrl.paused && !isTouch) renderer.domElement.requestPointerLock?.()?.catch?.(() => {});
+}
+addEventListener('keyup', (e) => {
+  if (e.code === 'KeyV') talk(false);
+  if (e.code === 'Tab') releaseTab();
+});
+addEventListener('blur', () => { talk(false); releaseTab(); }); // si la ventana pierde el foco con una tecla apretada
 
 // ---------- Bucle principal ----------
 const clock = new THREE.Clock();

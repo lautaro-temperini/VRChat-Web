@@ -45,10 +45,12 @@ npm run deploy   # build + wrangler deploy
   ground, roomPanel, `setHour(h)` para probar día/noche…). Si el panel del navegador está oculto,
   el juego corre a muy pocos cuadros: para probar física llamar a `ctrl.update(1/60)` en un bucle.
 - **Protocolo de la sala** (mensajes `t`): `join`, `s` (estado `[x,y,z,yaw,vel,pose]`), `afk`,
-  `mic`, `look`, `chat`, `rtc`, `screen`, `drop`, `pickup`, `mod`, `trade`. El servidor nunca
+  `mic`, `look`, `chat`, `rtc`, `screen`, `drop`, `pickup`, `mod`, `trade`, `emote` (gestos). El servidor nunca
   confía en el cliente para nombre, ropa ni objetos: los lee de `Accounts`.
 - **Catálogos compartidos** (objetos, peinados, validaciones) en `server/shared.js`, importados
   también por el cliente.
 - **Admins:** `wrangler.jsonc` → `vars.ADMIN_IDS`. El dueño de una sala `u-<id>` es esa cuenta.
-- La interfaz de avatar (`setLook`, `setEquip`, `update(dt, {speed, pose, turn, landing})`,
-  `root`, `scale`, `phase`, `mats.skin/shirt`) es la que tiene que respetar el modelo nuevo.
+- La interfaz de avatar (`setLook`, `setEquip`, `gesture(nombre)`, `update(dt, {speed, pose, turn, landing})`,
+  `root`, `scale`, `phase`, `mats.skin/shirt`) la usan el controlador, los jugadores remotos y los brazos
+  de 1ª persona. El modelo (Quaternius) se carga en segundo plano: `avatar.model` es `null` hasta entonces.
+- Para probar el personaje sin entrar al juego: `devtest/` (no se sube) con páginas sueltas de Vite.

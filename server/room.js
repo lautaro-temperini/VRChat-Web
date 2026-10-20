@@ -1,5 +1,5 @@
 import { DurableObject } from 'cloudflare:workers';
-import { cleanName, cleanLook, cleanEquip } from './shared.js';
+import { cleanName, cleanLook, cleanEquip, EMOTES } from './shared.js';
 
 // Cada sala del juego es una instancia de Room (un Durable Object).
 // - Reenvía posiciones, chat, AFK y estado del micrófono.
@@ -206,6 +206,11 @@ export class Room extends DurableObject {
         meta.afk = !!msg.v;
         ws.serializeAttachment(meta);
         this.broadcast({ t: 'afk', id: meta.id, v: meta.afk }, ws);
+        break;
+      }
+      case 'emote': {
+        if (!EMOTES[msg.e]) return;
+        this.broadcast({ t: 'emote', id: meta.id, e: msg.e }, ws);
         break;
       }
       case 'mic': {

@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 import { buildAccessory } from './accessories.js';
-import { ITEMS } from '../../server/shared.js';
+import { ITEMS, EMOTES } from '../../server/shared.js';
 
 // Personaje realista estilizado (modelos de Quaternius, CC0), mira hacia +Z.
 // El cuerpo y el pelo se cargan en segundo plano; mientras tanto el personaje
@@ -209,6 +209,24 @@ class Rig {
 }
 
 export const POSE = { stand: 0, crouch: 1, sit: 2, climb: 3, air: 4 };
+
+// Gestos provisorios hechos por código (se reemplazan por las animaciones de Mixamo).
+// Devuelven ángulos de los brazos [derecho, izquierdo] y del cuerpo, con la misma convención de update().
+const GESTURES = {
+  saludar: (t) => ({ sx: [-0.3, 0], sz: [-(2.55 + 0.28 * Math.sin(t * 11)), 0.1], el: [-0.25, -0.2] }),
+  aplaudir: (t) => {
+    const c = Math.abs(Math.sin(t * 8));
+    return { sx: [-0.95, -0.95], sz: [0.4 - 0.16 * c, -0.4 + 0.16 * c], el: [-1.25, -1.25] };
+  },
+  senalar: () => ({ sx: [-1.5, 0], sz: [-0.08, 0.1], el: [0, -0.2] }),
+  bailar: (t) => {
+    const b = t * 6.3;
+    return {
+      sx: [-2.5 + 0.45 * Math.sin(b), -2.5 - 0.45 * Math.sin(b)], sz: [-0.45, 0.45], el: [-0.6, -0.6],
+      y: -0.05 * Math.abs(Math.sin(b)), tilt: Math.sin(b / 2) * 0.12, knee: 0.25 * Math.abs(Math.sin(b)),
+    };
+  },
+};
 const damp = (cur, target, k, dt) => cur + (target - cur) * (1 - Math.exp(-k * dt));
 const mix = (a, b, t) => a + (b - a) * t;
 
@@ -224,6 +242,9 @@ export class Avatar {
     this.weights = { stand: 1, crouch: 0, sit: 0, climb: 0, air: 0 };
     this.j = { hip: [0, 0], knee: [0, 0], sx: [0, 0], sz: [0, 0], el: [0, 0], y: 0, lean: 0, tilt: 0, neck: 0 };
     this.scale = 1;
+    this.gest = null;   // gesto en curso: { name, t }
+    this.gestW = 0;     // cuánto pesa el gesto (para entrar y salir suave)
+    this.gestPose = null;
     this.model = null;  // { scene, rig, gltf, meshes, body }
     this.hairMeshes = [];
     this.accessories = [];
@@ -377,6 +398,11 @@ export class Avatar {
     this.model = null;
   }
 
+  // Gestos (/saludar, /bailar…): se cortan al moverse; los que no son "loop" duran un rato
+  gesture(name) {
+    if (EMOTES[name]) this.gest = { name, t: 0 };
+  }
+
   // motion: { speed (m/s), pose (POSE.*), turn (rad/s, para inclinarse en curvas), landing (0..1) }
   update(dt, { speed = 0, pose = POSE.stand, turn = 0, landing = 0 } = {}) {
     this.time += dt;
@@ -391,6 +417,17 @@ export class Avatar {
     const k = 18; // qué tan rápido siguen las articulaciones a su pose
     const J = this.j;
 
+    const G = this.gest;
+    if (G) {
+      G.t += dt;
+      const def = EMOTES[G.name];
+      if (speed > 0.5 || pose !== POSE.stand || (!def.loop && G.t > def.dur)) this.gest = null;
+      else this.gestPose = GESTURES[G.name](G.t);
+    }
+    this.gestW = damp(this.gestW, this.gest ? 1 : 0, 8, dt);
+    const gw = this.gestPose ? this.gestW : 0;
+    const gp = this.gestPose ?? {};
+
     [-1, 1].forEach((side, i) => {
       const ph = this.phase + (side > 0 ? 0 : Math.PI);
       const amp = (0.5 + 0.35 * sprint) * am * (1 - crouch * 0.45);
@@ -402,6 +439,7 @@ export class Avatar {
       knee = mix(knee, 1.7, climb);
       hip = mix(hip, -1.55, sit);
       knee = mix(knee, 1.55, sit);
+      knee = mix(knee, gp.knee ?? knee, gw);
       J.hip[i] = damp(J.hip[i], hip, k, dt);
       J.knee[i] = damp(J.knee[i], knee, k, dt);
     });
@@ -415,6 +453,7 @@ export class Avatar {
       sx = mix(sx, -0.5, air); sz = mix(sz, side * 0.85, air); el = mix(el, -0.6, air);
       sx = mix(sx, -2.75, climb); sz = mix(sz, side * 0.2, climb); el = mix(el, -0.35, climb);
       sx = mix(sx, -0.45, sit); sz = mix(sz, side * 0.12, sit); el = mix(el, -0.95, sit);
+      if (gw > 0.001) { sx = mix(sx, gp.sx[i], gw); sz = mix(sz, gp.sz[i], gw); el = mix(el, gp.el[i], gw); }
       J.sx[i] = damp(J.sx[i], sx, k, dt);
       J.sz[i] = damp(J.sz[i], sz, k, dt);
       J.el[i] = damp(J.el[i], el, k, dt);
@@ -423,9 +462,9 @@ export class Avatar {
     // Cuerpo: rebote, inclinación al correr, curvas y aterrizajes
     const lean = 0.05 * am + 0.2 * sprint + crouch * 0.35 + climb * 0.35;
     const bob = Math.abs(Math.sin(this.phase)) * (0.035 + 0.03 * sprint) * am;
-    J.y = damp(J.y, bob - crouch * 0.36 - sit * 0.42 - landing * 0.12, 20, dt);
+    J.y = damp(J.y, bob - crouch * 0.36 - sit * 0.42 - landing * 0.12 + (gp.y ?? 0) * gw, 20, dt);
     J.lean = damp(J.lean, lean, 10, dt);
-    J.tilt = damp(J.tilt, THREE.MathUtils.clamp(-turn * 0.07, -0.22, 0.22) * am, 8, dt);
+    J.tilt = damp(J.tilt, THREE.MathUtils.clamp(-turn * 0.07, -0.22, 0.22) * am + (gp.tilt ?? 0) * gw, 8, dt);
     J.neck = damp(J.neck, -lean * 0.7, 10, dt);
     this.applyPose(J, am);
   }

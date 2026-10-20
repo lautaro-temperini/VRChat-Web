@@ -52,11 +52,13 @@
 | AFK | No se expulsa por AFK; solo una etiqueta "AFK" debajo del nombre. Se sale al cerrar la pestaña |
 | Cuentas | Invitado persistente o usuario + contraseña; no pedir datos al recargar |
 | Cámara | Cambio 1ª/3ª persona con la rueda (sin botón en PC; en celular sí) |
-| Teclas | E usar · P personaje · V (mantener) hablar · M silenciar música de la sala · Tab jugadores/info · Esc menú con pestañas · I inventario · F amigos |
+| Teclas | E usar · P personaje · V (mantener) hablar · M silenciar música de la sala · Tab (mantener) jugadores/info · Esc menú con pestañas · I inventario · F amigos · Y Mundi · R gestos |
 | Stamina | Correr gasta stamina (barra visible) |
 | Interactuar | E en cuadros: ficha + vista previa del sitio; E en jugadores: perfil con pestaña galería (estilo Second Life) |
 | Objetos en el suelo | Otro jugador puede juntarlo a los 5 s; si nadie lo junta en 60 s, **se pierde para siempre** |
 | Inventario | No frena al personaje; se puede arrastrar un objeto a la escena para soltarlo |
+| Paneles que no frenan | Inventario, amigos (F), jugadores (Tab), gestos (R) y editor (P). En el editor la cámara es de vitrina hasta que te movés; ahí pasa a la normal |
+| Gestos | Con comandos (/saludar, /aplaudir, /señalar, /bailar) y con un menú en la R. El baile sigue hasta que te movés; el resto se hace una vez. Provisorios por código hasta tener Mixamo |
 | Mutear / ignorar | Mutear = silenciar su voz. Ignorar = silenciar voz y texto |
 | Moderación | Dueño de cada sala personal; el usuario "xvvave" es admin del Museo y de todas las salas. Expulsar, banear, silenciar, traer, mandar a la entrada, habilitar/deshabilitar chat/voz/pantalla/objetos |
 | Mapas | Botón Mundi + comandos en el chat (`/ir`, `/salas`) |
