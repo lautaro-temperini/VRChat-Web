@@ -8,8 +8,31 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@400;600;800&display=swap" rel="stylesheet" />
+  <!-- Pantalla de carga: estilos acá mismo para que se vea antes de que cargue el juego -->
+  <style>
+    #loading { position: fixed; inset: 0; z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
+      background: radial-gradient(circle at 50% 40%, #2a1d5c 0%, #120d2b 65%); color: #fff; font-family: Nunito, system-ui, sans-serif; transition: opacity .5s; }
+    #loading.done { opacity: 0; pointer-events: none; }
+    #loading h1 { margin: 0; font: 400 34px 'Lilita One', system-ui, sans-serif; letter-spacing: .6px; text-transform: uppercase; }
+    #loading svg { width: 72px; height: 72px; animation: loading-bob 1.4s ease-in-out infinite; }
+    #loading .bar { width: min(320px, 70vw); height: 10px; border-radius: 6px; background: rgba(255,255,255,.12); overflow: hidden; transform: skewX(-8deg); }
+    #loading .fill { height: 100%; width: 5%; background: #ffd60a; border-radius: 6px; transition: width .4s; }
+    #loading p { margin: 0; font-size: 14px; color: rgba(255,255,255,.7); font-weight: 600; }
+    @keyframes loading-bob { 50% { transform: translateY(-8px); } }
+  </style>
 </head>
 <body>
+  <div id="loading">
+    <svg viewBox="0 0 48 48">
+      <rect x="5" y="7" width="38" height="34" rx="9" transform="skewX(-8)" fill="#ffd60a" />
+      <rect x="12" y="13" width="24" height="22" rx="4" transform="skewX(-8)" fill="#120d2b" />
+      <path d="M17 31l6-8 4 5 3-3 4 6z" fill="#19d3ff" />
+      <circle cx="28.5" cy="18.5" r="2.6" fill="#ff4fd8" />
+    </svg>
+    <h1>Galería Online</h1>
+    <div class="bar"><div class="fill" id="loading-fill"></div></div>
+    <p id="loading-text">Cargando…</p>
+  </div>
   <div id="app"></div>
 
   <!-- Logo reutilizable -->

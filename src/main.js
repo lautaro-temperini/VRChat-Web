@@ -23,6 +23,12 @@ import { Ground } from './world/ground.js';
 import { detectQuality, FpsWatch } from './quality.js';
 
 const $ = (id) => document.getElementById(id);
+// Pantalla de carga (está en index.html): avanza por etapas y se va cuando está todo listo
+function loading(pct, text) {
+  $('loading-fill').style.width = `${pct}%`;
+  if (text) $('loading-text').textContent = text;
+}
+loading(30, 'Armando el museo…');
 const body = document.body;
 const pref = {
   get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } },
@@ -1092,6 +1098,17 @@ setInterval(() => world.setTime(fixedHour ?? hoursGMT3()), 30_000);
 if (import.meta.env.DEV) window.__game = { ctrl, me, gesture, openDJPanel, world, remotes, interact, camera, fpArms, renderer, rtc, social, net, ground, roomPanel, setHour: (h) => { fixedHour = h; world.setTime(h); }, get target() { return target; } };
 
 // ---------- Inicio: si ya hay sesión guardada, entra directo ----------
+// La pantalla de carga se va cuando el personaje y sus animaciones están listos (o a los 20 s, por las dudas)
+(async () => {
+  loading(60, 'Cargando tu personaje…');
+  const t0 = performance.now();
+  while (!me.model?.anim && performance.now() - t0 < 20_000) {
+    if (me.model) loading(85, 'Cargando animaciones…');
+    await new Promise((r) => setTimeout(r, 150));
+  }
+  loading(100, '¡Listo!');
+  setTimeout(() => { $('loading').classList.add('done'); setTimeout(() => $('loading').remove(), 600); }, 250);
+})();
 (async () => {
   setStatus();
   if (session.token) {
