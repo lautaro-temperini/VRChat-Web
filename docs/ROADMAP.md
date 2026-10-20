@@ -1,5 +1,8 @@
 # Roadmap y decisiones
 
+> **Pedidos nuevos del usuario (20/10): ver [PEDIDOS.md](PEDIDOS.md)** — música del DJ, OSC, editor de sala
+> y modelos subidos por usuarios, tipos de cuerpo, más peinados/cejas/ropa, selector RGB, estilo tipo MetaPerson.
+
 ## Próximos pasos
 
 ### En curso
@@ -49,7 +52,7 @@
 
 | Tema | Decisión |
 |---|---|
-| Estilo visual | Estilizado tipo Fortnite |
+| Estilo visual | ~~Estilizado tipo Fortnite~~ → **semi-realista tipo MetaPerson, no anime** (20/10). Posibles herramientas: Tripo o MCP de Blender |
 | Plataformas | PC y celular |
 | Público | Comunidad / amigos |
 | Personalización | Dos capas: básica (ropa + rasgos) y avanzada (completa) |
@@ -72,6 +75,11 @@
 | Mapas | Botón Mundi + comandos en el chat (`/ir`, `/salas`) |
 | Día y noche | Según la hora GMT-3 |
 | Web3 | No por ahora |
+| Próximo | Música del DJ, después puente OSC |
+| Editor de sala | Editor básico dentro del juego; cualquiera puede subir modelos si cumplen requisitos (requisitos a definir con el usuario) |
+| Cuerpos | Tipos de cuerpo distintos (flaco, gordo, musculoso, atlético…), no solo ancho |
+| Colores | Selector RGB completo (cuadradito "RGB +") en vez de filas de muestras |
+| Contenido de usuarios | Primero modelos; gestos/scripts propios más adelante |
 | Personaje | Modelo Quaternius para todos (se reemplaza el hecho por código, sin respaldo) |
 | Tipo de cuerpo | Masculino / femenino; todo libre (cualquier cuerpo puede usar cualquier peinado y barba) |
 | Peinados | corto, largo, rapado, rodete. Rulos → corto y coleta → rodete hasta que existan (sin preferencia del usuario; opción reversible) |
