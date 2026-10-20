@@ -53,4 +53,5 @@ npm run deploy   # build + wrangler deploy
 - La interfaz de avatar (`setLook`, `setEquip`, `gesture(nombre)`, `update(dt, {speed, pose, turn, landing})`,
   `root`, `scale`, `phase`, `mats.skin/shirt`) la usan el controlador, los jugadores remotos y los brazos
   de 1ª persona. El modelo (Quaternius) se carga en segundo plano: `avatar.model` es `null` hasta entonces.
+- **Calidad gráfica** automática en `src/quality.js` (`?calidad=low|medium|high` la fuerza en desarrollo).
 - Para probar el personaje sin entrar al juego: `devtest/` (no se sube) con páginas sueltas de Vite.

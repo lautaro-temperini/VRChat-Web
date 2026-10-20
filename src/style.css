@@ -21,7 +21,7 @@
 html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); touch-action: none; user-select: none; -webkit-user-select: none; }
 #app canvas { display: block; }
 .labels { position: fixed; inset: 0; pointer-events: none; z-index: 0; }
-#hud, #topbar, #chat, #touch, #hint, #prompt, #crosshair { z-index: 5; }
+#hud, #topbar, #dock, #voicebar, #chat, #touch, #hint, #prompt, #crosshair { z-index: 5; }
 .panel { z-index: 10; }
 .overlay { z-index: 20; }
 button { font: inherit; color: inherit; cursor: pointer; }
@@ -64,6 +64,8 @@ button.pill.icon { padding: 7px 10px; display: grid; place-items: center; }
 .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--danger); }
 .dot.on { background: #3dff9a; box-shadow: 0 0 8px #3dff9a; }
 #topbar { position: fixed; top: 12px; right: 12px; display: flex; gap: 8px; }
+#dock { position: fixed; bottom: 12px; right: 12px; display: flex; gap: 8px; }
+#voicebar { position: fixed; left: 12px; bottom: 12px; display: flex; gap: 8px; }
 
 #crosshair {
   position: fixed; left: 50%; top: 50%; width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50%;
@@ -87,10 +89,10 @@ body.touch #prompt kbd { display: none; }
   padding: 7px 14px; font-size: 12.5px; color: var(--muted); text-align: center; pointer-events: none; transition: opacity .3s;
 }
 body.locked #hint, body.editing #hint, body.touch #hint, body.auth #hint, body.settings #hint { opacity: 0; }
-body.auth #chat, body.auth #topbar, body.auth #touch, body.auth #hud { display: none; }
+body.auth #chat, body.auth #topbar, body.auth #dock, body.auth #voicebar, body.auth #touch, body.auth #hud { display: none; }
 
 /* ---------- Chat ---------- */
-#chat { position: fixed; left: 12px; bottom: 12px; width: min(380px, calc(100vw - 24px)); border-radius: 14px; padding: 8px; font-size: 14px; }
+#chat { position: fixed; left: 12px; bottom: 56px; width: min(380px, calc(100vw - 24px)); border-radius: 14px; padding: 8px; font-size: 14px; }
 #messages { max-height: 30vh; overflow-y: auto; display: flex; flex-direction: column; gap: 3px; scrollbar-width: none; }
 #messages .msg { padding: 3px 9px; border-radius: 9px; background: rgba(18, 13, 43, 0.62); width: fit-content; max-width: 100%; overflow-wrap: anywhere; user-select: text; }
 #messages .msg b { color: var(--primary); margin-right: 6px; font-weight: 800; }
@@ -230,7 +232,8 @@ body.touch.playing #touch { display: block; }
 #btn-use { right: 30px; bottom: 120px; }
 #btn-chat { right: 110px; bottom: 100px; }
 #btn-crouch.on { background: var(--accent); color: #04212b; }
-body.touch #chat { bottom: 170px; width: min(300px, calc(100vw - 24px)); }
+body.touch #chat { bottom: 214px; width: min(300px, calc(100vw - 24px)); }
+body.touch #voicebar { bottom: 170px; }
 body.touch.targeting #btn-use { background: var(--primary); color: var(--primary-ink); }
 
 @media (max-width: 700px) {
@@ -345,9 +348,13 @@ body.trading #trade, body.viewing #screenview { display: flex; }
 #screen-slot video { width: 100%; max-height: calc(100vh - 110px); border-radius: 12px; background: #000; display: block; }
 
 @media (max-width: 860px) {
-  #topbar .lbl { display: none; }
-  #topbar button.pill { padding: 7px 10px; }
+  #topbar .lbl, #dock .lbl, #voicebar .lbl { display: none; }
+  #topbar button.pill, #dock button.pill, #voicebar button.pill { padding: 7px 10px; }
 }
+/* En celular todo va arriba con íconos (abajo están el joystick y los botones de acción) */
+body.touch #topbar .lbl { display: none; }
+body.touch #topbar button.pill { padding: 7px 10px; }
+body.touch #dock { display: none; }
 @media (max-width: 700px) {
   .trade-cols { grid-template-columns: 1fr; }
 }

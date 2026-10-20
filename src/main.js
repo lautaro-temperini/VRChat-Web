@@ -20,6 +20,7 @@ import { EMOTES } from '../server/shared.js';
 import { UI_ICONS } from './ui/icons.js';
 import { createRoomPanel } from './ui/roompanel.js';
 import { Ground } from './world/ground.js';
+import { detectQuality, FpsWatch } from './quality.js';
 
 const $ = (id) => document.getElementById(id);
 const body = document.body;
@@ -30,13 +31,13 @@ const pref = {
 
 const isTouch = matchMedia('(pointer: coarse)').matches;
 body.classList.toggle('touch', isTouch);
-const quality = pref.get('quality', isTouch ? 'low' : 'high');
+const quality = detectQuality({ isTouch }); // 'low' | 'medium' | 'high' (automática, ver quality.js)
 const high = quality === 'high';
-setTextureQuality(quality);
+setTextureQuality(quality === 'low' ? 'low' : 'high');
 
 // ---------- Render ----------
-const renderer = new THREE.WebGLRenderer({ antialias: high, powerPreference: 'high-performance' });
-renderer.setPixelRatio(Math.min(devicePixelRatio, high ? 2 : 1));
+const renderer = new THREE.WebGLRenderer({ antialias: quality !== 'low', powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(devicePixelRatio, { low: 1, medium: 1.5, high: 2 }[quality]));
 renderer.setSize(innerWidth, innerHeight);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.1;
@@ -51,7 +52,7 @@ body.append(labels.domElement);
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.05, 120);
-const world = buildMuseum(scene, renderer, quality);
+const world = buildMuseum(scene, renderer, high ? 'high' : 'low');
 
 // Post-procesado (solo calidad alta): sombras de contacto (GTAO) + brillo solo en neones (bloom con umbral alto)
 let composer = null;
@@ -109,10 +110,12 @@ ctrl.onModeChange = (mode) => {
   body.classList.toggle('first', mode === 'first');
 };
 // Íconos en la barra superior (en pantallas chicas se ven solo los íconos)
-$('btn-cam').innerHTML = `<span class="lbl">3ª persona</span>`;
-for (const [id, icon] of [['btn-mic', 'mic'], ['btn-media', 'music'], ['btn-mundi', 'globe'], ['btn-gestures', 'hand'], ['btn-look', 'user'], ['btn-inv', 'bag'], ['btn-friends', 'friends']]) {
+$('btn-cam').innerHTML = `${UI_ICONS.camera}<span class="lbl">3ª persona</span>`;
+for (const [id, icon] of [['btn-mic', 'mic'], ['btn-media', 'music'], ['btn-mundi', 'globe'], ['btn-gestures', 'hand'], ['btn-room', 'friends'], ['btn-look', 'user'], ['btn-inv', 'bag'], ['btn-friends', 'phone']]) {
   $(id).insertAdjacentHTML('afterbegin', UI_ICONS[icon]);
 }
+// En celular, inventario, amigos y Mundi van arriba con el resto (abajo están los controles táctiles)
+if (isTouch) for (const b of [...$('dock').children]) $('topbar').insertBefore(b, $('btn-settings'));
 $('btn-cam').onclick = () => ctrl.setMode(ctrl.mode === 'first' ? 'third' : 'first');
 document.addEventListener('pointerlockchange', () => {
   body.classList.toggle('locked', document.pointerLockElement === renderer.domElement);
@@ -287,7 +290,6 @@ const audioPrefs = { voiceEnabled: true, master: 1, voices: 1, media: 1, ...pref
 function syncSettings() {
   $('sens').value = ctrl.sens;
   $('sens-val').textContent = `${ctrl.sens.toFixed(2)}×`;
-  for (const b of document.querySelectorAll('#quality-seg button')) b.classList.toggle('sel', b.dataset.q === quality);
   $('voice-enabled').checked = audioPrefs.voiceEnabled;
   for (const k of ['master', 'voices', 'media']) {
     $(`vol-${k}`).value = audioPrefs[k];
@@ -300,9 +302,6 @@ function applyAudioPrefs() {
   pref.set('audio', audioPrefs);
 }
 $('sens').oninput = (e) => { ctrl.sens = Number(e.target.value); pref.set('sens', ctrl.sens); syncSettings(); };
-for (const b of document.querySelectorAll('#quality-seg button')) {
-  b.onclick = () => { if (b.dataset.q !== quality) { pref.set('quality', b.dataset.q); location.reload(); } };
-}
 $('voice-enabled').onchange = (e) => { audioPrefs.voiceEnabled = e.target.checked; applyAudioPrefs(); syncSettings(); };
 for (const k of ['master', 'voices', 'media']) {
   $(`vol-${k}`).oninput = (e) => { audioPrefs[k] = Number(e.target.value); applyAudioPrefs(); syncSettings(); };
@@ -366,6 +365,7 @@ const roomPanel = createRoomPanel({
   ui: { openOverlay, closeOverlays, isOpen: (cls) => body.classList.contains(cls) },
   openProfile: (r) => openProfile(r),
 });
+$('btn-room').onclick = () => (body.classList.contains('roompanel') ? closeOverlays() : roomPanel.open());
 
 // Objetos en el suelo
 const ground = new Ground(scene);
@@ -915,8 +915,15 @@ const clock = new THREE.Clock();
 const staminaEl = $('stamina');
 const staminaFill = staminaEl.querySelector('.fill');
 let sendTimer = 0, lastSent = '', lastSentAt = 0, frame = 0;
+// Si anda lento: se apaga el post-procesado y se baja la resolución ya mismo (y la próxima vez arranca más abajo)
+const fpsWatch = new FpsWatch(quality, () => {
+  composer = null;
+  renderer.setPixelRatio(1);
+  toast('Bajamos la calidad gráfica para que el juego ande más fluido.');
+});
 renderer.setAnimationLoop(() => {
   const dt = Math.min(clock.getDelta(), 0.05);
+  fpsWatch.tick(dt, ctrl.enabled && !document.hidden);
   const t = clock.elapsedTime;
   ctrl.update(dt);
   for (const r of remotes.values()) r.update(dt);

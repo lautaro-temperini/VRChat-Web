@@ -17,6 +17,8 @@
    In Place en las de desplazamiento.
 
 ### Pendientes (a consultar antes de implementar)
+- **Modelos de personaje:** el usuario baja el pack completo gratis de Universal Base Characters
+  (cuerpos Regular y Teen, más peinados) y quizás la Universal Animation Library. Después se decide.
 - **Ropa del personaje nuevo:** hoy remera y buzo solo cambian el largo de la manga (el buzo no
   tiene capucha ni bolsillo) y la ropa se ve pegada al cuerpo. "Luego lo vemos".
 - **Peinados rulos y coleta** con el estilo del pack (hacerlos en Blender). Hoy se muestran como
@@ -67,4 +69,5 @@
 | Personaje | Modelo Quaternius para todos (se reemplaza el hecho por código, sin respaldo) |
 | Tipo de cuerpo | Masculino / femenino; todo libre (cualquier cuerpo puede usar cualquier peinado y barba) |
 | Peinados | corto, largo, rapado, rodete. Rulos → corto y coleta → rodete hasta que existan (sin preferencia del usuario; opción reversible) |
-| Texturas | 2K en PC; 1K solo en calidad baja (celular) |
+| Calidad gráfica | Siempre automática (sin selector): baja/media/alta según GPU, memoria y celular; si anda lento baja sola. KTX2 para celular más adelante (todavía no se instalan las herramientas) |
+| Botones | PC: Gestos, Sala, Personaje y Ajustes arriba a la derecha; Inventario, Amigos y Mundi abajo a la derecha; Hablar y Audio debajo del chat. Celular: todo arriba con íconos (mochila, celular, mundo); Hablar y Audio arriba del chat |
