@@ -978,7 +978,7 @@ world.setTime(hoursGMT3());
 setInterval(() => world.setTime(fixedHour ?? hoursGMT3()), 30_000);
 
 // Acceso para pruebas, solo en desarrollo (npm run dev)
-if (import.meta.env.DEV) window.__game = { ctrl, world, remotes, interact, camera, fpArms, renderer, rtc, social, net, ground, roomPanel, setHour: (h) => { fixedHour = h; world.setTime(h); }, get target() { return target; } };
+if (import.meta.env.DEV) window.__game = { ctrl, me, gesture, world, remotes, interact, camera, fpArms, renderer, rtc, social, net, ground, roomPanel, setHour: (h) => { fixedHour = h; world.setTime(h); }, get target() { return target; } };
 
 // ---------- Inicio: si ya hay sesión guardada, entra directo ----------
 (async () => {
