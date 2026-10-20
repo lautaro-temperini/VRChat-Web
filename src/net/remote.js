@@ -56,7 +56,12 @@ export class RemotePlayer {
   setName(name) { this.name = name; this.nameEl.textContent = name; }
   setLook(look, equip) { this.avatar.setLook(look); if (equip) this.avatar.setEquip(equip); }
   setMic(v = 'off') { this.mic = v; this.tag.dataset.mic = v; }
-  setSpeaking(on) { if (on !== this.speaking) { this.speaking = on; this.tag.classList.toggle('speaking', on); } }
+  setSpeaking(on) {
+    if (on === this.speaking) return;
+    this.speaking = on;
+    this.avatar.talking = on;
+    this.tag.classList.toggle('speaking', on);
+  }
   // Desde dónde suena su voz (la boca, más o menos)
   mouth() { return this.avatar.root.position.clone().setY(this.avatar.root.position.y + 1.55 * this.avatar.scale); }
   setAfk(v) { this.afk = !!v; this.tag.classList.toggle('is-afk', this.afk); }

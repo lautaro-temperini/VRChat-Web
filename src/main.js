@@ -16,7 +16,7 @@ import { api, session } from './net/api.js';
 import { RTC } from './net/rtc.js';
 import { createSocial } from './ui/social.js';
 import { toast } from './ui/toast.js';
-import { EMOTES } from '../server/shared.js';
+import { EMOTES, DANCES } from '../server/shared.js';
 import { UI_ICONS } from './ui/icons.js';
 import { createRoomPanel } from './ui/roompanel.js';
 import { Ground } from './world/ground.js';
@@ -346,6 +346,7 @@ async function talk(on) {
   if (on && roomPanel.info.silenced) return toast('Estás silenciado en esta sala.');
   const r = await rtc.talk(on);
   if (!r.ok) toast(r.error);
+  me.talking = on && r.ok; // animación de hablar mientras está quieto
 }
 const micBtn = $('btn-mic');
 micBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); talk(true); });
@@ -436,12 +437,18 @@ function gesture(name) {
   me.gesture(name);
   net.send({ t: 'emote', e: name });
 }
-for (const [id, g] of Object.entries(EMOTES)) {
-  const b = document.createElement('button');
-  b.className = 'act';
-  b.textContent = g.name;
-  b.onclick = () => { closeOverlays(); gesture(id); };
-  $('gesture-list').append(b);
+for (const [title, dance] of [['Gestos', false], ['Bailes (siguen hasta que te movés)', true]]) {
+  const h = document.createElement('h2');
+  h.className = 'sub-h';
+  h.textContent = title;
+  $('gesture-list').append(h);
+  Object.entries(EMOTES).filter(([, g]) => !!g.dance === dance).forEach(([id, g], i) => {
+    const b = document.createElement('button');
+    b.className = 'act';
+    b.textContent = dance ? `${i + 1}. ${g.name}` : g.name;
+    b.onclick = () => { closeOverlays(); gesture(id); };
+    $('gesture-list').append(b);
+  });
 }
 const toggleGestures = () => (body.classList.contains('gestures') ? closeOverlays() : openOverlay('gestures'));
 $('btn-gestures').onclick = toggleGestures;
@@ -659,15 +666,21 @@ function command(text) {
     case 'ayuda':
     case 'help':
       system('Comandos: /salas (ver salas) · /ir museo · /ir mi sala · /ir <amigo> (va a donde está, o a su sala)');
-      system('Gestos: /saludar · /aplaudir · /señalar · /bailar (hasta que te movés) · también con la R');
+      system('Gestos: /saludar · /aplaudir · /festejar · /señalar · también con la R');
+      system(`Bailes (siguen hasta que te movés): /bailar (uno al azar) o /bailar 1 a ${DANCES.length}: ${DANCES.map((d, i) => `${i + 1} ${d}`).join(' · ')}`);
       break;
     case 'saludar':
     case 'aplaudir':
+    case 'festejar':
     case 'señalar':
     case 'senalar':
-    case 'bailar':
       gesture(cmd.toLowerCase().replace('ñ', 'n'));
       break;
+    case 'bailar': {
+      const n = parseInt(arg, 10);
+      gesture(`baile${n >= 1 && n <= DANCES.length ? n : 1 + Math.floor(Math.random() * DANCES.length)}`);
+      break;
+    }
     case 'salas':
       system(`Salas: Museo · Tu sala${friends.length ? ' · ' + friends.map((f) => `Sala de ${f.name}${f.room ? `  (${social.roomLabel(f.room).toLowerCase()})` : ''}`).join(' · ') : ''}`);
       break;

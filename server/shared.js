@@ -29,13 +29,16 @@ export function cleanEquip(list) {
 }
 
 // rulos y coleta son del personaje anterior: se siguen aceptando para no perder lo guardado
-// Gestos: comandos del chat (/saludar…) y menú de la R. loop = se repite hasta que te movés
+// Gestos: comandos del chat (/saludar, /bailar 3…) y menú de la R.
+// loop = se repite hasta que te movés; dur = duración si no hay animación (hecho por código)
 export const EMOTES = {
   saludar: { name: 'Saludar', dur: 2.4 },
   aplaudir: { name: 'Aplaudir', dur: 3 },
+  festejar: { name: 'Festejar', dur: 2.9 },
   senalar: { name: 'Señalar', dur: 2.2 },
-  bailar: { name: 'Bailar', loop: true },
 };
+export const DANCES = ['Hip hop de brazos', 'Hip hop', 'Breakdance', 'Baile libre', 'House', 'House 2', 'Shuffle', 'Swing', 'Onda', 'Clásico'];
+DANCES.forEach((name, i) => { EMOTES[`baile${i + 1}`] = { name, loop: true, dance: true }; });
 
 export const HAIR_STYLES = ['corto', 'largo', 'rapado', 'rodete', 'rulos', 'coleta'];
 export const TOPS = ['remera', 'buzo'];

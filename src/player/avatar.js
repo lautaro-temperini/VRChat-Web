@@ -3,6 +3,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 import { buildAccessory } from './accessories.js';
 import { ITEMS, EMOTES } from '../../server/shared.js';
+import { LOCO, locomotionClips, gestureClip } from './anims.js';
 
 // Personaje realista estilizado (modelos de Quaternius, CC0), mira hacia +Z.
 // El cuerpo y el pelo se cargan en segundo plano; mientras tanto el personaje
@@ -173,7 +174,8 @@ class Rig {
       if (!o.isBone) return;
       const world = o.getWorldQuaternion(new THREE.Quaternion());
       const parentInv = o.parent.getWorldQuaternion(new THREE.Quaternion()).invert();
-      this.bones[o.name] = { bone: o, rest: o.quaternion.clone(), restPos: o.position.clone(), world, inv: world.clone().invert(), parentInv };
+      const worldPos = o.getWorldPosition(new THREE.Vector3());
+      this.bones[o.name] = { bone: o, rest: o.quaternion.clone(), restPos: o.position.clone(), world, inv: world.clone().invert(), parentInv, worldPos };
     });
   }
   // local = reposo · W⁻¹ · D · W  (D en el espacio del modelo)
@@ -210,7 +212,7 @@ class Rig {
 
 export const POSE = { stand: 0, crouch: 1, sit: 2, climb: 3, air: 4 };
 
-// Gestos provisorios hechos por código (se reemplazan por las animaciones de Mixamo).
+// Gestos hechos por código: aplaudir (no hay animación) y los demás mientras cargan las animaciones.
 // Devuelven ángulos de los brazos [derecho, izquierdo] y del cuerpo, con la misma convención de update().
 const GESTURES = {
   saludar: (t) => ({ sx: [-0.3, 0], sz: [-(2.55 + 0.28 * Math.sin(t * 11)), 0.1], el: [-0.25, -0.2] }),
@@ -242,7 +244,8 @@ export class Avatar {
     this.weights = { stand: 1, crouch: 0, sit: 0, climb: 0, air: 0 };
     this.j = { hip: [0, 0], knee: [0, 0], sx: [0, 0], sz: [0, 0], el: [0, 0], y: 0, lean: 0, tilt: 0, neck: 0 };
     this.scale = 1;
-    this.gest = null;   // gesto en curso: { name, t }
+    this.gest = null;   // gesto en curso: { name, t, action? }
+    this.talking = false; // hablando por voz: usa la animación de hablar cuando está quieto
     this.gestW = 0;     // cuánto pesa el gesto (para entrar y salir suave)
     this.gestPose = null;
     this.model = null;  // { scene, rig, gltf, meshes, body }
@@ -331,7 +334,17 @@ export class Avatar {
     const rig = new Rig(scene);
     const anchor = (bone, [x, y, z, s]) => { const g = rig.holder(bone, [x, y, z]); g.scale.setScalar(s); return g; };
     const anchors = { head: anchor('Head', def.head), face: anchor('Head', def.face), chest: anchor('spine_03', def.chest) };
-    this.model = { type, scene, rig, gltf, meshes, body, anchors, legY: rig.bones.thigh_l.bone.getWorldPosition(new THREE.Vector3()).y };
+    const model = { type, scene, rig, gltf, meshes, body, anchors, anim: null, legY: rig.bones.thigh_l.bone.getWorldPosition(new THREE.Vector3()).y };
+    this.model = model;
+    // Animaciones: hasta que cargan, el personaje se mueve con la animación hecha por código
+    locomotionClips(type, rig).then((clips) => {
+      if (this.model !== model) return;
+      const mixer = new THREE.AnimationMixer(scene);
+      const actions = {};
+      for (const [k, clip] of Object.entries(clips)) if (clip) actions[k] = mixer.clipAction(clip).setEffectiveWeight(0).play();
+      model.anim = { mixer, actions, gesture: null };
+      if (this.gest) this.gesture(this.gest.name); // un gesto que llegó antes de cargar
+    }).catch((e) => console.warn('No se pudieron cargar las animaciones', e));
     this.root.add(scene);
     this.attachAccessories();
     this.applyBuild();
@@ -393,6 +406,7 @@ export class Avatar {
     for (const a of this.accessories) a.group.removeFromParent();
     for (const h of this.hairMeshes) h.material.dispose();
     for (const o of m.meshes) o.material.dispose();
+    if (m.anim) { m.anim.mixer.stopAllAction(); m.anim.mixer.uncacheRoot(m.scene); }
     m.scene.removeFromParent();
     this.hairMeshes = [];
     this.model = null;
@@ -400,7 +414,23 @@ export class Avatar {
 
   // Gestos (/saludar, /bailar…): se cortan al moverse; los que no son "loop" duran un rato
   gesture(name) {
-    if (EMOTES[name]) this.gest = { name, t: 0 };
+    if (!EMOTES[name]) return;
+    const g = { name, t: 0 };
+    this.gest = g;
+    const m = this.model;
+    if (m?.anim?.gesture) { m.anim.gesture.stop(); m.anim.gesture = null; }
+    if (!m) return;
+    gestureClip(m.type, m.rig, name).then((clip) => {
+      const A = m.anim;
+      if (!clip || !A || this.gest !== g || this.model !== m) return;
+      const action = A.mixer.clipAction(clip);
+      action.setLoop(EMOTES[name].loop ? THREE.LoopRepeat : THREE.LoopOnce, Infinity);
+      action.clampWhenFinished = true;
+      action.reset().setEffectiveWeight(0).play();
+      g.action = action;
+      g.dur = clip.duration;
+      A.gesture = action;
+    });
   }
 
   // motion: { speed (m/s), pose (POSE.*), turn (rad/s, para inclinarse en curvas), landing (0..1) }
@@ -421,8 +451,9 @@ export class Avatar {
     if (G) {
       G.t += dt;
       const def = EMOTES[G.name];
-      if (speed > 0.5 || pose !== POSE.stand || (!def.loop && G.t > def.dur)) this.gest = null;
-      else this.gestPose = GESTURES[G.name](G.t);
+      const dur = G.dur ?? def.dur ?? 2;
+      if (speed > 0.5 || pose !== POSE.stand || (!def.loop && G.t > dur - 0.25)) this.gest = null;
+      else this.gestPose = (GESTURES[G.name] ?? (def.dance ? GESTURES.bailar : GESTURES.saludar))(G.t);
     }
     this.gestW = damp(this.gestW, this.gest ? 1 : 0, 8, dt);
     const gw = this.gestPose ? this.gestW : 0;
@@ -466,7 +497,51 @@ export class Avatar {
     J.lean = damp(J.lean, lean, 10, dt);
     J.tilt = damp(J.tilt, THREE.MathUtils.clamp(-turn * 0.07, -0.22, 0.22) * am + (gp.tilt ?? 0) * gw, 8, dt);
     J.neck = damp(J.neck, -lean * 0.7, 10, dt);
-    this.applyPose(J, am);
+    if (this.model?.anim) this.animate(dt, speed, gw);
+    else this.applyPose(J, am);
+  }
+
+  // Con las animaciones cargadas: mezcla según velocidad y pose, más el gesto encima
+  animate(dt, speed, gw) {
+    const m = this.model, A = m.anim, w = this.weights, R = m.rig, J = this.j;
+    // Gesto con animación: entra y sale suave con gestW (el de código, aplaudir, se aplica después)
+    if (!this.gest && A.gesture && this.gestW < 0.01) { A.gesture.stop(); A.gesture = null; }
+    const ga = A.gesture ? this.gestW : 0;
+
+    const base = 1 - ga;
+    const target = {};
+    for (const k of Object.keys(LOCO)) target[k] = 0;
+    const stand = blend(speed, [[0, 'idle'], [1.2, 'walk'], [4.6, 'jog'], [6.8, 'sprint']]);
+    if (this.talking) { stand.talk = stand.idle; stand.idle = 0; }
+    for (const [k, v] of Object.entries(stand)) target[k] += v * w.stand;
+    const crouch = blend(speed, [[0, 'crouch'], [1, 'crouchWalk']]);
+    for (const [k, v] of Object.entries(crouch)) target[k] += v * w.crouch;
+    target.air += w.air + w.climb;
+    target.sit += w.sit;
+    A.w ??= {};
+    for (const [k, action] of Object.entries(A.actions)) {
+      A.w[k] = damp(A.w[k] ?? 0, target[k], k === 'talk' || k === 'idle' ? 4 : 14, dt); // hablar entra y sale despacio
+      action.setEffectiveWeight(A.w[k] * base);
+      const s = LOCO[k].speed;
+      if (s) action.timeScale = THREE.MathUtils.clamp(speed / s / this.scale, 0.6, 2.5);
+    }
+    if (A.gesture) A.gesture.setEffectiveWeight(ga);
+    A.mixer.update(dt);
+
+    // Gesto hecho por código (aplaudir, o mientras carga la animación): pisa los brazos
+    if (gw > 0.001 && !A.gesture) {
+      const saved = ARM_BONES.map((n) => R.bones[n].bone.quaternion.clone());
+      [['l', 1], ['r', -1]].forEach(([s, side]) => {
+        const i = side > 0 ? 1 : 0;
+        R.set(`upperarm_${s}`, _q2.setFromEuler(_e.set(J.sx[i], 0, J.sz[i])).multiply(ARM_DOWN[side]));
+        R.set(`lowerarm_${s}`, _q3.copy(ARM_DOWN_INV[side]).multiply(qx(J.el[i])).multiply(ARM_DOWN[side]));
+      });
+      ARM_BONES.forEach((n, k) => { const b = R.bones[n].bone; b.quaternion.copy(saved[k].slerp(b.quaternion, gw)); });
+    }
+    // Inclinarse en las curvas y el golpe al aterrizar (la raíz no la mueven las animaciones)
+    const root = R.bones.root;
+    root.bone.position.copy(root.restPos).add(_v.set(0, Math.min(J.y, 0) * 0.5, 0).applyQuaternion(root.parentInv));
+    R.euler('root', 0, 0, J.tilt);
   }
 
   // Pasa los ángulos a los huesos del modelo
@@ -500,3 +575,17 @@ export class Avatar {
   }
 }
 const _v = new THREE.Vector3(), _q2 = new THREE.Quaternion(), _q3 = new THREE.Quaternion();
+const ARM_BONES = ['upperarm_l', 'lowerarm_l', 'upperarm_r', 'lowerarm_r'];
+
+// Pesos para mezclar animaciones según un valor (ej. velocidad): [[valor, nombre], …] ordenados
+function blend(x, points) {
+  const out = {};
+  for (const [, n] of points) out[n] = 0;
+  if (x <= points[0][0]) { out[points[0][1]] = 1; return out; }
+  for (let i = 1; i < points.length; i++) {
+    const [x1, n1] = points[i], [x0, n0] = points[i - 1];
+    if (x <= x1) { const t = (x - x0) / (x1 - x0); out[n0] = 1 - t; out[n1] = t; return out; }
+  }
+  out[points[points.length - 1][1]] = 1;
+  return out;
+}

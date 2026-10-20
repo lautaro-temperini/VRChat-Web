@@ -10,15 +10,18 @@
    - Animación procedural sobre los huesos (las mismas poses que el personaje anterior).
    - Texturas de 2K en PC y copias de 1K (`textures/1k/`) en calidad baja (celular).
    - Falta: parpadeo (el modelo no tiene párpados animables), ropa con volumen (ver pendientes).
-2. **Animaciones de Mixamo** (las baja el usuario): reemplazar la animación procedural con
-   retarget de `mixamorig:*` a los huesos de Quaternius. Lista pedida: Idle, Walking, Jogging, Fast Run,
+2. **Animaciones** ✅ (`src/player/anims.js`): movimiento básico de la Universal Animation Library
+   (Quaternius, mismo esqueleto) y gestos/bailes de Mixamo adaptados al esqueleto de Quaternius.
+   Falta: trepar (no hay animación; usa la de salto), Clapping (aplaudir sigue hecho por código).
+   Los packs originales están en `assets-src/` (no se publican); en `public/models/anims/` solo lo que se usa. Lista pedida: Idle, Walking, Jogging, Fast Run,
    Jump, Falling Idle, Crouch Idle, Crouch Walk Forward, Sitting Idle, Climbing / Braced Hang To Crouch,
    Talking, Waving, Clapping, Pointing, y 2-3 bailes. Formato FBX Binary, Without Skin, 30 fps,
    In Place en las de desplazamiento.
 
 ### Pendientes (a consultar antes de implementar)
-- **Modelos de personaje:** el usuario baja el pack completo gratis de Universal Base Characters
-  (cuerpos Regular y Teen, más peinados) y quizás la Universal Animation Library. Después se decide.
+- **Modelos de personaje:** el pack gratis de Universal Base Characters trae solo los 2 cuerpos
+  Superhero (Regular/Teen están en la versión Source, USD 19,99). El usuario no quiere seguir por ahí:
+  investigar alternativas fuera de Quaternius.
 - **Ropa del personaje nuevo:** hoy remera y buzo solo cambian el largo de la manga (el buzo no
   tiene capucha ni bolsillo) y la ropa se ve pegada al cuerpo. "Luego lo vemos".
 - **Peinados rulos y coleta** con el estilo del pack (hacerlos en Blender). Hoy se muestran como
@@ -60,7 +63,10 @@
 | Objetos en el suelo | Otro jugador puede juntarlo a los 5 s; si nadie lo junta en 60 s, **se pierde para siempre** |
 | Inventario | No frena al personaje; se puede arrastrar un objeto a la escena para soltarlo |
 | Paneles que no frenan | Inventario, amigos (F), jugadores (Tab), gestos (R) y editor (P). En el editor la cámara es de vitrina hasta que te movés; ahí pasa a la normal |
-| Gestos | Con comandos (/saludar, /aplaudir, /señalar, /bailar) y con un menú en la R. El baile sigue hasta que te movés; el resto se hace una vez. Provisorios por código hasta tener Mixamo |
+| Gestos | Con comandos (/saludar, /aplaudir, /festejar, /señalar, /bailar) y con un menú en la R. El baile sigue hasta que te movés; el resto se hace una vez |
+| Bailes | 10 bailes: /bailar = uno al azar, /bailar N = ese; en el menú de la R cada uno con su nombre |
+| Aplaudir / festejar | Como no hay Clapping, se agregó /festejar (Cheering); aplaudir sigue hecho por código |
+| Hablar | Con el micrófono abierto y quieto, el personaje usa la animación de hablar |
 | Mutear / ignorar | Mutear = silenciar su voz. Ignorar = silenciar voz y texto |
 | Moderación | Dueño de cada sala personal; el usuario "xvvave" es admin del Museo y de todas las salas. Expulsar, banear, silenciar, traer, mandar a la entrada, habilitar/deshabilitar chat/voz/pantalla/objetos |
 | Mapas | Botón Mundi + comandos en el chat (`/ir`, `/salas`) |
