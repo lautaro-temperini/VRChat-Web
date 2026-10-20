@@ -7,7 +7,7 @@ import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { buildMuseum } from './world/museum.js';
-import { Avatar, DEFAULT_LOOK, LOOK_OPTIONS } from './player/avatar.js';
+import { Avatar, DEFAULT_LOOK, LOOK_OPTIONS, setTextureQuality } from './player/avatar.js';
 import { PlayerController } from './player/controller.js';
 import { FPArms } from './player/fpArms.js';
 import { Net } from './net/net.js';
@@ -31,6 +31,7 @@ const isTouch = matchMedia('(pointer: coarse)').matches;
 body.classList.toggle('touch', isTouch);
 const quality = pref.get('quality', isTouch ? 'low' : 'high');
 const high = quality === 'high';
+setTextureQuality(quality);
 
 // ---------- Render ----------
 const renderer = new THREE.WebGLRenderer({ antialias: high, powerPreference: 'high-performance' });
@@ -211,9 +212,10 @@ function renderAccount() {
 
 // ---------- Editor de personaje (capa 1) ----------
 const GROUPS = [
-  ['skin', 'Piel'], ['eyes', 'Ojos'], ['hairStyle', 'Peinado'], ['hair', 'Color de pelo'],
+  ['body', 'Cuerpo'], ['skin', 'Piel'], ['eyes', 'Ojos'], ['hairStyle', 'Peinado'], ['beard', 'Barba'], ['hair', 'Color de pelo'],
   ['top', 'Arriba'], ['shirt', 'Color de remera / buzo'], ['pants', 'Pantalón'], ['shoes', 'Zapatillas'],
 ];
+const CHIP_LABELS = { masc: 'masculino', fem: 'femenino', false: 'sin barba', true: 'con barba' };
 function renderSwatches() {
   const root = $('swatches');
   root.innerHTML = '';
@@ -225,8 +227,8 @@ function renderSwatches() {
     row.className = 'swatches';
     for (const value of LOOK_OPTIONS[key]) {
       const b = document.createElement('button');
-      if (value.startsWith('#')) { b.className = 'swatch'; b.style.background = value; b.title = value; }
-      else { b.className = 'chip'; b.textContent = value; }
+      if (String(value).startsWith('#')) { b.className = 'swatch'; b.style.background = value; b.title = value; }
+      else { b.className = 'chip'; b.textContent = CHIP_LABELS[value] ?? value; }
       if (look[key] === value) b.classList.add('sel');
       b.onclick = () => { setLook({ ...look, [key]: value }); renderSwatches(); };
       row.append(b);

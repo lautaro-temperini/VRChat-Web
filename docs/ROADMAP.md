@@ -3,23 +3,24 @@
 ## Próximos pasos
 
 ### En curso
-1. **Personaje realista estilizado (Quaternius).** Modelos ya descargados en
-   `public/models/quaternius/` (CC0): 2 cuerpos (masc/fem, proporción "superhéroe") y 8 peinados,
-   esqueleto estilo Unreal de 65 huesos, sin animaciones. Plan:
-   - Clase `HumanAvatar` con la misma interfaz que `Avatar` (ver CLAUDE.md).
-   - Ropa: pintar la textura automáticamente según qué hueso mueve cada triángulo
-     (torso → remera/buzo, piernas → pantalón, pies → zapatillas), así el editor de colores sigue andando.
-   - Accesorios enganchados al hueso `Head` y a `spine_03`.
-   - Animación: primero mover los huesos con la animación procedural actual; después reemplazar
-     por animaciones de Mixamo (retarget de `mixamorig:*` a los huesos de Quaternius).
-   - Editor: tipo de cuerpo (masc/fem), barba; peinados del pack (corto, largo, rapado, rodete…).
-     **Hay que consultar** cómo se mapean los peinados actuales (rulos, coleta no existen en el pack).
-2. **Animaciones de Mixamo** (las baja el usuario). Lista pedida: Idle, Walking, Jogging, Fast Run,
+1. **Personaje realista estilizado (Quaternius).** ✅ Primera versión hecha (`src/player/avatar.js`,
+   reemplaza al personaje hecho por código). Modelos en `public/models/quaternius/` (CC0).
+   - Ropa pintada por el sombreador según el hueso que mueve cada vértice (torso, brazos, piernas, pies).
+   - Accesorios enganchados a `Head` (gorros, auriculares, anteojos) y a `spine_03` (cadena, mochila).
+   - Animación procedural sobre los huesos (las mismas poses que el personaje anterior).
+   - Texturas de 2K en PC y copias de 1K (`textures/1k/`) en calidad baja (celular).
+   - Falta: parpadeo (el modelo no tiene párpados animables), ropa con volumen (ver pendientes).
+2. **Animaciones de Mixamo** (las baja el usuario): reemplazar la animación procedural con
+   retarget de `mixamorig:*` a los huesos de Quaternius. Lista pedida: Idle, Walking, Jogging, Fast Run,
    Jump, Falling Idle, Crouch Idle, Crouch Walk Forward, Sitting Idle, Climbing / Braced Hang To Crouch,
    Talking, Waving, Clapping, Pointing, y 2-3 bailes. Formato FBX Binary, Without Skin, 30 fps,
    In Place en las de desplazamiento.
 
 ### Pendientes (a consultar antes de implementar)
+- **Ropa del personaje nuevo:** hoy remera y buzo solo cambian el largo de la manga (el buzo no
+  tiene capucha ni bolsillo) y la ropa se ve pegada al cuerpo. "Luego lo vemos".
+- **Peinados rulos y coleta** con el estilo del pack (hacerlos en Blender). Hoy se muestran como
+  corto y rodete, pero el dato guardado de cada cuenta no se toca.
 - **Puente OSC para artistas** (TouchDesigner, Ableton/Max for Live, Blender): programa local que
   recibe OSC y lo manda a la sala; luces/visuales reaccionando a lo que hacen en vivo. Showcase con
   varias pantallas compartidas.
@@ -61,3 +62,7 @@
 | Mapas | Botón Mundi + comandos en el chat (`/ir`, `/salas`) |
 | Día y noche | Según la hora GMT-3 |
 | Web3 | No por ahora |
+| Personaje | Modelo Quaternius para todos (se reemplaza el hecho por código, sin respaldo) |
+| Tipo de cuerpo | Masculino / femenino; todo libre (cualquier cuerpo puede usar cualquier peinado y barba) |
+| Peinados | corto, largo, rapado, rodete. Rulos → corto y coleta → rodete hasta que existan (sin preferencia del usuario; opción reversible) |
+| Texturas | 2K en PC; 1K solo en calidad baja (celular) |

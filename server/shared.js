@@ -28,7 +28,8 @@ export function cleanEquip(list) {
   return out;
 }
 
-export const HAIR_STYLES = ['corto', 'largo', 'rapado', 'rulos', 'coleta'];
+// rulos y coleta son del personaje anterior: se siguen aceptando para no perder lo guardado
+export const HAIR_STYLES = ['corto', 'largo', 'rapado', 'rodete', 'rulos', 'coleta'];
 export const TOPS = ['remera', 'buzo'];
 export const BODIES = ['masc', 'fem'];
 const COLOR_KEYS = ['skin', 'hair', 'eyes', 'shirt', 'pants', 'shoes'];
