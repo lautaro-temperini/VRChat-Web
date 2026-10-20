@@ -127,7 +127,7 @@ for (const b of document.querySelectorAll('button.pill:not(.icon)')) {
 
 // ---------- Estado de la interfaz ----------
 // Un solo panel/superposición abierto a la vez. Mientras hay uno, el jugador no se mueve.
-const OVERLAYS = ['editing', 'settings', 'inspecting', 'profiling', 'auth', 'inventory', 'friends', 'trading', 'viewing', 'roompanel', 'mundi', 'gestures', 'kicked'];
+const OVERLAYS = ['editing', 'settings', 'inspecting', 'profiling', 'auth', 'inventory', 'friends', 'trading', 'viewing', 'roompanel', 'mundi', 'gestures', 'djing', 'kicked'];
 // Paneles que no frenan al personaje (se puede seguir caminando con WASD)
 const NON_BLOCKING = ['inventory', 'friends', 'roompanel', 'editing', 'gestures'];
 function openOverlay(cls) {
@@ -519,7 +519,9 @@ function removeRemote(id) {
 net
   .on('welcome', (m) => {
     for (const id of [...remotes.keys()]) removeRemote(id);
+    if (rtc.djStream || ctrl.booth) endMySet(); // cambié de sala o se reconectó: la cabina ya no es mía
     rtc.setScreen(m.screen);
+    setDJ(m.dj);
     m.players.forEach(addRemote);
     for (const p of m.players) rtc.playerJoined(p.id);
     if (rtc.mic) net.send({ t: 'mic', v: rtc.micState });
@@ -534,7 +536,7 @@ net
   })
   .on('settings', ({ settings, by }) => {
     roomPanel.setRoom({ settings });
-    const off = Object.entries(settings).filter(([, v]) => !v).map(([k]) => ({ chat: 'chat', voice: 'voz', screen: 'pantalla', items: 'soltar objetos' }[k]));
+    const off = Object.entries(settings).filter(([, v]) => !v).map(([k]) => ({ chat: 'chat', voice: 'voz', screen: 'pantalla', dj: 'pasar música', items: 'soltar objetos' }[k]));
     system(`${by} cambió la sala.${off.length ? ` Deshabilitado: ${off.join(', ')}.` : ' Todo habilitado.'}`);
     if (!settings.voice && !roomPanel.info.mod) talk(false);
   })
@@ -583,6 +585,28 @@ net
     if (m.id === net.id) return;
     if (m.on) { rtc.setScreen({ id: m.id, streamId: m.streamId }); toast(`${remotes.get(m.id)?.name ?? 'Alguien'} está compartiendo su pantalla`); }
     else rtc.setScreen(null);
+  })
+  .on('dj', (m) => {
+    if (m.busy) { rtc.stopMusic(); return toast(`La cabina está ocupada: está pasando música ${m.name}.`); }
+    if (m.denied) { rtc.stopMusic(); return; }
+    const mine = m.id === net.id;
+    if (m.on) {
+      setDJ(m);
+      system(`🎧 ${mine ? 'Empezaste' : `${m.name} empezó`} a pasar música en la cabina.`);
+      if (mine) {
+        rtc.startMusic();
+        ctrl.enterBooth(world.dj.spot);
+        closeOverlays();
+        toast('Estás pasando música. E para terminar tu set.');
+      }
+    } else if (typeof m.track === 'string') {
+      if (rtc.dj) { rtc.dj.track = m.track; world.dj.setBooth(rtc.dj); }
+      if (m.track) system(`♪ Ahora suena: ${m.track}${mine ? '' : ` (DJ ${m.name})`}`);
+    } else {
+      if (mine) endMySet(false);
+      setDJ(null);
+      system(`🎧 ${mine ? 'Terminaste' : `${m.name} terminó`} su set.`);
+    }
   })
   .on('trade', (m) => social.onTrade(m))
   .on('chat', (m) => {
@@ -721,6 +745,7 @@ function findTarget() {
 }
 
 function interact() {
+  if (ctrl.booth) { openDJPanel(); return; }
   if (ctrl.sitting) { ctrl.stand(); return; }
   if (!target) return;
   fpArms.poke();
@@ -730,9 +755,73 @@ function interact() {
     ctrl.sit(seat);
   } else if (t.kind === 'player') openProfile(t.player);
   else if (t.kind === 'screen') useScreen();
+  else if (t.kind === 'dj') openDJPanel();
   else if (t.kind === 'pickup') net.send({ t: 'pickup', iid: t.ground.iid });
   else openInspect(t);
 }
+
+// ---------- Cabina del DJ ----------
+// Cualquiera puede pasar música si la cabina está libre (sin cola). Queda fijo en la cabina
+// hasta que aprieta E y confirma que termina su set.
+function setDJ(info) {
+  rtc.setDJ(info ? { id: info.id, streamId: info.streamId, name: info.name, track: info.track ?? '' } : null);
+  world.dj.setBooth(rtc.dj);
+}
+async function openDJPanel() {
+  if (rtc.dj && rtc.dj.id !== net.id) return toast(`La cabina está ocupada: está pasando música ${rtc.dj.name}.`);
+  const live = !!rtc.djStream;
+  $('djpanel').dataset.mode = live ? 'live' : 'setup';
+  $('dj-cancel').textContent = live ? 'Seguir pasando música' : 'Cancelar';
+  $('dj-file').hidden = !window.showOpenFilePicker;
+  if (!window.showOpenFilePicker) $('dj-file-name').textContent = 'Leer el track automáticamente funciona en Chrome o Edge.';
+  openOverlay('djing');
+  if (live) return;
+  const sel = $('dj-source');
+  sel.innerHTML = '<option value="">Buscando entradas de audio…</option>';
+  const inputs = await rtc.audioInputs();
+  sel.innerHTML = '';
+  for (const d of inputs) sel.append(new Option(d.name, d.id));
+  if (navigator.mediaDevices.getDisplayMedia) sel.append(new Option('Audio de la PC (compartir pantalla o pestaña con audio)', 'system'));
+  const last = pref.get('djSource', null);
+  if ([...sel.options].some((o) => o.value === last)) sel.value = last;
+}
+$('dj-start').onclick = async () => {
+  const source = $('dj-source').value;
+  pref.set('djSource', source);
+  $('dj-start').disabled = true;
+  const r = await rtc.captureMusic(source);
+  $('dj-start').disabled = false;
+  if (!r.ok) return toast(r.error);
+  net.send({ t: 'dj', on: true, streamId: r.streamId }); // la sala confirma (o dice que está ocupada)
+};
+$('dj-stop').onclick = () => { net.send({ t: 'dj', on: false }); endMySet(); };
+rtc.onMusicEnded = () => { if (rtc.djStream) { net.send({ t: 'dj', on: false }); endMySet(); } };
+function endMySet(close = true) {
+  rtc.stopMusic();
+  ctrl.leaveBooth(world.dj.exit);
+  if (close && body.classList.contains('djing')) closeOverlays();
+}
+
+// Nombre del track: se lee de un archivo de texto que escribe el programa del DJ (última línea)
+let trackFile = null, lastTrack = '';
+$('dj-file').onclick = async () => {
+  try {
+    [trackFile] = await window.showOpenFilePicker({ types: [{ description: 'Texto', accept: { 'text/plain': ['.txt', '.m3u', '.csv', '.log'] } }] });
+    $('dj-file-name').textContent = `Leyendo: ${trackFile.name}`;
+    lastTrack = '';
+    readTrack();
+  } catch { /* canceló */ }
+};
+async function readTrack() {
+  if (!trackFile || !rtc.djStream) return;
+  try {
+    const text = await (await trackFile.getFile()).text();
+    const line = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean).pop() ?? '';
+    const track = line.replace(/^\d{1,2}:\d{2}(:\d{2})?\s*[-:]?\s*/, '').slice(0, 120); // saca la hora del historial
+    if (track && track !== lastTrack) { lastTrack = track; net.send({ t: 'dj', track }); }
+  } catch { /* el programa lo está escribiendo: se reintenta */ }
+}
+setInterval(readTrack, 3000);
 
 // Pantalla gigante: compartir la mía, dejar de compartir, o ver la de otro en grande
 async function useScreen() {
@@ -744,6 +833,7 @@ async function useScreen() {
 }
 function promptFor(t) {
   if (t.kind === 'player') return `Ver perfil de ${t.player.name}`;
+  if (t.kind === 'dj') return !rtc.dj ? 'Pasar música' : rtc.dj.id === net.id ? 'Terminar tu set' : `Cabina ocupada (DJ ${rtc.dj.name})`;
   if (t.kind === 'screen') return rtc.screenStream ? 'Dejar de compartir' : rtc.screen ? 'Ver en grande' : 'Compartir tu pantalla';
   if (t.kind === 'pickup') {
     const g = t.ground;
@@ -942,7 +1032,8 @@ renderer.setAnimationLoop(() => {
   for (const r of remotes.values()) r.update(dt);
   world.update(dt, t);
   ground.update(dt, t, account?.id);
-  rtc.update(camera, (key) => (key.endsWith(':screen') ? world.screen.position : remotes.get(key)?.mouth()));
+  rtc.update(camera, (key) => (key.endsWith(':dj') ? world.dj.speakers : key.endsWith(':screen') ? world.screen.position : remotes.get(key)?.mouth()));
+  world.dj.setMusic(rtc.dj ? rtc.musicLevel() : -1);
 
   // Barra de stamina: aparece solo cuando no está llena
   staminaEl.classList.toggle('show', ctrl.stamina < 0.999 && ctrl.enabled);
@@ -998,7 +1089,7 @@ world.setTime(hoursGMT3());
 setInterval(() => world.setTime(fixedHour ?? hoursGMT3()), 30_000);
 
 // Acceso para pruebas, solo en desarrollo (npm run dev)
-if (import.meta.env.DEV) window.__game = { ctrl, me, gesture, world, remotes, interact, camera, fpArms, renderer, rtc, social, net, ground, roomPanel, setHour: (h) => { fixedHour = h; world.setTime(h); }, get target() { return target; } };
+if (import.meta.env.DEV) window.__game = { ctrl, me, gesture, openDJPanel, world, remotes, interact, camera, fpArms, renderer, rtc, social, net, ground, roomPanel, setHour: (h) => { fixedHour = h; world.setTime(h); }, get target() { return target; } };
 
 // ---------- Inicio: si ya hay sesión guardada, entra directo ----------
 (async () => {

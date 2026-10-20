@@ -100,7 +100,7 @@ body.auth #chat, body.auth #topbar, body.auth #dock, body.auth #voicebar, body.a
 #chat-form { display: none; margin-top: 6px; }
 body.typing #chat-form { display: block; }
 body.typing #chat { background: var(--panel); border: 1px solid var(--line); backdrop-filter: blur(12px); }
-#chat-input, .field input:not([type=range]), .field textarea {
+#chat-input, .field input:not([type=range]), .field textarea, .field select {
   width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: rgba(10, 6, 30, 0.55);
   color: var(--text); font: 600 15px var(--font); outline: none; user-select: text; resize: none;
 }
@@ -359,7 +359,11 @@ body.touch #dock { display: none; }
   .trade-cols { grid-template-columns: 1fr; }
 }
 /* ---------- Menú, panel de sala, Mundi, expulsado ---------- */
-body.roompanel #roompanel, body.mundi #mundi, body.kicked #kicked, body.gestures #gestures { display: flex; }
+body.roompanel #roompanel, body.mundi #mundi, body.kicked #kicked, body.gestures #gestures, body.djing #djpanel { display: flex; }
+.field select option { background: #1a1433; }
+#djpanel[data-mode=setup] #dj-live, #djpanel[data-mode=setup] #dj-stop { display: none; }
+#djpanel[data-mode=live] #dj-setup, #djpanel[data-mode=live] #dj-start { display: none; }
+#djpanel .dj-track .meta { margin: 4px 0; }
 .gesture-list { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .gesture-list .act { padding: 12px; }
 .gesture-list .sub-h { grid-column: 1 / -1; }

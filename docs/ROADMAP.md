@@ -32,7 +32,6 @@
 - **Puente OSC para artistas** (TouchDesigner, Ableton/Max for Live, Blender): programa local que
   recibe OSC y lo manda a la sala; luces/visuales reaccionando a lo que hacen en vivo. Showcase con
   varias pantallas compartidas.
-- **Música del DJ** desde una PC a los parlantes del escenario (la M ya silencia "música y pantalla").
 - **Salas de usuario tipo Fotolog/Instagram**: subir fotos que se cuelgan como cuadros, libro de visitas.
 - **Cartelera tipo muro** (Facebook/Twitter) en el hall.
 - **AR** en las dos direcciones (obras/avatar en tu habitación; fotos/escaneos del mundo real al juego).
@@ -52,6 +51,13 @@
 
 | Tema | Decisión |
 |---|---|
+| DJ: quién | Cualquiera puede pasar música si la cabina está libre; el dueño/mods pueden deshabilitarlo en la sala ("Pasar música (DJ)") |
+| DJ: turnos | Sin cola: si está ocupada, avisa "la cabina está ocupada por X" |
+| DJ: dónde suena | Desde los dos parlantes del escenario (canal izq./der.), más fuerte cerca, se oye en toda la sala. La M la silencia |
+| DJ: cabina | Se arranca con E en la cabina; el DJ queda fijo ahí. Para salir, E de nuevo y confirma "Terminar mi set" |
+| DJ: ritmo | Focos, luz del escenario, LEDs y pista de baile laten con los graves (cada uno lo calcula en su PC) |
+| DJ + pantalla | Pueden estar las dos a la vez |
+| DJ: cartel y avisos | Cartel "DJ: nombre" + track. En el chat: arranque, fin y "Ahora suena". El track se lee solo de un archivo de texto (Chrome/Edge); si no se configura, no se muestra |
 | Estilo visual | ~~Estilizado tipo Fortnite~~ → **semi-realista tipo MetaPerson, no anime** (20/10). Posibles herramientas: Tripo o MCP de Blender |
 | Plataformas | PC y celular |
 | Público | Comunidad / amigos |

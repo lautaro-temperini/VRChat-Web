@@ -7,7 +7,7 @@ import { toast } from './toast.js';
 //   expulsar, banear y habilitar/deshabilitar funciones de la sala.
 
 const $ = (id) => document.getElementById(id);
-const SETTINGS = [['chat', 'Chat de texto'], ['voice', 'Chat de voz'], ['screen', 'Compartir pantalla'], ['items', 'Soltar objetos']];
+const SETTINGS = [['chat', 'Chat de texto'], ['voice', 'Chat de voz'], ['screen', 'Compartir pantalla'], ['dj', 'Pasar música (DJ)'], ['items', 'Soltar objetos']];
 
 function loadSet(key) {
   try { return new Set(JSON.parse(localStorage.getItem(key) ?? '[]')); } catch { return new Set(); }

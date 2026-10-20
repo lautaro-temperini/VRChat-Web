@@ -243,3 +243,19 @@ export function sign(text, color = '#ffffff', bg = 'rgba(0,0,0,0)') {
   g.fillText(text, 512, 132);
   return toTexture(c);
 }
+
+// Cartel de la cabina con el DJ y el track (el texto largo se achica para que entre)
+export function djSign(title, sub = '') {
+  const [c, g] = canvas(1024, 256);
+  g.textAlign = 'center'; g.textBaseline = 'middle';
+  const fit = (text, weight, size, y, color) => {
+    g.font = `${weight} ${size}px "Segoe UI", Arial, sans-serif`;
+    const w = g.measureText(text).width;
+    if (w > 980) g.font = `${weight} ${Math.floor(size * 980 / w)}px "Segoe UI", Arial, sans-serif`;
+    g.fillStyle = color;
+    g.fillText(text, 512, y);
+  };
+  fit(title, 700, sub ? 92 : 110, sub ? 86 : 132, '#ffffff');
+  if (sub) fit(sub, 600, 58, 190, '#ff7af0');
+  return toTexture(c);
+}

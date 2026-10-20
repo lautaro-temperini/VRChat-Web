@@ -17,7 +17,7 @@ const DEAD_AFTER = 3 * 60_000;
 const MIC_STATES = ['off', 'on'];
 // Objetos en el suelo: otro jugador puede juntarlo a los 5 s; a los 60 s se pierde.
 const PICKUP_LOCK = 5_000, GROUND_LIFE = 60_000;
-const DEFAULT_SETTINGS = { chat: true, voice: true, screen: true, items: true };
+const DEFAULT_SETTINGS = { chat: true, voice: true, screen: true, items: true, dj: true };
 const SPAWN = { x: 3, z: 0 };
 
 // Estado de un jugador: [x, y, z, rotación, velocidad, pose]
@@ -36,6 +36,7 @@ export class Room extends DurableObject {
     this.states = new Map();   // últimas posiciones (en memoria)
     this.lastSeen = new Map(); // última señal de cada conexión
     this.screen = null;        // { id, streamId } de quien comparte pantalla
+    this.dj = null;            // { id, name, streamId, track } de quien pasa música en la cabina
     this.invites = new Map();  // "de>para" -> hora de la invitación a intercambiar
     this.trades = new Map();   // id -> intercambio en curso
     this.tradeOf = new Map();  // jugador -> id del intercambio
@@ -180,7 +181,7 @@ export class Room extends DurableObject {
       if (s) this.states.set(meta.id, s);
       const chat = (await this.ctx.storage.get('chat')) ?? [];
       this.send(ws, {
-        t: 'welcome', id: meta.id, players: this.players(ws), chat, screen: this.screen,
+        t: 'welcome', id: meta.id, players: this.players(ws), chat, screen: this.screen, dj: this.dj,
         room: { name: await this.roomName(), owner: await this.ownerId(), settings: this.settings, mod: meta.mod, silenced: !!this.silenced[user.id] },
         ground: this.ground.map((g) => ({ ...g, age: Date.now() - g.at })),
       });
@@ -272,6 +273,29 @@ export class Room extends DurableObject {
         }
         break;
       }
+      case 'dj': {
+        // Cabina del DJ: una persona a la vez (sin cola); cualquiera puede, salvo que la sala lo deshabilite
+        if (msg.on) {
+          if (silenced || (!this.settings.dj && !meta.mod)) {
+            this.send(ws, { t: 'dj', denied: true });
+            return this.notice(ws, silenced ? 'Estás silenciado en esta sala.' : 'Pasar música está deshabilitado en esta sala.');
+          }
+          if (this.dj && this.dj.id !== meta.id && this.byId(this.dj.id)) {
+            this.send(ws, { t: 'dj', busy: true, name: this.dj.name });
+            return;
+          }
+          this.dj = { id: meta.id, name: meta.name, streamId: String(msg.streamId ?? '').slice(0, 100), track: '' };
+          this.broadcast({ t: 'dj', on: true, ...this.dj });
+        } else if (typeof msg.track === 'string' && this.dj?.id === meta.id) {
+          const track = msg.track.replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 120);
+          if (track === this.dj.track) return;
+          this.dj.track = track;
+          this.broadcast({ t: 'dj', track, id: meta.id, name: meta.name });
+        } else if (this.dj?.id === meta.id) {
+          this.stopDJ();
+        }
+        break;
+      }
       case 'drop':
         await this.drop(ws, meta, msg);
         break;
@@ -359,6 +383,7 @@ export class Room extends DurableObject {
         await this.ctx.storage.put('silenced', this.silenced);
         if (on && tm.mic === 'on') { tm.mic = 'off'; target.serializeAttachment(tm); this.broadcast({ t: 'mic', id: tm.id, v: 'off' }); }
         if (on && this.screen?.id === tm.id) { this.screen = null; this.broadcast({ t: 'screen', on: false, id: tm.id }); }
+        if (on && this.dj?.id === tm.id) this.stopDJ();
         this.broadcast({ t: 'silenced', id: tm.id, v: on });
         break;
       }
@@ -381,6 +406,7 @@ export class Room extends DurableObject {
           this.screen = null;
           this.broadcast({ t: 'screen', on: false, id });
         }
+        if (msg.key === 'dj' && !msg.value && this.dj && !this.byId(this.dj.id)?.deserializeAttachment().mod) this.stopDJ();
         this.broadcast({ t: 'settings', settings: this.settings, by: meta.name });
         break;
       }
@@ -478,6 +504,12 @@ export class Room extends DurableObject {
     }
   }
 
+  stopDJ() {
+    const { id, name } = this.dj;
+    this.dj = null;
+    this.broadcast({ t: 'dj', on: false, id, name });
+  }
+
   async leave(ws) {
     const meta = ws.deserializeAttachment();
     if (!meta?.joined) return;
@@ -489,6 +521,7 @@ export class Room extends DurableObject {
       this.screen = null;
       this.broadcast({ t: 'screen', on: false, id: meta.id });
     }
+    if (this.dj?.id === meta.id) this.stopDJ();
     const tradeId = this.tradeOf.get(meta.id);
     if (tradeId) this.endTrade(this.trades.get(tradeId), () => ({ op: 'closed', name: meta.name }));
     this.broadcast({ t: 'leave', id: meta.id }, ws);

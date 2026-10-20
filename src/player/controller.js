@@ -40,6 +40,7 @@ export class PlayerController {
     this.crouchToggle = false;
     this.touchCrouch = false;
     this.sitting = null;
+    this.booth = null;      // en la cabina del DJ: fijo hasta salir con la E
     this.mantle = null;
     this.landing = 0;
     this.speed = 0;
@@ -112,7 +113,7 @@ export class PlayerController {
   }
 
   get crouched() {
-    return (this.crouchToggle || this.touchCrouch || this.keys.has('ControlLeft') || this.keys.has('ControlRight')) && !this.sitting && !this.mantle;
+    return (this.crouchToggle || this.touchCrouch || this.keys.has('ControlLeft') || this.keys.has('ControlRight')) && !this.sitting && !this.booth && !this.mantle;
   }
 
   jump() { this.jumpBuffer = JUMP_BUFFER; }
@@ -125,6 +126,24 @@ export class PlayerController {
     this.pos.set(seat.x, seat.y, seat.z);
     this.bodyYaw = seat.yaw;
     this.crouchToggle = false;
+  }
+
+  // Cabina del DJ: queda parado detrás de la cabina mirando a la pista, sin moverse
+  enterBooth(spot) {
+    this.stand();
+    this.booth = spot;
+    this.mantle = null;
+    this.vel.set(0, 0);
+    this.velY = 0;
+    this.grounded = true;
+    this.pos.set(spot.x, spot.y, spot.z);
+    this.bodyYaw = spot.yaw;
+    this.crouchToggle = false;
+  }
+  leaveBooth(exit) {
+    if (!this.booth) return;
+    this.booth = null;
+    this.pos.set(exit.x, this.pos.y, exit.z);
   }
 
   stand() {
@@ -240,8 +259,9 @@ export class PlayerController {
       if (len > 0.3 || this.jumpBuffer > 0) { this.jumpBuffer = 0; this.stand(); }
       else this.speed = 0;
     }
+    if (this.booth) { this.speed = 0; this.jumpBuffer = 0; }
 
-    if (this.sitting) {
+    if (this.sitting || this.booth) {
       // quieto en el asiento
     } else if (this.mantle) {
       // Trepando: primero sube, después avanza sobre el borde
@@ -328,7 +348,7 @@ export class PlayerController {
     if (this.showcase && (this.speed > 0.3 || !this.grounded)) this.showcase = false;
     const vitrina = !this.enabled || this.showcase;
     if (vitrina) this.bodyYaw += dt * 0.5; // vitrina: el personaje gira
-    else if (this.sitting || this.mantle) { /* fijo */ }
+    else if (this.sitting || this.booth || this.mantle) { /* fijo */ }
     else if (this.mode === 'first') this.bodyYaw = this.yaw + Math.PI;
     else if (this.speed > 0.3) this.bodyYaw += angleDiff(this.bodyYaw, Math.atan2(this.vel.x, this.vel.y)) * Math.min(1, dt * 14);
     this.turn = damp(this.turn, angleDiff(prevYaw, this.bodyYaw) / Math.max(dt, 1e-3), 8, dt);

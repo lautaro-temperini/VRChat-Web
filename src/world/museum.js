@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
-import { woodFloor, plasterBump, lightPool, painting, plaque, sign, rug, rng } from './textures.js';
+import { woodFloor, plasterBump, lightPool, painting, plaque, sign, djSign, rug, rng } from './textures.js';
 import { artworkInfo, SCULPTURES } from './artworks.js';
 
 // Sala principal. Zonas, de oeste a este:
@@ -520,14 +520,24 @@ export function buildMuseum(scene, renderer, quality) {
     tiles.setColorAt(i, col.setRGB(0.05, 0.05, 0.05));
   }
   scene.add(tiles);
+  // Música del DJ: nivel de graves (0..1) que manda main.js; con música, todo late con el bombo
+  const music = { level: 0, avg: 0, since: 0, pulse: 0, on: false };
   let beat = 0;
   animated.push((dt, t) => {
     beat += dt;
-    if (beat < 0.47) return;
+    music.since += dt;
+    music.avg += (music.level - music.avg) * Math.min(1, dt * 2);
+    let hit;
+    if (music.on) {
+      hit = music.level > 0.3 && music.level > music.avg * 1.18 && music.since > 0.28;
+      if (hit) music.since = 0;
+    } else hit = beat >= 0.47;
+    music.pulse = hit ? 1 : music.pulse * Math.exp(-dt * 6);
+    if (!hit) return;
     beat = 0;
     for (let i = 0; i < 64; i++) {
-      const on = Math.random() < 0.35;
-      col.setHSL((t * 0.05 + (i % 8) * 0.04) % 1, 0.8, on ? 0.15 : 0.03);
+      const on = Math.random() < (music.on ? 0.45 : 0.35);
+      col.setHSL((t * 0.05 + (i % 8) * 0.04) % 1, 0.8, on ? (music.on ? 0.22 : 0.15) : 0.03);
       tiles.setColorAt(i, col);
     }
     tiles.instanceColor.needsUpdate = true;
@@ -546,7 +556,7 @@ export function buildMuseum(scene, renderer, quality) {
   box(4.6, 0.04, 0.04, 15.3, 0.36, 4.5, ledMat, { cast: false, round: 0.015 });
 
   const booth = box(0.8, 1, 3, 16.2, 0.9, 0, darkMat, { collide: true, block: true, round: 0.05 });
-  interactive(booth, { kind: 'info', prompt: 'Ver cabina', info: { title: 'Cabina DJ', description: 'Muy pronto: pasá música en vivo desde tu PC y que suene por los parlantes de la sala, más fuerte cuanto más cerca estés.' } });
+  interactive(booth, { kind: 'dj' });
   const deckMat = new THREE.MeshStandardMaterial({ color: 0x2c2c30, metalness: 0.6, roughness: 0.4 });
   for (const z of [-0.85, 0.85]) {
     const deck = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.04, 48), deckMat);
@@ -574,6 +584,13 @@ export function buildMuseum(scene, renderer, quality) {
     new THREE.PlaneGeometry(6, 1.5),
     new THREE.MeshBasicMaterial({ map: sign('CABINA DJ', '#ffffff'), transparent: true, toneMapped: false }),
   );
+  // Cartel: "CABINA DJ" o el nombre del DJ y el track que suena
+  function setBooth(dj) {
+    const old = signMesh.material.map;
+    signMesh.material.map = dj ? djSign(`DJ: ${dj.name}`, dj.track ? `♪ ${dj.track}` : '') : sign('CABINA DJ', '#ffffff');
+    signMesh.material.needsUpdate = true;
+    old.dispose();
+  }
   signMesh.position.set(X1 - 0.05, 5.1, 0);
   signMesh.rotation.y = -Math.PI / 2;
   scene.add(signMesh);
@@ -599,14 +616,17 @@ export function buildMuseum(scene, renderer, quality) {
   stageLight.position.set(13.5, 3.5, 0);
   scene.add(stageLight);
   animated.push((dt, t) => {
+    const p = music.on ? music.pulse : 0;
     beams.forEach((b, i) => {
       b.rotation.z = Math.sin(t * 0.8 + i) * 0.55 - 0.2;
       b.rotation.x = Math.cos(t * 0.6 + i * 1.3) * 0.35;
       b.material.uniforms.color.value.setHSL((t * 0.08 + i * 0.25) % 1, 1, 0.55);
+      b.material.uniforms.opacity.value = 0.1 + p * 0.22;
     });
-    ledMat.color.setHSL((t * 0.1) % 1, 1, 0.5).multiplyScalar(GLOW);
-    cove.color.setHSL((t * 0.1 + 0.8) % 1, 1, 0.55).multiplyScalar(GLOW);
+    ledMat.color.setHSL((t * 0.1) % 1, 1, 0.5).multiplyScalar(GLOW * (1 + p * 1.5));
+    cove.color.setHSL((t * 0.1 + 0.8) % 1, 1, 0.55).multiplyScalar(GLOW * (1 + p));
     stageLight.color.setHSL((t * 0.1 + 0.5) % 1, 1, 0.5);
+    stageLight.intensity = 30 + p * 70;
   });
 
   return {
@@ -614,6 +634,14 @@ export function buildMuseum(scene, renderer, quality) {
     blockers,
     interactables,
     screen: screenApi,
+    // Cabina del DJ: dónde se para (mirando a la pista), dónde se baja y los dos parlantes [izq., der.]
+    dj: {
+      spot: { x: 17.05, y: 0.4, z: 0, yaw: -Math.PI / 2 },
+      exit: { x: 15.2, z: 0 },
+      speakers: [new THREE.Vector3(16.2, 1.6, -4), new THREE.Vector3(16.2, 1.6, 4)],
+      setBooth,
+      setMusic(level) { music.level = level; music.on = level >= 0; },
+    },
     bounds: { minY: 0.2, maxY: H - 0.2 },
     spawn: { x: 3, z: 0, yaw: Math.PI / 2 },
     update(dt, t) { for (const fn of animated) fn(dt, t); },

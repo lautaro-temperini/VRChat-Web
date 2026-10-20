@@ -195,6 +195,31 @@
     <button class="cta" data-close-panel>Cerrar</button>
   </aside>
 
+  <!-- E en la cabina: pasar música -->
+  <aside id="djpanel" class="panel">
+    <h1 class="display">Cabina DJ</h1>
+    <div id="dj-setup" class="dj-block">
+      <p class="meta">Elegí de dónde sale la música: la salida de tu controladora o placa de sonido, o un
+        cable virtual (VB-Cable en Windows, BlackHole en Mac) desde Serato, Rekordbox, Traktor, VirtualDJ o
+        Spotify. Va en estéreo y suena por los parlantes del escenario.</p>
+      <label class="field">Entrada de audio
+        <select id="dj-source"></select>
+      </label>
+    </div>
+    <div id="dj-live" class="dj-block">
+      <p class="meta">Estás pasando música. ¿Terminar tu set? La cabina queda libre para otro DJ.</p>
+    </div>
+    <div class="field dj-track">Nombre del track (opcional)
+      <p class="meta">Elegí el archivo de texto donde tu programa escribe lo que suena (por ejemplo el
+        historial de VirtualDJ o el "now playing" para OBS). El juego lo lee solo cuando cambia.</p>
+      <button class="act" id="dj-file">Elegir archivo</button>
+      <span class="meta" id="dj-file-name">Sin archivo: no se muestra el track.</span>
+    </div>
+    <button class="cta" id="dj-start">Empezar a pasar música</button>
+    <button class="cta" id="dj-stop">Terminar mi set</button>
+    <button class="act" data-close-panel id="dj-cancel">Cancelar</button>
+  </aside>
+
   <!-- R: gestos -->
   <aside id="gestures" class="panel">
     <h1 class="display">Gestos</h1>
