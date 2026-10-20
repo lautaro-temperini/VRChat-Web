@@ -21,6 +21,7 @@ import { UI_ICONS } from './ui/icons.js';
 import { createRoomPanel } from './ui/roompanel.js';
 import { Ground } from './world/ground.js';
 import { detectQuality, FpsWatch } from './quality.js';
+import { Bridge, applyOsc, defaultLights } from './net/osc.js';
 
 const $ = (id) => document.getElementById(id);
 // Pantalla de carga (está en index.html): avanza por etapas y se va cuando está todo listo
@@ -133,9 +134,9 @@ for (const b of document.querySelectorAll('button.pill:not(.icon)')) {
 
 // ---------- Estado de la interfaz ----------
 // Un solo panel/superposición abierto a la vez. Mientras hay uno, el jugador no se mueve.
-const OVERLAYS = ['editing', 'settings', 'inspecting', 'profiling', 'auth', 'inventory', 'friends', 'trading', 'viewing', 'roompanel', 'mundi', 'gestures', 'djing', 'kicked'];
+const OVERLAYS = ['editing', 'settings', 'inspecting', 'profiling', 'auth', 'inventory', 'friends', 'trading', 'viewing', 'roompanel', 'mundi', 'gestures', 'djing', 'artists', 'kicked'];
 // Paneles que no frenan al personaje (se puede seguir caminando con WASD)
-const NON_BLOCKING = ['inventory', 'friends', 'roompanel', 'editing', 'gestures'];
+const NON_BLOCKING = ['inventory', 'friends', 'roompanel', 'editing', 'gestures', 'artists'];
 function openOverlay(cls) {
   document.exitPointerLock?.();
   for (const c of OVERLAYS) body.classList.toggle(c, c === cls);
@@ -339,8 +340,10 @@ rtc.onScreen = (video, ownerId) => {
   screenVideo = video;
   world.screen.setVideo(video);
   if (!video && body.classList.contains('viewing')) closeOverlays();
+  setTimeout(refreshArtists); // el cartel de la consola dice quién tiene la pantalla del hall
 };
 rtc.onMic = (state) => { $('btn-mic').dataset.state = state; };
+rtc.onStage = (video) => world.stage.setVideo(video);
 // El navegador habilita el audio recién después de un click o una tecla
 for (const ev of ['pointerdown', 'keydown']) addEventListener(ev, () => rtc.audio(), { once: true });
 
@@ -528,6 +531,14 @@ net
     if (rtc.djStream || ctrl.booth) endMySet(); // cambié de sala o se reconectó: la cabina ya no es mía
     rtc.setScreen(m.screen);
     setDJ(m.dj);
+    // Si tenía luces o pantalla y me reconecté o cambié de sala, las suelto de mi lado
+    if (myLights) endPart('luces');
+    if (rtc.stageStream) endPart('escenario');
+    for (const part of Object.keys(parts)) delete parts[part];
+    Object.assign(parts, m.parts ?? {});
+    world.artists.setLights(m.lights ?? null);
+    rtc.setStage(parts.escenario ? { id: parts.escenario.id, streamId: parts.escenario.streamId } : null);
+    refreshArtists();
     m.players.forEach(addRemote);
     for (const p of m.players) rtc.playerJoined(p.id);
     if (rtc.mic) net.send({ t: 'mic', v: rtc.micState });
@@ -589,8 +600,11 @@ net
   .on('screen', (m) => {
     if (m.busy) return toast(`Ya está compartiendo ${remotes.get(m.id)?.name ?? 'otra persona'}. Esperá a que termine.`);
     if (m.id === net.id) return;
-    if (m.on) { rtc.setScreen({ id: m.id, streamId: m.streamId }); toast(`${remotes.get(m.id)?.name ?? 'Alguien'} está compartiendo su pantalla`); }
-    else rtc.setScreen(null);
+    if (m.on) {
+      rtc.setScreen({ id: m.id, streamId: m.streamId });
+      system(`🎬 ${remotes.get(m.id)?.name ?? 'Alguien'} está compartiendo su pantalla en la pantalla del hall.`);
+    } else rtc.setScreen(null);
+    refreshArtists();
   })
   .on('dj', (m) => {
     if (m.busy) { rtc.stopMusic(); return toast(`La cabina está ocupada: está pasando música ${m.name}.`); }
@@ -614,6 +628,28 @@ net
       system(`🎧 ${mine ? 'Terminaste' : `${m.name} terminó`} su set.`);
     }
   })
+  .on('part', (m) => {
+    if (m.busy || m.denied) {
+      if (m.part === 'escenario') rtc.stopStage();
+      if (m.busy) toast(`${PART_NAMES[m.part]} ya la tiene ${m.name}.`);
+      return renderArtists();
+    }
+    const mine = m.id === net.id, who = mine ? 'Vos' : m.name;
+    if (m.on) {
+      parts[m.part] = { id: m.id, name: m.name, streamId: m.streamId };
+      if (m.part === 'luces' && mine) { myLights = defaultLights(); bridge.start(); }
+      if (m.part === 'escenario') { if (mine) rtc.startStage(); else rtc.setStage({ id: m.id, streamId: m.streamId }); }
+      system(m.part === 'luces' ? `💡 ${who} ${mine ? 'tomaste' : 'tomó'} las luces.` : `🎬 ${who} ${mine ? 'estás pasando' : 'está pasando'} visuales en la pantalla del escenario.`);
+    } else {
+      delete parts[m.part];
+      if (m.part === 'luces') world.artists.setLights(null); // vuelven a automático
+      if (m.part === 'escenario') rtc.setStage(null);
+      if (mine) endPart(m.part);
+      system(m.part === 'luces' ? `💡 ${who} ${mine ? 'soltaste' : 'soltó'} las luces (vuelven a automático).` : `🎬 ${who} ${mine ? 'dejaste' : 'dejó'} la pantalla del escenario.`);
+    }
+    refreshArtists();
+  })
+  .on('luces', ({ s }) => world.artists.setLights(s))
   .on('trade', (m) => social.onTrade(m))
   .on('chat', (m) => {
     if (roomPanel.isIgnored(m.userId)) return; // ignorado: no veo sus mensajes
@@ -762,6 +798,7 @@ function interact() {
   } else if (t.kind === 'player') openProfile(t.player);
   else if (t.kind === 'screen') useScreen();
   else if (t.kind === 'dj') openDJPanel();
+  else if (t.kind === 'artists') openArtists();
   else if (t.kind === 'pickup') net.send({ t: 'pickup', iid: t.ground.iid });
   else openInspect(t);
 }
@@ -829,6 +866,71 @@ async function readTrack() {
 }
 setInterval(readTrack, 3000);
 
+// ---------- Consola de artistas ----------
+// Partes: luces (por OSC, desde el puente en la PC del artista), pantalla del escenario (video)
+// y pantalla del hall (la de siempre). Cada una la toma un artista a la vez.
+const PART_NAMES = { luces: 'Las luces', escenario: 'La pantalla del escenario', hall: 'La pantalla del hall' };
+const parts = {}; // luces / escenario → { id, name, streamId? }
+let myLights = null, lightsDirty = false;
+const bridge = new Bridge({
+  onStatus: (s) => { $('bridge-status').textContent = s === 'conectado' ? 'conectado ✓' : 'buscando el puente en tu PC…'; },
+  onMessage: (address, args) => {
+    if (!myLights || !applyOsc(myLights, address, args)) return;
+    lightsDirty = true;
+    world.artists.setLights(myLights);
+  },
+});
+// A la sala se manda a lo sumo ~15 veces por segundo
+setInterval(() => {
+  if (!lightsDirty || parts.luces?.id !== net.id) return;
+  lightsDirty = false;
+  net.send({ t: 'luces', s: myLights });
+}, 66);
+rtc.onStageEnded = () => { if (parts.escenario?.id === net.id) releasePart('escenario'); };
+
+function hallOwner() {
+  if (!rtc.screen) return null;
+  return rtc.screen.id === net.id ? name : remotes.get(rtc.screen.id)?.name ?? 'alguien';
+}
+function refreshArtists() {
+  world.artists.setSign({ luces: parts.luces?.name, escenario: parts.escenario?.name, hall: hallOwner() });
+  if (body.classList.contains('artists')) renderArtists();
+}
+function renderArtists() {
+  for (const row of document.querySelectorAll('.part-row')) {
+    const part = row.dataset.part;
+    const holder = part === 'hall' ? (rtc.screen ? { id: rtc.screen.id, name: hallOwner() } : null) : parts[part];
+    const mine = holder?.id === net.id;
+    row.classList.toggle('mine', mine);
+    row.querySelector('span').textContent = !holder ? 'Libre' : mine ? 'La tenés vos' : `La tiene ${holder.name}`;
+    const btn = row.querySelector('button');
+    btn.textContent = mine ? 'Soltar' : part === 'luces' ? 'Tomar las luces' : 'Pasar video';
+    btn.disabled = !!holder && !mine;
+    btn.onclick = () => takePart(part);
+  }
+  $('bridge-status').textContent = parts.luces?.id === net.id ? $('bridge-status').textContent : 'sin usar';
+}
+function openArtists() {
+  renderArtists();
+  openOverlay('artists');
+}
+async function takePart(part) {
+  if (part === 'hall') { await useScreen(); return renderArtists(); }
+  if (parts[part]?.id === net.id) return releasePart(part);
+  if (part === 'luces') return net.send({ t: 'part', part, on: true });
+  const r = await rtc.captureStage();
+  if (!r.ok) return toast(r.error);
+  net.send({ t: 'part', part, on: true, streamId: r.streamId }); // la sala confirma (o dice que está ocupada)
+}
+function releasePart(part) {
+  net.send({ t: 'part', part, on: false });
+  endPart(part);
+}
+function endPart(part) {
+  if (part === 'luces') { bridge.stop(); myLights = null; lightsDirty = false; }
+  if (part === 'escenario') rtc.stopStage();
+}
+
 // Pantalla gigante: compartir la mía, dejar de compartir, o ver la de otro en grande
 async function useScreen() {
   if (rtc.screenStream) { rtc.stopScreen(); toast('Dejaste de compartir tu pantalla.'); return; }
@@ -839,6 +941,7 @@ async function useScreen() {
 }
 function promptFor(t) {
   if (t.kind === 'player') return `Ver perfil de ${t.player.name}`;
+  if (t.kind === 'artists') return 'Consola de artistas';
   if (t.kind === 'dj') return !rtc.dj ? 'Pasar música' : rtc.dj.id === net.id ? 'Terminar tu set' : `Cabina ocupada (DJ ${rtc.dj.name})`;
   if (t.kind === 'screen') return rtc.screenStream ? 'Dejar de compartir' : rtc.screen ? 'Ver en grande' : 'Compartir tu pantalla';
   if (t.kind === 'pickup') {
@@ -1095,7 +1198,7 @@ world.setTime(hoursGMT3());
 setInterval(() => world.setTime(fixedHour ?? hoursGMT3()), 30_000);
 
 // Acceso para pruebas, solo en desarrollo (npm run dev)
-if (import.meta.env.DEV) window.__game = { ctrl, me, gesture, openDJPanel, world, remotes, interact, camera, fpArms, renderer, rtc, social, net, ground, roomPanel, setHour: (h) => { fixedHour = h; world.setTime(h); }, get target() { return target; } };
+if (import.meta.env.DEV) window.__game = { ctrl, me, gesture, openDJPanel, openArtists, parts, world, remotes, interact, camera, fpArms, renderer, rtc, social, net, ground, roomPanel, setHour: (h) => { fixedHour = h; world.setTime(h); }, get target() { return target; } };
 
 // ---------- Inicio: si ya hay sesión guardada, entra directo ----------
 // La pantalla de carga se va cuando el personaje y sus animaciones están listos (o a los 20 s, por las dudas)

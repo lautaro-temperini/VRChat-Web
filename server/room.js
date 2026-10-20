@@ -17,7 +17,9 @@ const DEAD_AFTER = 3 * 60_000;
 const MIC_STATES = ['off', 'on'];
 // Objetos en el suelo: otro jugador puede juntarlo a los 5 s; a los 60 s se pierde.
 const PICKUP_LOCK = 5_000, GROUND_LIFE = 60_000;
-const DEFAULT_SETTINGS = { chat: true, voice: true, screen: true, items: true, dj: true };
+const DEFAULT_SETTINGS = { chat: true, voice: true, screen: true, items: true, dj: true, artists: true };
+// Partes que toman los artistas en la consola (además de la pantalla del hall, que es this.screen)
+const PARTS = ['luces', 'escenario'];
 const SPAWN = { x: 3, z: 0 };
 
 // Estado de un jugador: [x, y, z, rotación, velocidad, pose]
@@ -37,6 +39,8 @@ export class Room extends DurableObject {
     this.lastSeen = new Map(); // última señal de cada conexión
     this.screen = null;        // { id, streamId } de quien comparte pantalla
     this.dj = null;            // { id, name, streamId, track } de quien pasa música en la cabina
+    this.parts = {};           // luces / escenario → { id, name, streamId? } del artista que la tiene
+    this.lights = null;        // último estado de las luces que mandó el artista (para los que entran)
     this.invites = new Map();  // "de>para" -> hora de la invitación a intercambiar
     this.trades = new Map();   // id -> intercambio en curso
     this.tradeOf = new Map();  // jugador -> id del intercambio
@@ -181,7 +185,7 @@ export class Room extends DurableObject {
       if (s) this.states.set(meta.id, s);
       const chat = (await this.ctx.storage.get('chat')) ?? [];
       this.send(ws, {
-        t: 'welcome', id: meta.id, players: this.players(ws), chat, screen: this.screen, dj: this.dj,
+        t: 'welcome', id: meta.id, players: this.players(ws), chat, screen: this.screen, dj: this.dj, parts: this.parts, lights: this.lights,
         room: { name: await this.roomName(), owner: await this.ownerId(), settings: this.settings, mod: meta.mod, silenced: !!this.silenced[user.id] },
         ground: this.ground.map((g) => ({ ...g, age: Date.now() - g.at })),
       });
@@ -296,6 +300,31 @@ export class Room extends DurableObject {
         }
         break;
       }
+      case 'part': {
+        // Consola de artistas: luces (OSC) y pantalla del escenario. Cada parte, un artista a la vez
+        const part = msg.part;
+        if (!PARTS.includes(part)) return;
+        const cur = this.parts[part];
+        if (msg.on) {
+          if (silenced || (!this.settings.artists && !meta.mod)) {
+            this.send(ws, { t: 'part', part, denied: true });
+            return this.notice(ws, silenced ? 'Estás silenciado en esta sala.' : 'La consola de artistas está deshabilitada en esta sala.');
+          }
+          if (cur && cur.id !== meta.id && this.byId(cur.id)) return this.send(ws, { t: 'part', part, busy: true, name: cur.name });
+          this.parts[part] = { id: meta.id, name: meta.name, ...(part === 'escenario' ? { streamId: String(msg.streamId ?? '').slice(0, 100) } : {}) };
+          this.broadcast({ t: 'part', part, on: true, ...this.parts[part] });
+        } else if (cur?.id === meta.id) this.releasePart(part);
+        break;
+      }
+      case 'luces': {
+        // Estado de las luces que manda el artista (ya validado y acotado)
+        if (this.parts.luces?.id !== meta.id) return;
+        const s = cleanLights(msg.s);
+        if (!s) return;
+        this.lights = s;
+        this.broadcast({ t: 'luces', s }, ws);
+        break;
+      }
       case 'drop':
         await this.drop(ws, meta, msg);
         break;
@@ -384,6 +413,7 @@ export class Room extends DurableObject {
         if (on && tm.mic === 'on') { tm.mic = 'off'; target.serializeAttachment(tm); this.broadcast({ t: 'mic', id: tm.id, v: 'off' }); }
         if (on && this.screen?.id === tm.id) { this.screen = null; this.broadcast({ t: 'screen', on: false, id: tm.id }); }
         if (on && this.dj?.id === tm.id) this.stopDJ();
+        if (on) for (const part of PARTS) if (this.parts[part]?.id === tm.id) this.releasePart(part);
         this.broadcast({ t: 'silenced', id: tm.id, v: on });
         break;
       }
@@ -407,6 +437,9 @@ export class Room extends DurableObject {
           this.broadcast({ t: 'screen', on: false, id });
         }
         if (msg.key === 'dj' && !msg.value && this.dj && !this.byId(this.dj.id)?.deserializeAttachment().mod) this.stopDJ();
+        if (msg.key === 'artists' && !msg.value) {
+          for (const part of PARTS) if (this.parts[part] && !this.byId(this.parts[part].id)?.deserializeAttachment().mod) this.releasePart(part);
+        }
         this.broadcast({ t: 'settings', settings: this.settings, by: meta.name });
         break;
       }
@@ -504,6 +537,13 @@ export class Room extends DurableObject {
     }
   }
 
+  releasePart(part) {
+    const { id, name } = this.parts[part];
+    delete this.parts[part];
+    if (part === 'luces') this.lights = null; // vuelven a automático
+    this.broadcast({ t: 'part', part, on: false, id, name });
+  }
+
   stopDJ() {
     const { id, name } = this.dj;
     this.dj = null;
@@ -522,6 +562,7 @@ export class Room extends DurableObject {
       this.broadcast({ t: 'screen', on: false, id: meta.id });
     }
     if (this.dj?.id === meta.id) this.stopDJ();
+    for (const part of PARTS) if (this.parts[part]?.id === meta.id) this.releasePart(part);
     const tradeId = this.tradeOf.get(meta.id);
     if (tradeId) this.endTrade(this.trades.get(tradeId), () => ({ op: 'closed', name: meta.name }));
     this.broadcast({ t: 'leave', id: meta.id }, ws);
@@ -536,4 +577,21 @@ export class Room extends DurableObject {
   async webSocketError(ws) {
     await this.leave(ws);
   }
+}
+
+// Luces que manda un artista: colores 0..1, intensidades 0..2, movimiento -1..1
+function cleanLights(s) {
+  if (!s || typeof s !== 'object') return null;
+  const n = (v, lo, hi, d) => (Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : d);
+  const color = (c) => (Array.isArray(c) && c.length === 3 ? c.map((v) => n(v, 0, 1, 1)) : null);
+  const out = {
+    color: color(s.color), intensidad: n(s.intensidad, 0, 2, 1), flash: n(s.flash, 0, 1, 0),
+    escenario: { color: color(s.escenario?.color), intensidad: n(s.escenario?.intensidad, 0, 2, 1) },
+    leds: { color: color(s.leds?.color) },
+    focos: [0, 1, 2, 3].map((i) => {
+      const f = Array.isArray(s.focos) ? s.focos[i] ?? {} : {};
+      return { color: color(f.color), intensidad: n(f.intensidad, 0, 2, 1), pan: n(f.pan, -1, 1, 0), tilt: n(f.tilt, -1, 1, 0) };
+    }),
+  };
+  return out;
 }

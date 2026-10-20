@@ -243,6 +243,35 @@
     <button class="act" data-close-panel id="dj-cancel">Cancelar</button>
   </aside>
 
+  <!-- E en la consola de artistas: luces (OSC) y pantallas -->
+  <aside id="artistpanel" class="panel">
+    <h1 class="display">Consola de artistas</h1>
+    <p class="meta">Cada parte la toma un artista a la vez. Al soltarla, vuelve a lo automático.</p>
+    <div class="part-row" data-part="luces">
+      <div class="who"><b>Luces</b><span></span></div><button class="act"></button>
+    </div>
+    <div class="part-row" data-part="escenario">
+      <div class="who"><b>Pantalla del escenario</b><span></span></div><button class="act"></button>
+    </div>
+    <div class="part-row" data-part="hall">
+      <div class="who"><b>Pantalla del hall</b><span></span></div><button class="act"></button>
+    </div>
+    <div class="bridge">
+      <p class="meta">Puente OSC: <b id="bridge-status">sin usar</b></p>
+      <details>
+        <summary>Cómo conectar TouchDesigner, Ableton o Blender</summary>
+        <p class="meta">1. En tu PC, en la carpeta del juego: <code>npm run puente</code> (o <code>node scripts/puente-osc.js</code>).<br>
+          2. Desde tu programa mandá OSC a <code>127.0.0.1:9000</code>.<br>
+          3. Acá: "Tomar las luces". Si el navegador pregunta por acceso a la red local, aceptá.</p>
+        <p class="meta"><code>/luces/color r g b</code> · <code>/luces/intensidad v</code> · <code>/luces/flash v</code><br>
+          <code>/luces/focos/color r g b</code> · <code>/luces/focos/mover pan tilt</code> · <code>/luces/focos/2/color …</code><br>
+          <code>/luces/escenario/color r g b</code> · <code>/luces/leds/color r g b</code><br>
+          Valores de 0 a 1 (los colores también de 0 a 255; mover de -1 a 1).</p>
+      </details>
+    </div>
+    <button class="cta" data-close-panel>Listo</button>
+  </aside>
+
   <!-- R: gestos -->
   <aside id="gestures" class="panel">
     <h1 class="display">Gestos</h1>

@@ -25,6 +25,9 @@ export class RTC {
     this.screen = null;       // { id, streamId } de quien comparte en la sala
     this.djStream = null;     // mi música, si estoy en la cabina
     this.dj = null;           // { id, streamId, name, track } de quien pasa música en la sala
+    this.stageStream = null;  // mi video en la pantalla del escenario (VJ)
+    this.stage = null;        // { id, streamId } de quien pasa video en la pantalla del escenario
+    this.onStage = () => {};  // (video | null) cuando cambia la pantalla del escenario
     this.remoteStreams = new Map(); // id del stream -> { id del jugador, stream } (para ubicar la música si llega antes del aviso)
     this.ctx = null;
     this.onScreen = () => {}; // (video | null, idDelDueño) cuando cambia la pantalla de la sala
@@ -92,7 +95,7 @@ export class RTC {
     pc.ontrack = (e) => this.onTrack(id, e);
     pc.onconnectionstatechange = () => { if (pc.connectionState === 'failed') pc.restartIce(); };
     this.peers.set(id, p);
-    for (const stream of [this.mic, this.screenStream, this.djStream]) {
+    for (const stream of [this.mic, this.screenStream, this.djStream, this.stageStream]) {
       if (!stream) continue;
       for (const t of stream.getTracks()) {
         const sender = pc.addTrack(t, stream);
@@ -125,7 +128,7 @@ export class RTC {
 
   // Alguien entró a la sala: si tengo micrófono o pantalla, me conecto con él
   playerJoined(id) {
-    if (this.mic || this.screenStream || this.djStream) this.peer(id);
+    if (this.mic || this.screenStream || this.djStream || this.stageStream) this.peer(id);
   }
 
   playerLeft(id) {
@@ -135,6 +138,7 @@ export class RTC {
     for (const [sid, r] of this.remoteStreams) if (r.id === id) this.remoteStreams.delete(sid);
     if (this.screen?.id === id) this.setScreen(null);
     if (this.dj?.id === id) this.setDJ(null);
+    if (this.stage?.id === id) this.setStage(null);
   }
 
   // ---------- Audio espacial ----------
@@ -143,6 +147,10 @@ export class RTC {
     const stream = e.streams[0];
     if (!stream) return;
     this.remoteStreams.set(stream.id, { id, stream });
+    if (this.stage && this.stage.id === id && stream.id === this.stage.streamId) {
+      if (e.track.kind === 'video') this.onStage(videoOf(stream));
+      return;
+    }
     if (this.dj && this.dj.id === id && stream.id === this.dj.streamId) {
       if (e.track.kind === 'audio') this.addMusic(`${id}:dj`, stream);
       return;
@@ -440,6 +448,53 @@ export class RTC {
     }
   }
 
+  // ---------- Pantalla del escenario (VJ): solo video ----------
+
+  async captureStage() {
+    try {
+      const stream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 30 }, audio: false });
+      this.pendingStage = stream;
+      return { ok: true, streamId: stream.id };
+    } catch {
+      return { ok: false, error: 'Se canceló o el navegador no permite compartir pantalla.' };
+    }
+  }
+
+  // La sala confirmó que la pantalla es mía
+  startStage() {
+    const stream = this.pendingStage;
+    if (!stream) return;
+    this.pendingStage = null;
+    this.stageStream = stream;
+    stream.getVideoTracks()[0]?.addEventListener('ended', () => this.onStageEnded?.());
+    for (const id of this.remoteIds()) {
+      const p = this.peers.get(id);
+      if (p) for (const t of stream.getTracks()) p.pc.addTrack(t, stream);
+      else this.peer(id);
+    }
+    this.onStage(videoOf(stream));
+  }
+
+  stopStage() {
+    for (const stream of [this.stageStream, this.pendingStage]) {
+      if (!stream) continue;
+      for (const t of stream.getTracks()) t.stop();
+      for (const { pc } of this.peers.values()) {
+        for (const sender of pc.getSenders()) if (sender.track && stream.getTracks().includes(sender.track)) pc.removeTrack(sender);
+      }
+    }
+    this.stageStream = this.pendingStage = null;
+  }
+
+  setStage(info) {
+    if (!info && this.stage) this.onStage(null);
+    this.stage = info;
+    if (info && info.id !== this.net.id) {
+      const r = this.remoteStreams.get(info.streamId);
+      if (r?.stream.getVideoTracks().length) this.onStage(videoOf(r.stream));
+    }
+  }
+
   // Mensaje de la sala sobre quién comparte
   setScreen(info) {
     if (!info && this.screen) {
@@ -462,4 +517,11 @@ function setBitrate(sender) {
   if (!params.encodings?.length) params.encodings = [{}];
   params.encodings[0].maxBitrate = 256000;
   sender.setParameters(params).catch(() => {});
+}
+
+function videoOf(stream) {
+  const video = document.createElement('video');
+  Object.assign(video, { muted: true, playsInline: true, autoplay: true, srcObject: stream });
+  video.play().catch(() => {});
+  return video;
 }

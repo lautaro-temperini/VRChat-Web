@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
-import { woodFloor, plasterBump, lightPool, painting, plaque, sign, djSign, rug, rng } from './textures.js';
+import { woodFloor, plasterBump, lightPool, painting, plaque, sign, djSign, artistsSign, rug, rng } from './textures.js';
 import { artworkInfo, SCULPTURES } from './artworks.js';
 
 // Sala principal. Zonas, de oeste a este:
@@ -591,9 +591,53 @@ export function buildMuseum(scene, renderer, quality) {
     signMesh.material.needsUpdate = true;
     old.dispose();
   }
-  signMesh.position.set(X1 - 0.05, 5.1, 0);
+  signMesh.position.set(X1 - 0.05, 6.15, 0);
   signMesh.rotation.y = -Math.PI / 2;
   scene.add(signMesh);
+
+  // Pantalla del escenario (detrás del DJ): la toma un VJ desde la consola; solo video
+  const stageIdle = sign('VISUALES', '#3a2f6b', '#07060f');
+  const stageScreen = new THREE.Mesh(new THREE.PlaneGeometry(6.4, 3.6), new THREE.MeshBasicMaterial({ map: stageIdle, toneMapped: false }));
+  stageScreen.position.set(X1 - 0.17, 3.45, 0);
+  stageScreen.rotation.y = -Math.PI / 2;
+  scene.add(stageScreen);
+  box(0.14, 3.8, 6.6, X1 - 0.1, 3.45, 0, darkMat, { cast: false, round: 0.04 });
+  const stageApi = {
+    setVideo(video) {
+      if (stageScreen.material.map !== stageIdle) stageScreen.material.map.dispose();
+      if (video) {
+        const tex = new THREE.VideoTexture(video);
+        tex.colorSpace = THREE.SRGBColorSpace;
+        stageScreen.material.map = tex;
+      } else stageScreen.material.map = stageIdle;
+      stageScreen.material.needsUpdate = true;
+    },
+  };
+
+  // Consola de artistas (frente al escenario): E para tomar luces o pantallas
+  const consoleMat = neon(0x19d3ff);
+  const desk = box(1.4, 1, 0.7, 11.9, 0.5, -5.7, darkMat, { collide: true, block: true, round: 0.05 });
+  box(1.3, 0.03, 0.03, 11.9, 1.0, -5.37, consoleMat, { cast: false, round: 0.01 });
+  for (const [x, w] of [[11.55, 0.5], [12.2, 0.5]]) {
+    const pad = new THREE.Mesh(new THREE.PlaneGeometry(w, 0.3), new THREE.MeshBasicMaterial({ color: 0x0c2a3a, toneMapped: false }));
+    pad.position.set(x, 1.005, -5.7);
+    pad.rotation.x = -Math.PI / 2;
+    scene.add(pad);
+  }
+  interactive(desk, { kind: 'artists' });
+  const artistSign = new THREE.Mesh(new THREE.PlaneGeometry(3, 0.75), new THREE.MeshBasicMaterial({ map: artistsSign({}), transparent: true, toneMapped: false }));
+  artistSign.position.set(11.9, 2.1, -5.7);
+  artistSign.rotation.y = -Math.PI / 2;
+  scene.add(artistSign);
+  function setArtists(parts) {
+    const old = artistSign.material.map;
+    artistSign.material.map = artistsSign(parts);
+    artistSign.material.needsUpdate = true;
+    old.dispose();
+  }
+
+  // Luces que manda un artista por OSC (null = automáticas)
+  let lightOverride = null;
 
   // Haces de luz que se mueven sobre el escenario
   box(0.15, 0.15, 9, 15, 6.6, 0, steelMat, { cast: false, round: 0.03 });
@@ -616,6 +660,24 @@ export function buildMuseum(scene, renderer, quality) {
   stageLight.position.set(13.5, 3.5, 0);
   scene.add(stageLight);
   animated.push((dt, t) => {
+    const L = lightOverride;
+    if (L) {
+      // Manda el artista: color general, y si mandó algo más específico, eso
+      const flash = L.flash;
+      const rgb = (c, fallback) => (c ?? fallback ?? [1, 1, 1]);
+      beams.forEach((b, i) => {
+        const f = L.focos[i];
+        b.rotation.z = f.pan * 0.8 - 0.2;
+        b.rotation.x = f.tilt * 0.6;
+        b.material.uniforms.color.value.setRGB(...rgb(f.color, L.color));
+        b.material.uniforms.opacity.value = (0.1 + flash * 0.3) * f.intensidad * L.intensidad;
+      });
+      ledMat.color.setRGB(...rgb(L.leds.color, L.color)).multiplyScalar(GLOW * L.intensidad * (1 + flash * 2));
+      cove.color.setRGB(...rgb(L.leds.color, L.color)).multiplyScalar(GLOW * L.intensidad * (1 + flash));
+      stageLight.color.setRGB(...rgb(L.escenario.color, L.color));
+      stageLight.intensity = (30 + flash * 90) * L.escenario.intensidad * L.intensidad;
+      return;
+    }
     const p = music.on ? music.pulse : 0;
     beams.forEach((b, i) => {
       b.rotation.z = Math.sin(t * 0.8 + i) * 0.55 - 0.2;
@@ -642,6 +704,9 @@ export function buildMuseum(scene, renderer, quality) {
       setBooth,
       setMusic(level) { music.level = level; music.on = level >= 0; },
     },
+    stage: stageApi,
+    // Consola de artistas: cartel con quién tiene cada parte, y las luces que mandan por OSC
+    artists: { setSign: setArtists, setLights(s) { lightOverride = s; } },
     bounds: { minY: 0.2, maxY: H - 0.2 },
     spawn: { x: 3, z: 0, yaw: Math.PI / 2 },
     update(dt, t) { for (const fn of animated) fn(dt, t); },

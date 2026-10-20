@@ -31,9 +31,6 @@
   tiene capucha ni bolsillo) y la ropa se ve pegada al cuerpo. "Luego lo vemos".
 - **Peinados rulos y coleta** con el estilo del pack (hacerlos en Blender). Hoy se muestran como
   corto y rodete, pero el dato guardado de cada cuenta no se toca.
-- **Puente OSC para artistas** (TouchDesigner, Ableton/Max for Live, Blender): programa local que
-  recibe OSC y lo manda a la sala; luces/visuales reaccionando a lo que hacen en vivo. Showcase con
-  varias pantallas compartidas.
 - **Salas de usuario tipo Fotolog/Instagram**: subir fotos que se cuelgan como cuadros, libro de visitas.
 - **Cartelera tipo muro** (Facebook/Twitter) en el hall.
 - **AR** en las dos direcciones (obras/avatar en tu habitación; fotos/escaneos del mundo real al juego).
@@ -60,6 +57,12 @@
 | DJ: ritmo | Focos, luz del escenario, LEDs y pista de baile laten con los graves (cada uno lo calcula en su PC) |
 | DJ + pantalla | Pueden estar las dos a la vez |
 | DJ: cartel y avisos | Cartel "DJ: nombre" + track. En el chat: arranque, fin y "Ahora suena". El track se lee solo de un archivo de texto (Chrome/Edge); si no se configura, no se muestra |
+| Artistas: qué | Luces por OSC (focos, luz del escenario, LEDs: una sola parte) y visuales como video desde su PC (pantalla compartida) |
+| Artistas: quién y cuántos | Cualquiera (el dueño/mods pueden deshabilitar la consola). Varios a la vez, una parte cada uno: luces, pantalla del escenario, pantalla del hall → 2 VJ + 1 DJ + 1 de luces |
+| Artistas: dónde | Consola junto al escenario (E). La pantalla del hall también se toma con E sobre ella |
+| Pantalla del escenario | Nueva, detrás del DJ, solo video (sin audio) |
+| Luces + DJ | Si hay artista en luces, manda él (el latido con la música se apaga). Al soltar, vuelven a automático |
+| Artistas: cartel y avisos | Cartel en la consola con quién tiene cada parte + aviso en el chat al tomar/soltar |
 | Estilo visual | ~~Estilizado tipo Fortnite~~ → **semi-realista tipo MetaPerson, no anime** (20/10). Posibles herramientas: Tripo o MCP de Blender |
 | Plataformas | PC y celular |
 | Público | Comunidad / amigos |

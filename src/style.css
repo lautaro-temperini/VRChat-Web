@@ -359,7 +359,14 @@ body.touch #dock { display: none; }
   .trade-cols { grid-template-columns: 1fr; }
 }
 /* ---------- Menú, panel de sala, Mundi, expulsado ---------- */
-body.roompanel #roompanel, body.mundi #mundi, body.kicked #kicked, body.gestures #gestures, body.djing #djpanel { display: flex; }
+body.roompanel #roompanel, body.mundi #mundi, body.kicked #kicked, body.gestures #gestures, body.djing #djpanel, body.artists #artistpanel { display: flex; }
+.part-row { display: flex; align-items: center; gap: 10px; padding: 10px; border-radius: 12px; background: rgba(255, 255, 255, 0.05); }
+.part-row .who { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.part-row .who span { color: var(--muted); font-size: 12.5px; }
+.part-row.mine { outline: 1px solid var(--accent); }
+.part-row .act { padding: 7px 12px; font-size: 12.5px; white-space: nowrap; }
+#artistpanel code { font-size: 12px; background: rgba(255, 255, 255, 0.08); padding: 1px 5px; border-radius: 5px; user-select: text; }
+#artistpanel summary { cursor: pointer; font-weight: 700; font-size: 13.5px; }
 .field select option { background: #1a1433; }
 #djpanel[data-mode=setup] #dj-live, #djpanel[data-mode=setup] #dj-stop { display: none; }
 #djpanel[data-mode=live] #dj-setup, #djpanel[data-mode=live] #dj-start { display: none; }

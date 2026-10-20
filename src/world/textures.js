@@ -259,3 +259,25 @@ export function djSign(title, sub = '') {
   if (sub) fit(sub, 600, 58, 190, '#ff7af0');
   return toTexture(c);
 }
+
+// Cartel de la consola de artistas: quién tiene las luces y las pantallas
+export function artistsSign({ luces, escenario, hall } = {}) {
+  const [c, g] = canvas(1024, 256);
+  g.fillStyle = 'rgba(7,6,15,0.75)'; g.fillRect(0, 0, 1024, 256);
+  g.textAlign = 'left'; g.textBaseline = 'middle';
+  g.font = '700 46px "Segoe UI", Arial, sans-serif';
+  g.fillStyle = '#19d3ff';
+  g.fillText('CONSOLA DE ARTISTAS · E', 36, 48);
+  const row = (label, who, y) => {
+    g.font = '600 40px "Segoe UI", Arial, sans-serif';
+    g.fillStyle = who ? '#ffffff' : 'rgba(255,255,255,0.45)';
+    const text = `${label}: ${who ?? 'libre'}`;
+    const w = g.measureText(text).width;
+    if (w > 950) g.font = `600 ${Math.floor(40 * 950 / w)}px "Segoe UI", Arial, sans-serif`;
+    g.fillText(text, 36, y);
+  };
+  row('Luces', luces, 116);
+  row('Pantalla del escenario', escenario, 168);
+  row('Pantalla del hall', hall, 220);
+  return toTexture(c);
+}

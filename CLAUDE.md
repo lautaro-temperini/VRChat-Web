@@ -45,7 +45,9 @@ npm run deploy   # build + wrangler deploy
   ground, roomPanel, `setHour(h)` para probar día/noche…). Si el panel del navegador está oculto,
   el juego corre a muy pocos cuadros: para probar física llamar a `ctrl.update(1/60)` en un bucle.
 - **Protocolo de la sala** (mensajes `t`): `join`, `s` (estado `[x,y,z,yaw,vel,pose]`), `afk`,
-  `mic`, `look`, `chat`, `rtc`, `screen`, `drop`, `pickup`, `mod`, `trade`, `emote` (gestos), `dj` (cabina: on/off, track). El servidor nunca
+  `mic`, `look`, `chat`, `rtc`, `screen`, `drop`, `pickup`, `mod`, `trade`, `emote` (gestos), `dj` (cabina: on/off, track), `part` (consola de artistas: luces / escenario), `luces` (estado de las luces por OSC).
+- **Puente OSC:** `npm run puente` (sin dependencias) recibe OSC en el puerto 9000 y lo pasa a la pestaña
+  del juego por http://127.0.0.1:9001. Direcciones en `src/net/osc.js`. El servidor nunca
   confía en el cliente para nombre, ropa ni objetos: los lee de `Accounts`.
 - **Catálogos compartidos** (objetos, peinados, validaciones) en `server/shared.js`, importados
   también por el cliente.
