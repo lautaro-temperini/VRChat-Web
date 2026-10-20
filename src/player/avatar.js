@@ -511,12 +511,18 @@ export class Avatar {
     const base = 1 - ga;
     const target = {};
     for (const k of Object.keys(LOCO)) target[k] = 0;
-    const stand = blend(speed, [[0, 'idle'], [1.2, 'walk'], [4.6, 'jog'], [6.8, 'sprint']]);
+    const stand = blend(speed, [[0, 'idle'], [1.6, 'walk'], [3, 'jog'], [4.6, 'sprint']]);
     if (this.talking) { stand.talk = stand.idle; stand.idle = 0; }
     for (const [k, v] of Object.entries(stand)) target[k] += v * w.stand;
     const crouch = blend(speed, [[0, 'crouch'], [1, 'crouchWalk']]);
     for (const [k, v] of Object.entries(crouch)) target[k] += v * w.crouch;
-    target.air += w.air + w.climb;
+    target.air += w.air;
+    target.climb += w.climb;
+    // Trepar dura lo que tarda el juego en subirte (0,42 s): la animación arranca de cero cada vez
+    if (A.actions.climb) {
+      if (w.climb > 0.5 && !A.climbing) { A.climbing = true; A.actions.climb.reset(); A.actions.climb.timeScale = A.actions.climb.getClip().duration / 0.5; }
+      if (w.climb < 0.1) A.climbing = false;
+    }
     target.sit += w.sit;
     A.w ??= {};
     for (const [k, action] of Object.entries(A.actions)) {

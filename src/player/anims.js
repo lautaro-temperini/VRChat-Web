@@ -10,17 +10,20 @@ import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 
 const BASE = `${import.meta.env.BASE_URL}models/anims/`;
 
-// Movimiento básico (nombres de la Universal Animation Library) y su velocidad natural en m/s
+// Movimiento básico y su velocidad natural en m/s (ya escalada a la altura de nuestros personajes).
+// file = Mixamo (más natural; puede ser distinto por cuerpo), clip = Universal Animation Library.
+// hips: false = sin mover la cadera (trepar: la subida ya la hace el juego)
 export const LOCO = {
-  idle: { clip: 'Idle_Loop' },
+  idle: { file: { masc: 'mixamo/quieto_masc.fbx', fem: 'mixamo/quieto_fem.fbx' } },
   talk: { clip: 'Idle_Talking_Loop' },
-  walk: { clip: 'Walk_Loop', speed: 0.97 },
-  jog: { clip: 'Jog_Fwd_Loop', speed: 5.36 },
-  sprint: { clip: 'Sprint_Loop', speed: 8.25 },
-  crouch: { clip: 'Crouch_Idle_Loop' },
-  crouchWalk: { clip: 'Crouch_Fwd_Loop', speed: 0.75 },
-  air: { clip: 'Jump_Loop' },
-  sit: { clip: 'Sitting_Idle_Loop' },
+  walk: { file: 'mixamo/caminar.fbx', speed: 1.66 },
+  jog: { file: 'mixamo/trotar.fbx', speed: 2.4 },
+  sprint: { file: 'mixamo/correr.fbx', speed: 4.4 },
+  crouch: { file: 'mixamo/agachado.fbx' },
+  crouchWalk: { file: 'mixamo/agachado_caminar.fbx', speed: 0.5 },
+  air: { file: 'mixamo/caer.fbx' },
+  sit: { file: 'mixamo/sentado.fbx' },
+  climb: { file: 'mixamo/trepar.fbx', hips: false },
 };
 
 // Gestos con animación (los que no están acá se hacen por código, ver GESTURES en avatar.js)
@@ -86,7 +89,7 @@ function loadFBX(file) {
 const _a = new THREE.Quaternion(), _b = new THREE.Quaternion(), _q = new THREE.Quaternion(), _v = new THREE.Vector3();
 
 // rig: el de avatar.js ({ bones: { nombre: { rest, world, inv, restPos, parentInv, worldPos } } })
-function retarget(clip, src, rig, name) {
+function retarget(clip, src, rig, name, { hips = true } = {}) {
   const tracks = [];
   const pelvis = rig.bones.pelvis;
   const ratio = pelvis.worldPos.y / src.hipsPos.y; // altura de cadera (y de paso las unidades: cm → m)
@@ -106,7 +109,7 @@ function retarget(clip, src, rig, name) {
         _q.fromArray(track.values, i).premultiply(A).multiply(B).normalize().toArray(v, i);
       }
       tracks.push(new THREE.QuaternionKeyframeTrack(`${S.to}.quaternion`, track.times, v));
-    } else if (prop === 'position' && bone === src.hips) {
+    } else if (prop === 'position' && bone === src.hips && hips) {
       // Cadera: solo el movimiento respecto del reposo, escalado a la altura del personaje.
       // Se le saca el corrimiento horizontal (el personaje no se tiene que ir de su lugar).
       const n = track.times.length, v = new Float32Array(n * 3);
@@ -131,17 +134,19 @@ function retarget(clip, src, rig, name) {
 
 // Clips ya adaptados, por tipo de cuerpo (todos los avatares con el mismo cuerpo los comparten)
 const adapted = new Map();
-function adapt(key, rig, make) {
-  if (!adapted.has(key)) adapted.set(key, make().then((c) => c && retarget(c.clip, c.src, rig, key)));
+function adapt(key, rig, make, opts) {
+  if (!adapted.has(key)) adapted.set(key, make().then((c) => c && retarget(c.clip, c.src, rig, key, opts)));
   return adapted.get(key);
 }
 
 export function locomotionClips(bodyType, rig) {
   return Promise.all(Object.entries(LOCO).map(async ([k, def]) => {
-    const clip = await adapt(`${bodyType}:${def.clip}`, rig, async () => {
+    const file = typeof def.file === 'object' ? def.file[bodyType] ?? def.file.masc : def.file;
+    const clip = await adapt(`${bodyType}:${file ?? def.clip}`, rig, async () => {
+      if (file) return loadFBX(file);
       const ual = await loadUAL();
       return { clip: ual.clips[def.clip], src: ual.src };
-    });
+    }, { hips: def.hips ?? true });
     return [k, clip];
   })).then(Object.fromEntries);
 }

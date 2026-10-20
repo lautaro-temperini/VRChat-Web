@@ -15,7 +15,9 @@
    - Falta: parpadeo (el modelo no tiene párpados animables), ropa con volumen (ver pendientes).
 2. **Animaciones** ✅ (`src/player/anims.js`): movimiento básico de la Universal Animation Library
    (Quaternius, mismo esqueleto) y gestos/bailes de Mixamo adaptados al esqueleto de Quaternius.
-   Falta: trepar (no hay animación; usa la de salto), Clapping (aplaudir sigue hecho por código).
+   Caminar, trotar, correr, agacharse, caer, sentarse, trepar y quieto (masc/fem) son de Mixamo (más
+   naturales que las de Quaternius, que se veían "superhéroe"); de Quaternius quedan hablar y un baile.
+   Falta: Clapping (aplaudir sigue hecho por código).
    Los packs originales están en `assets-src/` (no se publican); en `public/models/anims/` solo lo que se usa. Lista pedida: Idle, Walking, Jogging, Fast Run,
    Jump, Falling Idle, Crouch Idle, Crouch Walk Forward, Sitting Idle, Climbing / Braced Hang To Crouch,
    Talking, Waving, Clapping, Pointing, y 2-3 bailes. Formato FBX Binary, Without Skin, 30 fps,
