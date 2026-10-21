@@ -121,7 +121,7 @@ $('btn-cam').innerHTML = `${UI_ICONS.camera}<span class="lbl">3ª persona</span>
 for (const [id, icon] of [['btn-mic', 'mic'], ['btn-media', 'music'], ['btn-mundi', 'globe'], ['btn-gestures', 'hand'], ['btn-room', 'friends'], ['btn-look', 'user'], ['btn-inv', 'bag'], ['btn-friends', 'phone']]) {
   $(id).insertAdjacentHTML('afterbegin', UI_ICONS[icon]);
 }
-// En celular, inventario, amigos y Mundi van arriba con el resto (abajo están los controles táctiles)
+// En celular, inventario, amigos y el mapa van arriba con el resto (abajo están los controles táctiles)
 if (isTouch) for (const b of [...$('dock').children]) $('topbar').insertBefore(b, $('btn-settings'));
 $('btn-cam').onclick = () => ctrl.setMode(ctrl.mode === 'first' ? 'third' : 'first');
 document.addEventListener('pointerlockchange', () => {
@@ -134,7 +134,7 @@ for (const b of document.querySelectorAll('button.pill:not(.icon)')) {
 
 // ---------- Estado de la interfaz ----------
 // Un solo panel/superposición abierto a la vez. Mientras hay uno, el jugador no se mueve.
-const OVERLAYS = ['editing', 'settings', 'inspecting', 'profiling', 'auth', 'inventory', 'friends', 'trading', 'viewing', 'roompanel', 'mundi', 'gestures', 'djing', 'artists', 'kicked'];
+const OVERLAYS = ['editing', 'settings', 'inspecting', 'profiling', 'auth', 'inventory', 'friends', 'trading', 'viewing', 'roompanel', 'mundi', 'gestures', 'djing', 'artists', 'controls', 'kicked'];
 // Paneles que no frenan al personaje (se puede seguir caminando con WASD)
 const NON_BLOCKING = ['inventory', 'friends', 'roompanel', 'editing', 'gestures', 'artists'];
 function openOverlay(cls) {
@@ -336,14 +336,14 @@ const remotes = new Map();
 const rtc = new RTC(net);
 rtc.getRemoteIds = () => [...remotes.keys()];
 let screenVideo = null;
-rtc.onScreen = (video, ownerId) => {
-  screenVideo = video;
-  world.screen.setVideo(video);
-  if (!video && body.classList.contains('viewing')) closeOverlays();
-  setTimeout(refreshArtists); // el cartel de la consola dice quién tiene la pantalla del hall
-};
+rtc.onScreen = () => {}; // la pantalla del hall ya no existe: hay una sola pantalla (la del VJ)
 rtc.onMic = (state) => { $('btn-mic').dataset.state = state; };
-rtc.onStage = (video) => world.stage.setVideo(video);
+// La pantalla (toda la pared del escenario): la usa el VJ que la toma en la consola
+rtc.onStage = (video) => {
+  screenVideo = video;
+  world.stage.setVideo(video);
+  if (!video && body.classList.contains('viewing')) closeOverlays();
+};
 // El navegador habilita el audio recién después de un click o una tecla
 for (const ev of ['pointerdown', 'keydown']) addEventListener(ev, () => rtc.audio(), { once: true });
 
@@ -408,7 +408,7 @@ renderer.domElement.addEventListener('drop', (e) => {
   if (p) social.dropByIid(iid, p);
 });
 
-// Mundi: lista de salas
+// Mapa: lista de salas
 function openMundi() {
   const list = $('mundi-list');
   list.innerHTML = '';
@@ -478,8 +478,8 @@ function openScreenView() {
   Object.assign(v, { muted: true, playsInline: true, autoplay: true, srcObject: screenVideo.srcObject });
   v.play().catch(() => {});
   $('screen-slot').replaceChildren(v);
-  const owner = remotes.get(rtc.screen?.id);
-  $('screen-who').textContent = owner ? `Pantalla de ${owner.name}` : 'Tu pantalla';
+  const owner = parts.escenario && remotes.get(parts.escenario.id);
+  $('screen-who').textContent = owner ? `Visuales de ${owner.name}` : 'Tus visuales';
   openOverlay('viewing');
 }
 
@@ -500,9 +500,20 @@ if (room.startsWith('u-')) {
   api(`profile?id=${room.slice(2)}`).then((r) => { if (r.ok) { roomTitle = `Sala de ${r.profile.name}`; setStatus(); } });
 }
 
+// Controles: al entrar (una vez por visita), con /controls o desde el menú
+let controlsShown = false;
+function openControls() {
+  $('controls-list').innerHTML = isTouch
+    ? '<dl><dt>Joystick</dt><dd>Moverse (hasta el borde: trotar)</dd><dt>Arrastrar</dt><dd>Mirar</dd><dt>Saltar · Agachar</dt><dd>Botones de la derecha</dd><dt>Usar</dt><dd>Lo que tenés adelante</dd><dt>Chat</dt><dd>Escribir · /ayuda para ver comandos</dd></dl>'
+    : document.querySelector('.mtab[data-mtab=controls] dl').outerHTML;
+  openOverlay('controls');
+}
+$('controls-ok').onclick = closeOverlays;
+
 function join() {
   joined = true;
   refreshState();
+  if (!controlsShown) { controlsShown = true; setTimeout(openControls, 400); }
   net.connect(() => ({ token: session.token, s: ctrl.state(), afk }));
   social.refreshFriends();
   setInterval(() => social.refreshFriends(), 25_000);
@@ -639,13 +650,13 @@ net
       parts[m.part] = { id: m.id, name: m.name, streamId: m.streamId };
       if (m.part === 'luces' && mine) { myLights = defaultLights(); bridge.start(); }
       if (m.part === 'escenario') { if (mine) rtc.startStage(); else rtc.setStage({ id: m.id, streamId: m.streamId }); }
-      system(m.part === 'luces' ? `💡 ${who} ${mine ? 'tomaste' : 'tomó'} las luces.` : `🎬 ${who} ${mine ? 'estás pasando' : 'está pasando'} visuales en la pantalla del escenario.`);
+      system(m.part === 'luces' ? `💡 ${who} ${mine ? 'tomaste' : 'tomó'} las luces.` : `🎬 ${who} ${mine ? 'estás pasando' : 'está pasando'} visuales en la pantalla.`);
     } else {
       delete parts[m.part];
       if (m.part === 'luces') world.artists.setLights(null); // vuelven a automático
       if (m.part === 'escenario') rtc.setStage(null);
       if (mine) endPart(m.part);
-      system(m.part === 'luces' ? `💡 ${who} ${mine ? 'soltaste' : 'soltó'} las luces (vuelven a automático).` : `🎬 ${who} ${mine ? 'dejaste' : 'dejó'} la pantalla del escenario.`);
+      system(m.part === 'luces' ? `💡 ${who} ${mine ? 'soltaste' : 'soltó'} las luces (vuelven a automático).` : `🎬 ${who} ${mine ? 'dejaste' : 'dejó'} la pantalla.`);
     }
     refreshArtists();
   })
@@ -729,9 +740,13 @@ function command(text) {
   const arg = rest.join(' ').trim().toLowerCase().replace(/^@/, '');
   const friends = social.friends.friends;
   switch (cmd.toLowerCase()) {
+    case 'controls':
+    case 'controles':
+      openControls();
+      break;
     case 'ayuda':
     case 'help':
-      system('Comandos: /salas (ver salas) · /ir museo · /ir mi sala · /ir <amigo> (va a donde está, o a su sala)');
+      system('Comandos: /controls (teclas) · /salas (ver salas) · /ir museo · /ir mi sala · /ir <amigo> (va a donde está, o a su sala)');
       system('Gestos: /saludar · /aplaudir · /festejar · /señalar · también con la R');
       system(`Bailes (siguen hasta que te movés): /bailar (uno al azar) o /bailar 1 a ${DANCES.length}: ${DANCES.map((d, i) => `${i + 1} ${d}`).join(' · ')}`);
       break;
@@ -869,7 +884,7 @@ setInterval(readTrack, 3000);
 // ---------- Consola de artistas ----------
 // Partes: luces (por OSC, desde el puente en la PC del artista), pantalla del escenario (video)
 // y pantalla del hall (la de siempre). Cada una la toma un artista a la vez.
-const PART_NAMES = { luces: 'Las luces', escenario: 'La pantalla del escenario', hall: 'La pantalla del hall' };
+const PART_NAMES = { luces: 'Las luces', escenario: 'La pantalla' };
 const parts = {}; // luces / escenario → { id, name, streamId? }
 let myLights = null, lightsDirty = false;
 const bridge = new Bridge({
@@ -888,18 +903,14 @@ setInterval(() => {
 }, 66);
 rtc.onStageEnded = () => { if (parts.escenario?.id === net.id) releasePart('escenario'); };
 
-function hallOwner() {
-  if (!rtc.screen) return null;
-  return rtc.screen.id === net.id ? name : remotes.get(rtc.screen.id)?.name ?? 'alguien';
-}
 function refreshArtists() {
-  world.artists.setSign({ luces: parts.luces?.name, escenario: parts.escenario?.name, hall: hallOwner() });
+  world.artists.setSign({ luces: parts.luces?.name, escenario: parts.escenario?.name });
   if (body.classList.contains('artists')) renderArtists();
 }
 function renderArtists() {
   for (const row of document.querySelectorAll('.part-row')) {
     const part = row.dataset.part;
-    const holder = part === 'hall' ? (rtc.screen ? { id: rtc.screen.id, name: hallOwner() } : null) : parts[part];
+    const holder = parts[part];
     const mine = holder?.id === net.id;
     row.classList.toggle('mine', mine);
     row.querySelector('span').textContent = !holder ? 'Libre' : mine ? 'La tenés vos' : `La tiene ${holder.name}`;
@@ -915,7 +926,6 @@ function openArtists() {
   openOverlay('artists');
 }
 async function takePart(part) {
-  if (part === 'hall') { await useScreen(); return renderArtists(); }
   if (parts[part]?.id === net.id) return releasePart(part);
   if (part === 'luces') return net.send({ t: 'part', part, on: true });
   const r = await rtc.captureStage();
@@ -931,19 +941,18 @@ function endPart(part) {
   if (part === 'escenario') rtc.stopStage();
 }
 
-// Pantalla gigante: compartir la mía, dejar de compartir, o ver la de otro en grande
-async function useScreen() {
-  if (rtc.screenStream) { rtc.stopScreen(); toast('Dejaste de compartir tu pantalla.'); return; }
-  if (rtc.screen && rtc.screen.id !== net.id) { openScreenView(); return; }
-  if (!navigator.mediaDevices?.getDisplayMedia) { toast('Este dispositivo no permite compartir pantalla.'); return; }
-  const r = await rtc.startScreen();
-  toast(r.ok ? 'Estás compartiendo tu pantalla con la sala. E de nuevo para dejar de compartir.' : r.error);
+// La pantalla: E para pasar video (si está libre), dejar de pasarlo, o verla en grande
+function useScreen() {
+  const holder = parts.escenario;
+  if (!holder) return takePart('escenario');
+  if (holder.id === net.id) return releasePart('escenario');
+  openScreenView();
 }
 function promptFor(t) {
   if (t.kind === 'player') return `Ver perfil de ${t.player.name}`;
   if (t.kind === 'artists') return 'Consola de artistas';
   if (t.kind === 'dj') return !rtc.dj ? 'Pasar música' : rtc.dj.id === net.id ? 'Terminar tu set' : `Cabina ocupada (DJ ${rtc.dj.name})`;
-  if (t.kind === 'screen') return rtc.screenStream ? 'Dejar de compartir' : rtc.screen ? 'Ver en grande' : 'Compartir tu pantalla';
+  if (t.kind === 'screen') return !parts.escenario ? 'Pasar visuales' : parts.escenario.id === net.id ? 'Dejar de pasar visuales' : 'Ver en grande';
   if (t.kind === 'pickup') {
     const g = t.ground;
     return ground.locked(g, account?.id) ? `Disponible en ${Math.ceil((5000 - ground.age(g)) / 1000)} s` : `Juntar ${g.name.toLowerCase()}`;

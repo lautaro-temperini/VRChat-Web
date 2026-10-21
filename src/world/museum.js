@@ -1,22 +1,28 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
-import { woodFloor, plasterBump, lightPool, painting, plaque, sign, djSign, artistsSign, rug, rng } from './textures.js';
+import { lightPool, painting, plaque, artistsSign, boothSign, concrete, collage, rng } from './textures.js';
 import { artworkInfo, SCULPTURES } from './artworks.js';
 
-// Sala principal. Zonas, de oeste a este:
-//   x -18..-8  pantalla de video + bancos (paredes verde petróleo)
-//   x  -8.. 2  esculturas, bajo el tragaluz (paredes claras)
-//   x   2..18  pista de baile + cabina de DJ (paredes oscuras con neón)
-const X0 = -18, X1 = 18, Z0 = -11, Z1 = 11, H = 7, T = 0.4;
-// Tragaluz: abertura en el techo con vigas, por donde entra el sol
-const SX0 = -16, SX1 = 11, SZ = 2.6, WELL = 1.4, BAY = 1.8;
+// Sala principal (48 × 22 m), de oeste a este:
+//   x -30..-6  hall: puerta doble de entrada, barra (sur), baño que sobresale (norte),
+//              esculturas junto a la pared del medio, escaleras al balcón (norte y sur)
+//   x  -6..18  pista: paredes negras, balcón en U (2º piso) sobre tres paredes, cabina de VJ y
+//              luces abajo del balcón oeste, escenario con DJ y una pantalla que ocupa toda la pared este
+const X0 = -30, X1 = 18, Z0 = -11, Z1 = 11, H = 7, T = 0.4;
+const XP = -6;                        // pared del medio: el hall al oeste, la pista al este
+const BY = 3.5, BT = 0.25;            // balcón: altura del piso y espesor de la losa
+const BX = 12, BZ = 7.5, BW = -1;     // balcón: franjas norte/sur hasta x = 12 (|z| > 7,5) y franja oeste hasta x = -1
+// Tragaluz: abertura en el techo del hall, por donde entra el sol (termina antes de la pista)
+const SX0 = -27, SX1 = -7.5, SZ = 2.6, WELL = 1.4, BAY = 1.8;
 const SUN_FROM = new THREE.Vector3(-6, 12, 5);
+// Baño: sobresale al norte del hall
+const WC = { x0: -22, x1: -15, z0: -17, door0: -19.6, door1: -17.6, h: 3.2 };
 // Neón: color por encima de 1 para que el bloom (umbral alto) brille solo en estas piezas
 const GLOW = 5;
 
 export function buildMuseum(scene, renderer, quality) {
-  const colliders = [];     // cajas en el plano XZ con altura (top); climb:false = no se puede trepar
+  const colliders = [];     // cajas en el plano XZ con altura (top) y, si flotan, base (bottom)
   const blockers = [];      // mallas que frenan la cámara en tercera persona
   const interactables = []; // cosas con las que se interactúa con E
   const animated = [];      // funciones (dt, t) que se llaman cada frame
@@ -32,22 +38,28 @@ export function buildMuseum(scene, renderer, quality) {
   scene.add(hemi);
 
   const sun = new THREE.DirectionalLight(0xffe2b8, high ? 3 : 1.6);
-  sun.position.copy(SUN_FROM);
+  sun.target.position.set(-6, 0, 0);
+  sun.position.copy(SUN_FROM).add(sun.target.position);
+  scene.add(sun.target);
   if (high) {
     sun.castShadow = true;
     sun.shadow.mapSize.set(2048, 2048);
-    Object.assign(sun.shadow.camera, { left: -24, right: 24, top: 18, bottom: -18, near: 1, far: 45 });
+    Object.assign(sun.shadow.camera, { left: -30, right: 30, top: 20, bottom: -20, near: 1, far: 50 });
     sun.shadow.bias = -0.0005;
     sun.shadow.normalBias = 0.03;
   }
   scene.add(sun);
 
   // ---------- Materiales ----------
-  const bump = plasterBump();
-  bump.repeat.set(6, 2);
-  const wallMat = new THREE.MeshStandardMaterial({ color: 0xf1ebe0, roughness: 0.95, bumpMap: bump, bumpScale: 0.4 });
-  const tealMat = new THREE.MeshStandardMaterial({ color: 0x1f5560, roughness: 0.9 });
-  const nightMat = new THREE.MeshStandardMaterial({ color: 0x1e1b28, roughness: 0.85 });
+  const concreteTex = concrete();
+  const floorMat = (w, d) => {
+    const t = concreteTex.clone();
+    t.repeat.set(w / 6, d / 6);
+    t.needsUpdate = true;
+    return new THREE.MeshStandardMaterial({ map: t, roughness: 0.22, metalness: 0.05 });
+  };
+  const wallMat = new THREE.MeshStandardMaterial({ color: 0xf1ebe0, roughness: 0.95 });
+  const blackMat = new THREE.MeshStandardMaterial({ color: 0x0b0b0d, roughness: 0.9 });
   const woodMat = new THREE.MeshStandardMaterial({ color: 0x4a2c1b, roughness: 0.45 });
   const trimMat = new THREE.MeshStandardMaterial({ color: 0xf7f3ea, roughness: 0.6 });
   const darkMat = new THREE.MeshStandardMaterial({ color: 0x1b1b20, roughness: 0.55, metalness: 0.2 });
@@ -55,6 +67,9 @@ export function buildMuseum(scene, renderer, quality) {
   const brassMat = new THREE.MeshStandardMaterial({ color: 0xd4a74a, roughness: 0.25, metalness: 1 });
   const marbleMat = new THREE.MeshStandardMaterial({ color: 0xf4f1ea, roughness: 0.3 });
   const pedestalMat = new THREE.MeshStandardMaterial({ color: 0xf2f0ec, roughness: 0.85 });
+  const glassMat = new THREE.MeshStandardMaterial({ color: 0x9fb8c8, roughness: 0.05, metalness: 0.2, transparent: true, opacity: 0.18, depthWrite: false });
+  const fabricMat = new THREE.MeshStandardMaterial({ color: 0x2f3a48, roughness: 0.95 });
+  const porcelainMat = new THREE.MeshStandardMaterial({ color: 0xf6f6f2, roughness: 0.15 });
   const frameMats = [
     new THREE.MeshStandardMaterial({ color: 0x3a2414, roughness: 0.45 }),
     new THREE.MeshStandardMaterial({ color: 0xc9a14a, roughness: 0.28, metalness: 1 }),
@@ -62,6 +77,8 @@ export function buildMuseum(scene, renderer, quality) {
   ];
   const neon = (hex) => { const m = new THREE.MeshBasicMaterial({ toneMapped: false }); m.color.set(hex).multiplyScalar(GLOW); return m; };
 
+  // opts: collide (choca), float (choca solo a su altura: se puede pasar por debajo), block (frena la cámara),
+  //       climb (se puede trepar), round (bordes redondeados), cast (sombra)
   function box(w, h, d, x, y, z, mat, opts = {}) {
     const geo = opts.round ? new RoundedBoxGeometry(w, h, d, 4, opts.round) : new THREE.BoxGeometry(w, h, d);
     const m = new THREE.Mesh(geo, mat);
@@ -69,12 +86,12 @@ export function buildMuseum(scene, renderer, quality) {
     m.castShadow = high && (opts.cast ?? true);
     m.receiveShadow = high;
     scene.add(m);
-    if (opts.collide) collider(x - w / 2, x + w / 2, z - d / 2, z + d / 2, y + h / 2, opts.climb);
+    if (opts.collide) collider(x - w / 2, x + w / 2, z - d / 2, z + d / 2, y + h / 2, opts.climb, opts.float ? y - h / 2 : undefined);
     if (opts.block) blockers.push(m);
     return m;
   }
-  function collider(minX, maxX, minZ, maxZ, top, climb = true) {
-    colliders.push({ minX, maxX, minZ, maxZ, top, climb });
+  function collider(minX, maxX, minZ, maxZ, top, climb = true, bottom) {
+    colliders.push({ minX, maxX, minZ, maxZ, top, climb, bottom });
   }
   function interactive(object, data) {
     const item = { object, ...data };
@@ -82,38 +99,37 @@ export function buildMuseum(scene, renderer, quality) {
     interactables.push(item);
     return item;
   }
-
-  // ---------- Piso ----------
-  const floorTex = woodFloor();
-  floorTex.repeat.set((X1 - X0) / 4.5, (Z1 - Z0) / 4.5);
-  const floor = new THREE.Mesh(new THREE.PlaneGeometry(X1 - X0, Z1 - Z0), new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.32 }));
-  floor.rotation.x = -Math.PI / 2;
-  floor.receiveShadow = high;
-  scene.add(floor);
-
-  // ---------- Techo con tragaluz ----------
-  const ceilMat = new THREE.MeshStandardMaterial({ color: 0xe6e0d6, roughness: 1 });
-  function ceiling(x, z, w, d) {
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), ceilMat);
-    m.rotation.x = Math.PI / 2;
-    m.position.set(x, H, z);
-    m.castShadow = high; // tapa el sol: solo entra por el tragaluz
+  function plane(w, h, mat, x, y, z, rotY = 0, rotX = 0) {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat);
+    m.position.set(x, y, z);
+    m.rotation.set(rotX, rotY, 0, 'YXZ');
+    m.receiveShadow = high;
     scene.add(m);
+    return m;
   }
-  ceiling(0, (Z0 - SZ) / 2, X1 - X0, -SZ - Z0);
-  ceiling(0, (Z1 + SZ) / 2, X1 - X0, Z1 - SZ);
-  ceiling((X0 + SX0) / 2, 0, SX0 - X0, SZ * 2);
-  ceiling((SX1 + X1) / 2, 0, X1 - SX1, SZ * 2);
+
+  // ---------- Piso: cemento pulido ----------
+  plane(X1 - X0, Z1 - Z0, floorMat(X1 - X0, Z1 - Z0), (X0 + X1) / 2, 0, 0, 0, -Math.PI / 2);
+
+  // ---------- Techo: claro en el hall (con tragaluz), negro sobre la pista ----------
+  const ceilMat = new THREE.MeshStandardMaterial({ color: 0xe6e0d6, roughness: 1 });
+  const ceilBlack = new THREE.MeshStandardMaterial({ color: 0x08080a, roughness: 1 });
+  function ceiling(x0, x1, z0, z1, mat) {
+    const m = plane(x1 - x0, z1 - z0, mat, (x0 + x1) / 2, H, (z0 + z1) / 2, 0, Math.PI / 2);
+    m.castShadow = high; // tapa el sol: solo entra por el tragaluz
+  }
+  ceiling(X0, XP, Z0, -SZ, ceilMat);
+  ceiling(X0, XP, SZ, Z1, ceilMat);
+  ceiling(X0, SX0, -SZ, SZ, ceilMat);
+  ceiling(SX1, XP, -SZ, SZ, ceilMat);
+  ceiling(XP, X1, Z0, Z1, ceilBlack);
 
   const wellX = (SX0 + SX1) / 2, wellW = SX1 - SX0;
   box(wellW, WELL, 0.1, wellX, H + WELL / 2, -SZ - 0.05, trimMat);
   box(wellW, WELL, 0.1, wellX, H + WELL / 2, SZ + 0.05, trimMat);
   box(0.1, WELL, SZ * 2, SX0 - 0.05, H + WELL / 2, 0, trimMat);
   box(0.1, WELL, SZ * 2, SX1 + 0.05, H + WELL / 2, 0, trimMat);
-  const sky = new THREE.Mesh(new THREE.PlaneGeometry(wellW, SZ * 2), new THREE.MeshBasicMaterial({ color: new THREE.Color(0xd6e8ff).multiplyScalar(1.5) }));
-  sky.rotation.x = Math.PI / 2;
-  sky.position.set(wellX, H + WELL, 0);
-  scene.add(sky);
+  const sky = plane(wellW, SZ * 2, new THREE.MeshBasicMaterial({ color: new THREE.Color(0xd6e8ff).multiplyScalar(1.5) }), wellX, H + WELL, 0, 0, Math.PI / 2);
   for (let x = SX0 + BAY; x < SX1 - 0.1; x += BAY) box(0.09, 0.14, SZ * 2, x, H + WELL - 0.12, 0, steelMat, { round: 0.02 });
   box(wellW, 0.14, 0.09, wellX, H + WELL - 0.12, 0, steelMat, { round: 0.02 });
 
@@ -173,29 +189,22 @@ export function buildMuseum(scene, renderer, quality) {
     });
   }
 
-  // Luces lineales en el techo
-  const panelMat = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xfff3e0, emissiveIntensity: 1.3 });
-  for (const x of [-13, -4.5, 4.5]) for (const z of [-6.8, 6.8]) box(5, 0.04, 0.3, x, H - 0.02, z, panelMat, { cast: false, round: 0.015 });
-
   // ---------- Paredes ----------
   const wall = { collide: true, block: true, cast: false, climb: false };
-  box(X1 - X0 + 2 * T, H, T, 0, H / 2, Z0 - T / 2, wallMat, wall); // norte
-  box(X1 - X0 + 2 * T, H, T, 0, H / 2, Z1 + T / 2, wallMat, wall); // sur
-  box(T, H, Z1 - Z0, X0 - T / 2, H / 2, 0, wallMat, wall);         // oeste
-  box(T, H, Z1 - Z0, X1 + T / 2, H / 2, 0, wallMat, wall);         // este
+  // Norte: con el hueco de la puerta del baño
+  box(WC.door0 - X0 + T, H, T, (X0 - T + WC.door0) / 2, H / 2, Z0 - T / 2, wallMat, wall);
+  box(X1 + T - WC.door1, H, T, (WC.door1 + X1 + T) / 2, H / 2, Z0 - T / 2, wallMat, wall);
+  box(WC.door1 - WC.door0, H - 2.5, T, (WC.door0 + WC.door1) / 2, 2.5 + (H - 2.5) / 2, Z0 - T / 2, wallMat, { cast: false });
+  box(X1 - X0 + 2 * T, H, T, (X0 + X1) / 2, H / 2, Z1 + T / 2, wallMat, wall); // sur
+  box(T, H, Z1 - Z0, X0 - T / 2, H / 2, 0, wallMat, wall);                     // oeste
+  box(T, H, Z1 - Z0, X1 + T / 2, H / 2, 0, wallMat, wall);                     // este
 
-  // Color por zona (paneles sobre la pared, de la boiserie al techo)
-  const PH = H - 1.06 - 0.18, PY = 1.06 + PH / 2;
-  for (const z of [Z0 + 0.01, Z1 - 0.01]) {
-    box(10, PH, 0.02, -13, PY, z, tealMat, { cast: false });
-    box(16, PH, 0.02, 10, PY, z, nightMat, { cast: false });
-  }
-  box(0.02, PH, Z1 - Z0, X0 + 0.01, PY, 0, tealMat, { cast: false });
-  box(0.02, PH, Z1 - Z0, X1 - 0.01, PY, 0, nightMat, { cast: false });
+  // Pista: paredes negras de piso a techo
+  for (const z of [Z0 + 0.012, Z1 - 0.012]) box(X1 - XP, H, 0.02, (XP + X1) / 2, H / 2, z, blackMat, { cast: false });
 
-  // Boiserie de madera, moldura y cornisa (el grosor va hacia adentro de la sala)
-  for (const [x, z, alongX] of [[0, Z0, true], [0, Z1, true], [X0, 0, false], [X1, 0, false]]) {
-    const len = alongX ? X1 - X0 : Z1 - Z0;
+  // Hall: boiserie de madera, moldura y cornisa (el grosor va hacia adentro)
+  const hallW = XP - X0, hallX = (X0 + XP) / 2;
+  for (const [x, z, alongX, len] of [[hallX, Z0, true, hallW], [hallX, Z1, true, hallW], [X0, 0, false, Z1 - Z0]]) {
     const piece = (h, y, thick, mat, round) => {
       const inward = (alongX ? -Math.sign(z) : -Math.sign(x)) * thick / 2;
       box(alongX ? len : thick, h, alongX ? thick : len, alongX ? x : x + inward, y, alongX ? z + inward : z, mat, { cast: false, round });
@@ -205,11 +214,26 @@ export function buildMuseum(scene, renderer, quality) {
     piece(0.18, H - 0.09, 0.14, trimMat, 0.04);
   }
 
-  // Pared divisoria (con cuadros en ambas caras)
-  box(0.3, 4.2, 9, -8, 2.1, 0, wallMat, { collide: true, block: true, climb: false });
-  box(0.38, 0.12, 9.08, -8, 4.26, 0, trimMat, { round: 0.04 });
+  // Puerta doble de entrada (pared oeste)
+  {
+    const x = X0 + 0.03, w = 2.8, h = 3.1;
+    box(0.1, h + 0.2, 0.18, x, (h + 0.2) / 2, -w / 2 - 0.09, darkMat, { cast: false });
+    box(0.1, h + 0.2, 0.18, x, (h + 0.2) / 2, w / 2 + 0.09, darkMat, { cast: false });
+    box(0.1, 0.2, w + 0.36, x, h + 0.1, 0, darkMat, { cast: false });
+    const doorGlass = new THREE.MeshStandardMaterial({ color: 0x1d2a33, roughness: 0.08, metalness: 0.6, emissive: 0x6f8aa0, emissiveIntensity: 0.25 });
+    for (const s of [-1, 1]) {
+      box(0.06, h, w / 2 - 0.04, x + 0.02, h / 2, s * (w / 4 + 0.01), doorGlass, { cast: false });
+      box(0.07, h, 0.08, x + 0.02, h / 2, s * (w / 2 - 0.04), darkMat, { cast: false });
+      box(0.07, h, 0.06, x + 0.02, h / 2, s * 0.04, darkMat, { cast: false });
+      box(0.05, 1.1, 0.04, x + 0.09, 1.15, s * 0.16, brassMat, { cast: false, round: 0.015 });
+    }
+  }
 
-  // Columnas de mármol acanaladas, con base y capitel
+  // Pared del medio (hasta la losa del balcón; cuadros del lado del hall)
+  box(0.3, BY - BT, 9, XP, (BY - BT) / 2, 0, wallMat, { collide: true, block: true, climb: false });
+  box(0.02, BY - BT, 9, XP + 0.16, (BY - BT) / 2, 0, blackMat, { cast: false });
+
+  // Columnas de mármol acanaladas en el hall
   const shaftGeo = new THREE.CylinderGeometry(0.25, 0.27, H - 0.75, 160, 1, true);
   {
     const p = shaftGeo.attributes.position;
@@ -222,8 +246,8 @@ export function buildMuseum(scene, renderer, quality) {
     shaftGeo.computeVertexNormals();
   }
   const ringGeo = new THREE.TorusGeometry(0.29, 0.045, 12, 48).rotateX(Math.PI / 2);
-  for (const x of [-13, -3, 7]) {
-    for (const z of [-7.6, 7.6]) {
+  for (const x of [-25, -16.5]) {
+    for (const z of [-6.6, 6.6]) {
       box(0.8, 0.22, 0.8, x, 0.11, z, marbleMat, { round: 0.03 });
       const ring = new THREE.Mesh(ringGeo, marbleMat);
       ring.position.set(x, 0.27, z);
@@ -234,12 +258,11 @@ export function buildMuseum(scene, renderer, quality) {
       for (const m of [ring, col, ringTop]) { m.castShadow = m.receiveShadow = high; scene.add(m); }
       blockers.push(col);
       box(0.74, 0.3, 0.74, x, H - 0.2, z, marbleMat, { round: 0.03 });
-      // Colisión de toda la altura: no se atraviesa ni se trepa
       collider(x - 0.4, x + 0.4, z - 0.4, z + 0.4, H, false);
     }
   }
 
-  // ---------- Cuadros (con marco biselado y foco en el techo) ----------
+  // ---------- Cuadros del hall (con marco biselado y foco en el techo) ----------
   const pool = lightPool();
   const poolMat = new THREE.MeshBasicMaterial({ map: pool, transparent: true, opacity: 0.2, blending: THREE.AdditiveBlending, depthWrite: false });
   const spotGeo = new THREE.CylinderGeometry(0.05, 0.07, 0.18, 20).rotateX(Math.PI / 2);
@@ -255,12 +278,11 @@ export function buildMuseum(scene, renderer, quality) {
   }
 
   let artId = 1;
-  function hangArt(x, z, rotY, railOffset) {
+  function hangArt(x, z, rotY, railOffset, y = 2.15) {
     const w = 1.5 + rand() * 1.1, h = 1.1 + rand() * 0.8;
     const g = new THREE.Group();
-    g.position.set(x, 2.15, z);
+    g.position.set(x, y, z);
     g.rotation.y = rotY;
-
     const glow = new THREE.Mesh(new THREE.PlaneGeometry(w * 2, h * 2), poolMat);
     glow.position.set(0, 0.25, 0.006);
     g.add(glow);
@@ -280,7 +302,6 @@ export function buildMuseum(scene, renderer, quality) {
     g.add(label);
     scene.add(g);
     interactive(g, { kind: 'art', prompt: 'Ver obra', info, image: tex.image });
-
     if (railOffset) {
       // Foco colgado del riel, apuntando al cuadro
       const head = new THREE.Mesh(spotGeo, steelMat);
@@ -294,105 +315,14 @@ export function buildMuseum(scene, renderer, quality) {
     }
     artId++;
   }
+  for (const x of [-26.8, -23.6, -14.6]) hangArt(x, Z0 + 0.03, 0, 1.4);
+  for (const x of [-27, -13.4]) hangArt(x, Z1 - 0.03, Math.PI, 1.4);
+  for (const z of [-6.4, 6.4]) hangArt(X0 + 0.03, z, Math.PI / 2, 1.4);
+  for (const z of [-2.2, 2.2]) hangArt(XP - 0.16, z, -Math.PI / 2, 0, 1.75);
+  box(XP - X0, 0.04, 0.05, hallX, H - 0.08, Z0 + 1.4, steelMat, { cast: false, round: 0.015 });
+  box(XP - X0, 0.04, 0.05, hallX, H - 0.08, Z1 - 1.4, steelMat, { cast: false, round: 0.015 });
 
-  for (const x of [-15, -11, -4.5, -0.5, 4, 8]) {
-    hangArt(x, Z0 + 0.03, 0, 1.4);
-    hangArt(x, Z1 - 0.03, Math.PI, 1.4);
-  }
-  for (const z of [-2.2, 2.2]) {
-    hangArt(-8.15, z, -Math.PI / 2);
-    hangArt(-7.85, z, Math.PI / 2);
-  }
-  box(27, 0.04, 0.05, -3.5, H - 0.08, Z0 + 1.4, steelMat, { cast: false, round: 0.015 });
-  box(27, 0.04, 0.05, -3.5, H - 0.08, Z1 - 1.4, steelMat, { cast: false, round: 0.015 });
-
-  // ---------- Pantalla de video (zona oeste) ----------
-  const vid = document.createElement('canvas');
-  vid.width = 640; vid.height = 360;
-  const vg = vid.getContext('2d');
-  const vidTex = new THREE.CanvasTexture(vid);
-  vidTex.colorSpace = THREE.SRGBColorSpace;
-  const bezel = box(0.14, 4.25, 7.45, X0 + 0.09, 3.2, 0, darkMat, { cast: false, round: 0.05 });
-  const screen = new THREE.Mesh(new THREE.PlaneGeometry(7, 3.94), new THREE.MeshBasicMaterial({ map: vidTex, toneMapped: false }));
-  screen.position.set(X0 + 0.165, 3.2, 0);
-  screen.rotation.y = Math.PI / 2;
-  scene.add(screen);
-  interactive(screen, { kind: 'screen', prompt: 'Compartir tu pantalla' });
-  bezel.userData.interact = screen.userData.interact;
-  const cyan = neon(0x36e6ff);
-  const tube = (w, h, d, x, y, z) => box(w, h, d, x, y, z, cyan, { cast: false, round: 0.012 });
-  tube(0.03, 0.03, 7.6, X0 + 0.17, 5.35, 0);
-  tube(0.03, 0.03, 7.6, X0 + 0.17, 1.05, 0);
-  tube(0.03, 4.34, 0.03, X0 + 0.17, 3.2, -3.78);
-  tube(0.03, 4.34, 0.03, X0 + 0.17, 3.2, 3.78);
-  // Cuando alguien comparte su pantalla, se ve acá (si no, la animación de espera)
-  let liveVideo = null;
-  const screenApi = {
-    position: new THREE.Vector3(X0 + 0.2, 3.2, 0),
-    setVideo(video) {
-      liveVideo = video;
-      if (screen.material.map !== vidTex) screen.material.map?.dispose();
-      if (video) {
-        const tex = new THREE.VideoTexture(video);
-        tex.colorSpace = THREE.SRGBColorSpace;
-        screen.material.map = tex;
-      } else screen.material.map = vidTex;
-      screen.material.needsUpdate = true;
-    },
-    get live() { return !!liveVideo; },
-  };
-  let vidClock = 0;
-  animated.push((dt, t) => {
-    if (liveVideo) return;
-    vidClock += dt;
-    if (vidClock < 1 / 30) return;
-    vidClock = 0;
-    const grad = vg.createLinearGradient(0, 0, 640, 360);
-    grad.addColorStop(0, `hsl(${(t * 20) % 360} 70% 18%)`);
-    grad.addColorStop(1, `hsl(${(t * 20 + 120) % 360} 70% 10%)`);
-    vg.fillStyle = grad;
-    vg.fillRect(0, 0, 640, 360);
-    for (let i = 0; i < 6; i++) {
-      const x = 320 + Math.sin(t * 0.7 + i * 1.7) * 220, y = 180 + Math.cos(t * 0.9 + i * 2.3) * 120;
-      const r = vg.createRadialGradient(x, y, 0, x, y, 120);
-      r.addColorStop(0, `hsla(${(i * 60 + t * 40) % 360} 90% 60% / 0.55)`);
-      r.addColorStop(1, 'hsla(0 0% 0% / 0)');
-      vg.fillStyle = r;
-      vg.fillRect(0, 0, 640, 360);
-    }
-    vg.fillStyle = 'rgba(255,255,255,0.92)';
-    vg.font = '700 34px "Segoe UI", Arial';
-    vg.textAlign = 'center';
-    vg.fillText('PANTALLA', 320, 170);
-    vg.font = '20px "Segoe UI", Arial';
-    vg.fillText('Acercate y apretá E para compartir tu pantalla', 320, 205);
-    vidTex.needsUpdate = true;
-  });
-
-  // Alfombra y bancos frente a la pantalla (con E te sentás)
-  const rugMesh = new THREE.Mesh(new THREE.PlaneGeometry(4.2, 8), new THREE.MeshStandardMaterial({ map: rug(), roughness: 0.95 }));
-  rugMesh.rotation.x = -Math.PI / 2;
-  rugMesh.position.set(-12.2, 0.004, 0);
-  rugMesh.receiveShadow = high;
-  scene.add(rugMesh);
-  const cushion = new THREE.MeshStandardMaterial({ color: 0x2f5e64, roughness: 0.9 });
-  for (const z of [-2.2, 2.2]) {
-    const bench = new THREE.Group();
-    scene.add(bench);
-    const parts = [
-      box(0.5, 0.3, 0.12, -12, 0.15, z - 1.3, woodMat, { round: 0.03 }),
-      box(0.5, 0.3, 0.12, -12, 0.15, z + 1.3, woodMat, { round: 0.03 }),
-      box(0.6, 0.1, 3, -12, 0.35, z, woodMat, { round: 0.035 }),
-      box(0.56, 0.08, 2.9, -12, 0.44, z, cushion, { round: 0.035 }),
-    ];
-    for (const p of parts) bench.attach(p);
-    collider(-12.3, -11.7, z - 1.5, z + 1.5, 0.48);
-    // Asientos: mirando a la pantalla (oeste)
-    const seats = [-0.9, 0, 0.9].map((dz) => ({ x: -11.9, y: 0, z: z + dz, yaw: -Math.PI / 2 }));
-    interactive(bench, { kind: 'sit', prompt: 'Sentarse', seats });
-  }
-
-  // ---------- Plantas ----------
+  // ---------- Plantas (solo en el hall) ----------
   const potMat = new THREE.MeshStandardMaterial({ color: 0xc4683f, roughness: 0.8 });
   const soilMat = new THREE.MeshStandardMaterial({ color: 0x2b1d14, roughness: 1 });
   const leafMats = [0x3f8a3a, 0x2f6e2c, 0x58a548].map((c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.55, side: THREE.DoubleSide }));
@@ -404,7 +334,6 @@ export function buildMuseum(scene, renderer, quality) {
   leafShape.bezierCurveTo(-0.1, 0.32, -0.11, 0.1, 0, 0);
   const leafGeo = new THREE.ShapeGeometry(leafShape, 12);
   {
-    // Curvar la hoja hacia abajo y plegarla por la nervadura
     const p = leafGeo.attributes.position;
     for (let i = 0; i < p.count; i++) {
       const x = p.getX(i), y = p.getY(i);
@@ -432,7 +361,6 @@ export function buildMuseum(scene, renderer, quality) {
       pivot.add(tilt);
       const leaf = new THREE.Mesh(leafGeo, leafMats[i % 3]);
       leaf.scale.setScalar(s * (1.15 - (i / 16) * 0.4));
-      leaf.castShadow = high;
       tilt.add(leaf);
       g.add(pivot);
     }
@@ -440,9 +368,9 @@ export function buildMuseum(scene, renderer, quality) {
     scene.add(g);
     collider(x - 0.3, x + 0.3, z - 0.3, z + 0.3, 1.2, false);
   }
-  for (const [x, z] of [[-17.3, -10.3], [-17.3, 10.3], [-8, -5.2], [-8, 5.2], [1.4, -10.3], [1.4, 10.3], [17.3, -10.3], [17.3, 10.3]]) plant(x, z);
+  for (const [x, z] of [[-29.3, -10.3], [-29.3, 10.3], [-29.2, -2.1], [-29.2, 2.1], [-6.9, -5.3], [-6.9, 5.3], [-12.9, -10.3]]) plant(x, z);
 
-  // ---------- Esculturas ----------
+  // ---------- Esculturas (del lado del hall de la pared del medio) ----------
   const sculptures = [];
   function pedestal(x, z, w, h, mesh, lift, key) {
     const body = box(w, h - 0.05, w, x, (h - 0.05) / 2, z, pedestalMat, { collide: true, block: true, round: 0.025 });
@@ -451,16 +379,15 @@ export function buildMuseum(scene, renderer, quality) {
     mesh.castShadow = high;
     scene.add(mesh);
     sculptures.push(mesh);
-    const info = SCULPTURES[key];
-    const item = interactive(mesh, { kind: 'art', prompt: 'Ver escultura', info });
+    const item = interactive(mesh, { kind: 'art', prompt: 'Ver escultura', info: SCULPTURES[key] });
     body.userData.interact = item;
     cap.userData.interact = item;
   }
-  pedestal(-5.5, -3.2, 0.8, 1, new THREE.Mesh(
+  pedestal(-11.6, -3.2, 0.8, 1, new THREE.Mesh(
     new THREE.TorusKnotGeometry(0.24, 0.075, 260, 32),
     new THREE.MeshStandardMaterial({ color: 0xd4a74a, metalness: 1, roughness: 0.22 }),
   ), 0.4, 'knot');
-  pedestal(-5.5, 3.2, 0.8, 1, new THREE.Mesh(
+  pedestal(-11.6, 3.2, 0.8, 1, new THREE.Mesh(
     new THREE.IcosahedronGeometry(0.33, 0),
     new THREE.MeshPhysicalMaterial({ color: 0xf4f1ea, roughness: 0.35, clearcoat: 1, flatShading: true }),
   ), 0.36, 'ico');
@@ -469,29 +396,30 @@ export function buildMuseum(scene, renderer, quality) {
     const v = i / 40;
     vaseProfile.push(new THREE.Vector2(0.12 + Math.sin(v * Math.PI * 1.2) * 0.16 + v * 0.03, v * 0.7));
   }
-  pedestal(-2, -3.2, 0.8, 1, new THREE.Mesh(
+  pedestal(-7.6, -3.2, 0.8, 1, new THREE.Mesh(
     new THREE.LatheGeometry(vaseProfile, 64),
     new THREE.MeshStandardMaterial({ color: 0xa0612f, metalness: 0.85, roughness: 0.35, side: THREE.DoubleSide }),
   ), 0, 'vase');
-  pedestal(-2, 3.2, 0.8, 1, new THREE.Mesh(
+  pedestal(-7.6, 3.2, 0.8, 1, new THREE.Mesh(
     new THREE.SphereGeometry(0.3, 64, 48),
     new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 1, roughness: 0.04 }),
   ), 0.3, 'sphere');
-
-  // Pieza central: columna retorcida, rodeada de sogas de terciopelo
   const colGeo = new THREE.BoxGeometry(0.5, 2.4, 0.5, 1, 80, 1);
-  const pos = colGeo.attributes.position;
-  for (let i = 0; i < pos.count; i++) {
-    const y = pos.getY(i), a = (y + 1.2) * 1.3;
-    const x = pos.getX(i), z = pos.getZ(i);
-    pos.setXYZ(i, x * Math.cos(a) - z * Math.sin(a), y, x * Math.sin(a) + z * Math.cos(a));
+  {
+    const pos = colGeo.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+      const y = pos.getY(i), a = (y + 1.2) * 1.3;
+      const x = pos.getX(i), z = pos.getZ(i);
+      pos.setXYZ(i, x * Math.cos(a) - z * Math.sin(a), y, x * Math.sin(a) + z * Math.cos(a));
+    }
+    colGeo.computeVertexNormals();
   }
-  colGeo.computeVertexNormals();
-  pedestal(-3.75, 0, 1.4, 0.5, new THREE.Mesh(colGeo, new THREE.MeshPhysicalMaterial({ color: 0x101012, roughness: 0.15, clearcoat: 1, clearcoatRoughness: 0.1 })), 1.2, 'column');
+  const CX = -9.6;
+  pedestal(CX, 0, 1.2, 0.5, new THREE.Mesh(colGeo, new THREE.MeshPhysicalMaterial({ color: 0x101012, roughness: 0.15, clearcoat: 1, clearcoatRoughness: 0.1 })), 1.2, 'column');
   animated.push((dt) => { for (const s of sculptures) s.rotation.y += dt * 0.25; });
-
+  // Sogas de terciopelo alrededor de la columna
   const velvet = new THREE.MeshStandardMaterial({ color: 0x8a1020, roughness: 0.7 });
-  const R = 1.35, posts = [[-R, -R], [R, -R], [R, R], [-R, R]].map(([dx, dz]) => new THREE.Vector3(-3.75 + dx, 0, dz));
+  const R = 1.05, posts = [[-R, -R], [R, -R], [R, R], [-R, R]].map(([dx, dz]) => new THREE.Vector3(CX + dx, 0, dz));
   for (const p of posts) {
     const post = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.9, 16), brassMat);
     post.position.set(p.x, 0.45, p.z);
@@ -509,44 +437,183 @@ export function buildMuseum(scene, renderer, quality) {
     rope.castShadow = high;
     scene.add(rope);
   });
-  collider(-3.75 - R, -3.75 + R, -R, R, 1, false);
+  collider(CX - R, CX + R, -R, R, 1, false);
 
-  // ---------- Pista de baile ----------
-  const tiles = new THREE.InstancedMesh(new RoundedBoxGeometry(0.96, 0.03, 0.96, 2, 0.012), new THREE.MeshBasicMaterial({ toneMapped: false }), 64);
-  const m4 = new THREE.Matrix4(), col = new THREE.Color();
-  for (let i = 0; i < 64; i++) {
-    m4.makeTranslation(4.5 + (i % 8), 0.012, -3.5 + Math.floor(i / 8));
-    tiles.setMatrixAt(i, m4);
-    tiles.setColorAt(i, col.setRGB(0.05, 0.05, 0.05));
+  // ---------- Asientos (E para sentarse) ----------
+  // seats: [{ x, y, z, yaw }] (yaw 0 = mirando a +z)
+  function sofa(x, y, z, yaw) {
+    const g = new THREE.Group();
+    g.position.set(x, y, z);
+    g.rotation.y = yaw;
+    const add = (w, h, d, px, py, pz, mat, round = 0.06) => {
+      const m = new THREE.Mesh(new RoundedBoxGeometry(w, h, d, 3, round), mat);
+      m.position.set(px, py, pz);
+      m.castShadow = high;
+      g.add(m);
+    };
+    add(2.4, 0.3, 0.95, 0, 0.17, 0, darkMat, 0.04);
+    add(2.1, 0.16, 0.8, 0, 0.4, 0.06, fabricMat);
+    add(2.4, 0.55, 0.22, 0, 0.6, -0.38, fabricMat);
+    for (const s of [-1, 1]) add(0.2, 0.42, 0.95, s * 1.12, 0.45, 0, fabricMat);
+    scene.add(g);
+    const cos = Math.cos(yaw), sin = Math.sin(yaw);
+    const hw = Math.abs(cos) * 1.2 + Math.abs(sin) * 0.48, hd = Math.abs(sin) * 1.2 + Math.abs(cos) * 0.48;
+    collider(x - hw, x + hw, z - hd, z + hd, y + 0.48, true, y);
+    const seats = [-0.7, 0, 0.7].map((d) => ({ x: x + cos * d + sin * 0.1, y, z: z - sin * d + cos * 0.1, yaw }));
+    interactive(g, { kind: 'sit', prompt: 'Sentarse', seats });
   }
-  scene.add(tiles);
-  // Música del DJ: nivel de graves (0..1) que manda main.js; con música, todo late con el bombo
-  const music = { level: 0, avg: 0, since: 0, pulse: 0, on: false };
-  let beat = 0;
-  animated.push((dt, t) => {
-    beat += dt;
-    music.since += dt;
-    music.avg += (music.level - music.avg) * Math.min(1, dt * 2);
-    let hit;
-    if (music.on) {
-      hit = music.level > 0.3 && music.level > music.avg * 1.18 && music.since > 0.28;
-      if (hit) music.since = 0;
-    } else hit = beat >= 0.47;
-    music.pulse = hit ? 1 : music.pulse * Math.exp(-dt * 6);
-    if (!hit) return;
-    beat = 0;
-    for (let i = 0; i < 64; i++) {
-      const on = Math.random() < (music.on ? 0.45 : 0.35);
-      col.setHSL((t * 0.05 + (i % 8) * 0.04) % 1, 0.8, on ? (music.on ? 0.22 : 0.15) : 0.03);
-      tiles.setColorAt(i, col);
-    }
-    tiles.instanceColor.needsUpdate = true;
-  });
+  function stool(x, z, yaw) {
+    const g = new THREE.Group();
+    g.position.set(x, 0, z);
+    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.04, 0.7, 16), steelMat);
+    leg.position.y = 0.36;
+    const foot = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.22, 0.03, 32), steelMat);
+    foot.position.y = 0.015;
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.012, 8, 32).rotateX(Math.PI / 2), steelMat);
+    ring.position.y = 0.3;
+    const seat = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.18, 0.07, 32), new THREE.MeshStandardMaterial({ color: 0x8a1c1c, roughness: 0.5 }));
+    seat.position.y = 0.74;
+    for (const m of [leg, foot, ring, seat]) { m.castShadow = high; g.add(m); }
+    scene.add(g);
+    collider(x - 0.2, x + 0.2, z - 0.2, z + 0.2, 0.78);
+    interactive(g, { kind: 'sit', prompt: 'Sentarse', seats: [{ x, y: 0.3, z, yaw }] });
+  }
 
-  // Tiras de LED al ras del piso y del techo en la zona oscura
+  // ---------- Barra (sur del hall) con banquetas ----------
+  {
+    const x0 = -24, x1 = -15, cx = (x0 + x1) / 2, w = x1 - x0;
+    box(w, 1.05, 0.7, cx, 0.525, 9.7, woodMat, { collide: true, block: true, climb: false, round: 0.03 });
+    box(w + 0.2, 0.06, 0.9, cx, 1.08, 9.65, new THREE.MeshStandardMaterial({ color: 0x1a1a1c, roughness: 0.15, metalness: 0.3 }), { round: 0.02 });
+    box(w, 0.04, 0.04, cx, 0.12, 9.33, neon(0xff9a3d), { cast: false });
+    // Estantes con botellas contra la pared
+    for (const y of [1.35, 1.85, 2.35]) box(w, 0.04, 0.3, cx, y, Z1 - 0.2, darkMat, { cast: false });
+    const bottleGeo = new THREE.CylinderGeometry(0.04, 0.045, 0.3, 12);
+    const bottleMats = [0x2e7d32, 0x6d4c41, 0xffb74d, 0x90caf9, 0xd81b60].map((c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.1, transparent: true, opacity: 0.85 }));
+    for (const y of [1.52, 2.02, 2.52]) {
+      for (let x = x0 + 0.3; x < x1 - 0.2; x += 0.22 + rand() * 0.2) {
+        const b = new THREE.Mesh(bottleGeo, bottleMats[Math.floor(rand() * bottleMats.length)]);
+        b.position.set(x, y, Z1 - 0.22);
+        scene.add(b);
+      }
+    }
+    box(w, 0.02, 1.2, cx, 3, Z1 - 0.6, neon(0xffb36b), { cast: false });
+    for (let i = 0; i < 8; i++) stool(x0 + 0.6 + i * ((w - 1.2) / 7), 8.75, 0);
+  }
+
+  // ---------- Baño (sobresale al norte del hall): paredes de collage ----------
+  {
+    const { x0, x1, z0, h } = WC, cx = (x0 + x1) / 2, cz = (z0 + Z0) / 2, w = x1 - x0, d = Z0 - z0;
+    plane(w, d, floorMat(w, d), cx, 0.002, cz, 0, -Math.PI / 2);
+    box(T, h, d, x0 - T / 2, h / 2, cz, wallMat, wall);
+    box(T, h, d, x1 + T / 2, h / 2, cz, wallMat, wall);
+    box(w + 2 * T, h, T, cx, h / 2, z0 - T / 2, wallMat, wall);
+    box(w + 2 * T, T, d + T, cx, h + T / 2, cz, wallMat, { cast: false });
+    const coll = (seed, rep) => { const t = collage(seed); t.repeat.set(rep, 1); return new THREE.MeshStandardMaterial({ map: t, roughness: 0.8 }); };
+    plane(d, h, coll(3, d / h), x0 + 0.01, h / 2, cz, Math.PI / 2);
+    plane(d, h, coll(5, d / h), x1 - 0.01, h / 2, cz, -Math.PI / 2);
+    plane(w, h, coll(8, w / h), cx, h / 2, z0 + 0.01, 0);
+    plane(WC.door0 - x0, h, coll(13, 1), (x0 + WC.door0) / 2, h / 2, Z0 - T - 0.01, Math.PI);
+    plane(x1 - WC.door1, h, coll(21, 1), (WC.door1 + x1) / 2, h / 2, Z0 - T - 0.01, Math.PI);
+    plane(w - 0.4, d - 0.6, new THREE.MeshBasicMaterial({ color: 0xfff1dc }), cx, h - 0.01, cz, 0, Math.PI / 2);
+    // Dos cubículos contra la pared del fondo, con inodoro
+    for (const [sx, ex] of [[x0, -19.3], [-19.3, -16.6]]) {
+      const mx = (sx + ex) / 2;
+      box(0.05, 2.1, 1.8, ex, 1.15, z0 + 0.9, darkMat, { collide: true, climb: false });
+      box(ex - sx - 1, 2.1, 0.05, sx + (ex - sx - 1) / 2, 1.15, z0 + 1.8, darkMat, { collide: true, climb: false });
+      box(0.4, 0.42, 0.55, mx, 0.21, z0 + 0.4, porcelainMat, { round: 0.08 });
+      box(0.42, 0.45, 0.16, mx, 0.62, z0 + 0.1, porcelainMat, { round: 0.04 });
+      collider(mx - 0.25, mx + 0.25, z0, z0 + 0.7, 0.45);
+    }
+    // Lavatorio y espejo contra la pared este
+    box(0.55, 0.85, 2.6, x1 - 0.3, 0.425, -13.3, darkMat, { collide: true, climb: false, round: 0.02 });
+    for (const z of [-14.1, -12.5]) {
+      const basin = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.16, 0.12, 32), porcelainMat);
+      basin.position.set(x1 - 0.3, 0.9, z);
+      scene.add(basin);
+    }
+    plane(2.4, 1.1, new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 1, roughness: 0.03 }), x1 - 0.02, 1.7, -13.3, -Math.PI / 2);
+    box(0.02, 0.02, 2.4, x1 - 0.05, 2.3, -13.3, neon(0xff6fb5), { cast: false });
+  }
+
+  // ---------- Escaleras al balcón (norte y sur del hall, pegadas a la pista) ----------
+  {
+    const steps = 12, run = 0.5, x0 = XP - steps * run, rise = BY / steps;
+    for (const [z, s] of [[Z0 + 0.75, 1], [Z1 - 0.75, -1]]) {
+      for (let i = 0; i < steps; i++) {
+        const top = (i + 1) * rise;
+        box(run, top, 1.5, x0 + run * (i + 0.5), top / 2, z, i % 2 ? darkMat : steelMat, { collide: true, block: true, climb: false });
+      }
+      // Baranda del lado abierto
+      const rz = z + s * 0.78;
+      const len = Math.hypot(steps * run, BY);
+      const rail = box(len, 0.05, 0.05, x0 + (steps * run) / 2, BY / 2 + 1, rz, steelMat, { cast: false, round: 0.02 });
+      rail.rotation.z = Math.atan2(BY, steps * run);
+      const glass = box(len, 0.9, 0.02, x0 + (steps * run) / 2, BY / 2 + 0.5, rz, glassMat, { cast: false });
+      glass.rotation.z = rail.rotation.z;
+    }
+  }
+
+  // ---------- Balcón en U sobre la pista (2º piso) ----------
+  const balconyTop = floorMat(18, 3.5);
+  const slab = (x0, x1, z0, z1) => {
+    const w = x1 - x0, d = z1 - z0;
+    box(w, BT, d, (x0 + x1) / 2, BY - BT / 2, (z0 + z1) / 2, darkMat, { collide: true, float: true, block: true, climb: false });
+    plane(w, d, balconyTop, (x0 + x1) / 2, BY + 0.002, (z0 + z1) / 2, 0, -Math.PI / 2);
+  };
+  slab(XP, BX, Z0, -BZ);
+  slab(XP, BX, BZ, Z1);
+  slab(XP, BW, -BZ, BZ);
+  // Barandas de vidrio (chocan solo a la altura del balcón)
+  const railing = (x0, x1, z0, z1) => {
+    const w = Math.max(x1 - x0, 0.06), d = Math.max(z1 - z0, 0.06), cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
+    box(w, 1, d, cx, BY + 0.5, cz, glassMat, { cast: false });
+    box(w + 0.02, 0.05, d + 0.02, cx, BY + 1.03, cz, steelMat, { cast: false, round: 0.02 });
+    collider(cx - w / 2 - 0.03, cx + w / 2 + 0.03, cz - d / 2 - 0.03, cz + d / 2 + 0.03, BY + 1.1, false, BY);
+  };
+  railing(BW, BX, -BZ, -BZ);
+  railing(BW, BX, BZ, BZ);
+  railing(BX, BX, Z0, -BZ);
+  railing(BX, BX, BZ, Z1);
+  railing(BW, BW, -BZ, BZ);
+  railing(XP, XP, Z0 + 1.6, Z1 - 1.6); // del lado del hall (las escaleras llegan por las puntas)
+  // Columnas negras que sostienen el balcón
+  for (const [x, z] of [[BW, -BZ], [BW, BZ], [5.5, -BZ], [5.5, BZ], [BX, -BZ], [BX, BZ]]) {
+    const c = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, BY - BT, 24), blackMat);
+    c.position.set(x, (BY - BT) / 2, z);
+    c.castShadow = high;
+    scene.add(c);
+    blockers.push(c);
+    collider(x - 0.18, x + 0.18, z - 0.18, z + 0.18, BY - BT, false);
+  }
+  // Sillones del balcón, mirando a la pista
+  for (const x of [0.5, 4, 8.8]) {
+    sofa(x, BY, -10.3, 0);
+    sofa(x, BY, 10.3, Math.PI);
+  }
+
+  // Tiras de LED al ras del piso y del techo en la pista
   const cove = neon(0xff3df2);
-  for (const z of [Z0 + 0.08, Z1 - 0.08]) box(16, 0.025, 0.025, 10, 0.03, z, cove, { cast: false, round: 0.01 });
-  for (const z of [Z0 + 0.15, Z1 - 0.15]) box(16, 0.025, 0.025, 10, H - 0.22, z, cove, { cast: false, round: 0.01 });
+  for (const z of [Z0 + 0.08, Z1 - 0.08]) {
+    box(X1 - XP, 0.025, 0.025, (XP + X1) / 2, 0.03, z, cove, { cast: false, round: 0.01 });
+    box(X1 - XP, 0.025, 0.025, (XP + X1) / 2, H - 0.12, z, cove, { cast: false, round: 0.01 });
+  }
+
+  // ---------- Cabina de VJ y luces (abajo del balcón oeste, mirando a la pista) ----------
+  const vjX = -3.1;
+  const desk = box(1.1, 1, 3.4, vjX, 0.5, 0, darkMat, { collide: true, block: true, climb: false, round: 0.05 });
+  box(0.03, 0.03, 3.3, vjX + 0.56, 0.98, 0, neon(0x19d3ff), { cast: false });
+  const deskItem = interactive(desk, { kind: 'artists' });
+  for (const z of [-1, 0, 1]) {
+    const pad = plane(0.7, 0.8, new THREE.MeshBasicMaterial({ color: z === 0 ? 0x2a0f3a : 0x0c2a3a, toneMapped: false }), vjX - 0.05, 1.006, z * 1.05, 0, -Math.PI / 2);
+    pad.userData.interact = deskItem;
+  }
+  const artistSign = plane(3, 0.75, new THREE.MeshBasicMaterial({ map: artistsSign({}), transparent: true, toneMapped: false }), vjX + 0.2, 2.75, 0, Math.PI / 2);
+  function setArtists(parts) {
+    const old = artistSign.material.map;
+    artistSign.material.map = artistsSign(parts);
+    artistSign.material.needsUpdate = true;
+    old.dispose();
+  }
 
   // ---------- Escenario y cabina de DJ ----------
   box(4.6, 0.4, 9, 15.3, 0.2, 0, darkMat, { collide: true, round: 0.04 });
@@ -554,7 +621,6 @@ export function buildMuseum(scene, renderer, quality) {
   box(0.04, 0.04, 9, 13.02, 0.36, 0, ledMat, { cast: false, round: 0.015 });
   box(4.6, 0.04, 0.04, 15.3, 0.36, -4.5, ledMat, { cast: false, round: 0.015 });
   box(4.6, 0.04, 0.04, 15.3, 0.36, 4.5, ledMat, { cast: false, round: 0.015 });
-
   const booth = box(0.8, 1, 3, 16.2, 0.9, 0, darkMat, { collide: true, block: true, round: 0.05 });
   interactive(booth, { kind: 'dj' });
   const deckMat = new THREE.MeshStandardMaterial({ color: 0x2c2c30, metalness: 0.6, roughness: 0.4 });
@@ -565,7 +631,6 @@ export function buildMuseum(scene, renderer, quality) {
     animated.push((dt) => { deck.rotation.y += dt * 3.5; });
   }
   box(0.4, 0.06, 0.5, 16.15, 1.43, 0, deckMat, { cast: false, round: 0.02 });
-
   const coneMat = new THREE.MeshStandardMaterial({ color: 0x333336, metalness: 0.5, roughness: 0.5 });
   for (const z of [-4, 4]) {
     box(0.8, 2.2, 0.8, 16.6, 1.5, z, darkMat, { collide: true, block: true, round: 0.05 });
@@ -579,123 +644,181 @@ export function buildMuseum(scene, renderer, quality) {
       scene.add(c, surround);
     }
   }
-
-  const signMesh = new THREE.Mesh(
-    new THREE.PlaneGeometry(6, 1.5),
-    new THREE.MeshBasicMaterial({ map: sign('CABINA DJ', '#ffffff'), transparent: true, toneMapped: false }),
-  );
-  // Cartel: "CABINA DJ" o el nombre del DJ y el track que suena
+  // Cartelito en el frente de la cabina con el DJ y el track (solo cuando hay DJ)
+  const boothSignMesh = plane(2.6, 0.65, new THREE.MeshBasicMaterial({ toneMapped: false }), 15.78, 0.85, 0, -Math.PI / 2);
+  boothSignMesh.visible = false;
   function setBooth(dj) {
-    const old = signMesh.material.map;
-    signMesh.material.map = dj ? djSign(`DJ: ${dj.name}`, dj.track ? `♪ ${dj.track}` : '') : sign('CABINA DJ', '#ffffff');
-    signMesh.material.needsUpdate = true;
-    old.dispose();
+    boothSignMesh.material.map?.dispose();
+    boothSignMesh.visible = !!dj;
+    if (dj) { boothSignMesh.material.map = boothSign(dj.name, dj.track); boothSignMesh.material.needsUpdate = true; }
   }
-  signMesh.position.set(X1 - 0.05, 6.15, 0);
-  signMesh.rotation.y = -Math.PI / 2;
-  scene.add(signMesh);
 
-  // Pantalla del escenario (detrás del DJ): la toma un VJ desde la consola; solo video
-  const stageIdle = sign('VISUALES', '#3a2f6b', '#07060f');
-  const stageScreen = new THREE.Mesh(new THREE.PlaneGeometry(6.4, 3.6), new THREE.MeshBasicMaterial({ map: stageIdle, toneMapped: false }));
-  stageScreen.position.set(X1 - 0.17, 3.45, 0);
-  stageScreen.rotation.y = -Math.PI / 2;
-  scene.add(stageScreen);
-  box(0.14, 3.8, 6.6, X1 - 0.1, 3.45, 0, darkMat, { cast: false, round: 0.04 });
-  const stageApi = {
+  // ---------- Pantalla: toda la pared este. La toma un VJ (solo video) ----------
+  const SW = Z1 - Z0, SH = H - 0.4;
+  const idle = document.createElement('canvas');
+  idle.width = 512; idle.height = Math.round(512 * SH / SW);
+  const ig = idle.getContext('2d');
+  const idleTex = new THREE.CanvasTexture(idle);
+  idleTex.colorSpace = THREE.SRGBColorSpace;
+  const bigScreen = plane(SW, SH, new THREE.MeshBasicMaterial({ map: idleTex, toneMapped: false }), X1 - 0.03, 0.4 + SH / 2, 0, -Math.PI / 2);
+  interactive(bigScreen, { kind: 'screen' });
+  let liveVideo = null;
+  const screenApi = {
+    position: new THREE.Vector3(X1 - 0.2, 3.5, 0),
     setVideo(video) {
-      if (stageScreen.material.map !== stageIdle) stageScreen.material.map.dispose();
+      liveVideo = video;
+      if (bigScreen.material.map !== idleTex) bigScreen.material.map.dispose();
       if (video) {
+        // "Cubrir": la pared es más ancha que un video 16:9, así que se recorta arriba y abajo
         const tex = new THREE.VideoTexture(video);
         tex.colorSpace = THREE.SRGBColorSpace;
-        stageScreen.material.map = tex;
-      } else stageScreen.material.map = stageIdle;
-      stageScreen.material.needsUpdate = true;
+        const fit = () => {
+          const a = (video.videoWidth || 16) / (video.videoHeight || 9), A = SW / SH;
+          if (A > a) { tex.repeat.set(1, a / A); tex.offset.set(0, (1 - a / A) / 2); } else { tex.repeat.set(A / a, 1); tex.offset.set((1 - A / a) / 2, 0); }
+        };
+        fit();
+        video.addEventListener('loadedmetadata', fit);
+        bigScreen.material.map = tex;
+      } else bigScreen.material.map = idleTex;
+      bigScreen.material.needsUpdate = true;
     },
+    get live() { return !!liveVideo; },
   };
+  // Sin video: ondas oscuras muy suaves (que se note que es una pantalla, sin llamar la atención)
+  let idleClock = 0;
+  animated.push((dt, t) => {
+    if (liveVideo) return;
+    idleClock += dt;
+    if (idleClock < 1 / 15) return;
+    idleClock = 0;
+    ig.fillStyle = '#040408';
+    ig.fillRect(0, 0, idle.width, idle.height);
+    for (let i = 0; i < 4; i++) {
+      const x = idle.width * (0.5 + Math.sin(t * 0.15 + i * 1.9) * 0.45), y = idle.height * (0.5 + Math.cos(t * 0.2 + i * 2.3) * 0.4);
+      const r = ig.createRadialGradient(x, y, 0, x, y, idle.width * 0.35);
+      r.addColorStop(0, `hsla(${(i * 70 + t * 6) % 360} 70% 40% / 0.18)`);
+      r.addColorStop(1, 'hsla(0 0% 0% / 0)');
+      ig.fillStyle = r;
+      ig.fillRect(0, 0, idle.width, idle.height);
+    }
+    idleTex.needsUpdate = true;
+  });
 
-  // Consola de artistas (frente al escenario): E para tomar luces o pantallas
-  const consoleMat = neon(0x19d3ff);
-  const desk = box(1.4, 1, 0.7, 11.9, 0.5, -5.7, darkMat, { collide: true, block: true, round: 0.05 });
-  box(1.3, 0.03, 0.03, 11.9, 1.0, -5.37, consoleMat, { cast: false, round: 0.01 });
-  for (const [x, w] of [[11.55, 0.5], [12.2, 0.5]]) {
-    const pad = new THREE.Mesh(new THREE.PlaneGeometry(w, 0.3), new THREE.MeshBasicMaterial({ color: 0x0c2a3a, toneMapped: false }));
-    pad.position.set(x, 1.005, -5.7);
-    pad.rotation.x = -Math.PI / 2;
-    scene.add(pad);
-  }
-  interactive(desk, { kind: 'artists' });
-  const artistSign = new THREE.Mesh(new THREE.PlaneGeometry(3, 0.75), new THREE.MeshBasicMaterial({ map: artistsSign({}), transparent: true, toneMapped: false }));
-  artistSign.position.set(11.9, 2.1, -5.7);
-  artistSign.rotation.y = -Math.PI / 2;
-  scene.add(artistSign);
-  function setArtists(parts) {
-    const old = artistSign.material.map;
-    artistSign.material.map = artistsSign(parts);
-    artistSign.material.needsUpdate = true;
-    old.dispose();
-  }
-
-  // Luces que manda un artista por OSC (null = automáticas)
-  let lightOverride = null;
-
-  // Haces de luz que se mueven sobre el escenario
-  box(0.15, 0.15, 9, 15, 6.6, 0, steelMat, { cast: false, round: 0.03 });
-  const beamGeo = new THREE.ConeGeometry(1.1, 6, 48, 1, true);
-  beamGeo.translate(0, -3, 0);
-  const beams = [];
-  for (const z of [-3, -1, 1, 3]) {
-    const mat = new THREE.ShaderMaterial({
-      uniforms: { color: { value: new THREE.Color() }, opacity: { value: 0.1 } },
-      vertexShader: 'varying float vY; void main(){ vY = position.y; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-      fragmentShader: 'uniform vec3 color; uniform float opacity; varying float vY; void main(){ float f = clamp(1.0 + vY / 6.0, 0.0, 1.0); gl_FragColor = vec4(color, opacity * f * f); }',
-      transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+  // ---------- Luces de la pista: tiras de LED pixel en el techo y beams ----------
+  const PIX_X0 = BW + 0.6, PIX_X1 = BX - 0.4, PIX_N = 44, STRIPS = [-6, -3.6, -1.2, 1.2, 3.6, 6];
+  const pixels = new THREE.InstancedMesh(new THREE.BoxGeometry(0.16, 0.03, 0.05), new THREE.MeshBasicMaterial({ toneMapped: false }), PIX_N * STRIPS.length);
+  {
+    const m4 = new THREE.Matrix4();
+    STRIPS.forEach((z, s) => {
+      for (let i = 0; i < PIX_N; i++) {
+        m4.makeTranslation(PIX_X0 + (i / (PIX_N - 1)) * (PIX_X1 - PIX_X0), H - 0.05, z);
+        pixels.setMatrixAt(s * PIX_N + i, m4);
+        pixels.setColorAt(s * PIX_N + i, new THREE.Color(0, 0, 0));
+      }
+      box(PIX_X1 - PIX_X0 + 0.3, 0.02, 0.09, (PIX_X0 + PIX_X1) / 2, H - 0.025, z, blackMat, { cast: false });
     });
-    const beam = new THREE.Mesh(beamGeo, mat);
-    beam.position.set(15, 6.5, z);
-    scene.add(beam);
-    beams.push(beam);
+  }
+  scene.add(pixels);
+
+  // Beams: cabezales móviles en dos barras, con un haz finito
+  const beamGeo = new THREE.CylinderGeometry(0.02, 0.32, 7, 24, 1, true);
+  beamGeo.translate(0, -3.5, 0);
+  const beams = [];
+  for (const z of [-3.6, 3.6]) {
+    box(PIX_X1 - PIX_X0, 0.08, 0.08, (PIX_X0 + PIX_X1) / 2, H - 0.45, z, steelMat, { cast: false });
+    for (const x of [1.2, 5, 8.8]) {
+      const head = new THREE.Group();
+      head.position.set(x, H - 0.6, z);
+      const body = new THREE.Mesh(new RoundedBoxGeometry(0.22, 0.26, 0.22, 3, 0.04), darkMat);
+      head.add(body);
+      const mat = new THREE.ShaderMaterial({
+        uniforms: { color: { value: new THREE.Color() }, opacity: { value: 0 } },
+        vertexShader: 'varying float vY; void main(){ vY = position.y; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+        fragmentShader: 'uniform vec3 color; uniform float opacity; varying float vY; void main(){ float f = clamp(1.0 + vY / 7.0, 0.0, 1.0); gl_FragColor = vec4(color, opacity * f); }',
+        transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+      });
+      const beam = new THREE.Mesh(beamGeo, mat);
+      beam.position.y = -0.12;
+      head.add(beam);
+      scene.add(head);
+      beams.push({ head, beam });
+    }
   }
   const stageLight = new THREE.PointLight(0xff00ff, 30, 16, 2);
   stageLight.position.set(13.5, 3.5, 0);
   scene.add(stageLight);
+
+  // Música del DJ: nivel de graves (0..1) que manda main.js; con música, todo late con el bombo
+  const music = { level: 0, avg: 0, since: 0, pulse: 0, on: false };
+  // Luces que manda un artista por OSC (null = automáticas)
+  let lightOverride = null;
+  // Fiesta: de noche, con DJ o con artista de luces. De día y sin nadie, apagadas
+  let night = 0, party = 0;
+  const col = new THREE.Color();
   animated.push((dt, t) => {
+    music.since += dt;
+    music.avg += (music.level - music.avg) * Math.min(1, dt * 2);
+    const hit = music.on && music.level > 0.3 && music.level > music.avg * 1.18 && music.since > 0.28;
+    if (hit) music.since = 0;
+    music.pulse = hit ? 1 : music.pulse * Math.exp(-dt * 6);
+    const target = lightOverride || music.on ? 1 : night;
+    party += (target - party) * Math.min(1, dt * 1.5);
+
     const L = lightOverride;
+    const rgb = (c, fallback) => (c ?? fallback ?? [1, 1, 1]);
+    const p = music.on ? music.pulse : 0;
+    const flash = L ? L.flash : p;
+    // Beams
+    beams.forEach(({ head, beam }, i) => {
+      const f = L?.focos[i % 4];
+      if (f) {
+        head.rotation.z = f.pan * 0.9;
+        head.rotation.x = f.tilt * 0.7;
+        beam.material.uniforms.color.value.setRGB(...rgb(f.color, L.color));
+        beam.material.uniforms.opacity.value = (0.18 + flash * 0.3) * f.intensidad * L.intensidad;
+      } else {
+        head.rotation.z = Math.sin(t * 0.7 + i * 1.1) * 0.6;
+        head.rotation.x = Math.cos(t * 0.5 + i * 0.8) * 0.45;
+        beam.material.uniforms.color.value.setHSL((t * 0.05 + i * 0.17) % 1, 1, 0.6);
+        beam.material.uniforms.opacity.value = (0.14 + p * 0.25) * party;
+      }
+    });
+    // Tiras de LED pixel: una onda de color que corre por la pista (con artista: su color de LEDs)
+    const ledCol = L ? rgb(L.leds.color, L.color) : null;
+    for (let s = 0; s < STRIPS.length; s++) {
+      for (let i = 0; i < PIX_N; i++) {
+        const k = i / PIX_N;
+        if (ledCol) {
+          const wave = 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(t * 4 - k * 12 + s));
+          col.setRGB(...ledCol).multiplyScalar(GLOW * 0.6 * wave * L.intensidad * (1 + flash * 2));
+        } else {
+          const wave = 0.5 + 0.5 * Math.sin(t * 2.2 - k * 9 + s * 0.8);
+          col.setHSL((t * 0.04 + k * 0.5 + s * 0.05) % 1, 1, 0.5).multiplyScalar(GLOW * 0.5 * party * (0.15 + 0.85 * wave) * (1 + p * 1.5));
+        }
+        pixels.setColorAt(s * PIX_N + i, col);
+      }
+    }
+    pixels.instanceColor.needsUpdate = true;
     if (L) {
-      // Manda el artista: color general, y si mandó algo más específico, eso
-      const flash = L.flash;
-      const rgb = (c, fallback) => (c ?? fallback ?? [1, 1, 1]);
-      beams.forEach((b, i) => {
-        const f = L.focos[i];
-        b.rotation.z = f.pan * 0.8 - 0.2;
-        b.rotation.x = f.tilt * 0.6;
-        b.material.uniforms.color.value.setRGB(...rgb(f.color, L.color));
-        b.material.uniforms.opacity.value = (0.1 + flash * 0.3) * f.intensidad * L.intensidad;
-      });
       ledMat.color.setRGB(...rgb(L.leds.color, L.color)).multiplyScalar(GLOW * L.intensidad * (1 + flash * 2));
       cove.color.setRGB(...rgb(L.leds.color, L.color)).multiplyScalar(GLOW * L.intensidad * (1 + flash));
       stageLight.color.setRGB(...rgb(L.escenario.color, L.color));
       stageLight.intensity = (30 + flash * 90) * L.escenario.intensidad * L.intensidad;
-      return;
+    } else {
+      ledMat.color.setHSL((t * 0.1) % 1, 1, 0.5).multiplyScalar(GLOW * (0.15 + 0.85 * party) * (1 + p * 1.5));
+      cove.color.setHSL((t * 0.1 + 0.8) % 1, 1, 0.55).multiplyScalar(GLOW * party * (1 + p));
+      stageLight.color.setHSL((t * 0.1 + 0.5) % 1, 1, 0.5);
+      stageLight.intensity = (30 + p * 70) * party;
     }
-    const p = music.on ? music.pulse : 0;
-    beams.forEach((b, i) => {
-      b.rotation.z = Math.sin(t * 0.8 + i) * 0.55 - 0.2;
-      b.rotation.x = Math.cos(t * 0.6 + i * 1.3) * 0.35;
-      b.material.uniforms.color.value.setHSL((t * 0.08 + i * 0.25) % 1, 1, 0.55);
-      b.material.uniforms.opacity.value = 0.1 + p * 0.22;
-    });
-    ledMat.color.setHSL((t * 0.1) % 1, 1, 0.5).multiplyScalar(GLOW * (1 + p * 1.5));
-    cove.color.setHSL((t * 0.1 + 0.8) % 1, 1, 0.55).multiplyScalar(GLOW * (1 + p));
-    stageLight.color.setHSL((t * 0.1 + 0.5) % 1, 1, 0.5);
-    stageLight.intensity = 30 + p * 70;
   });
 
   return {
     colliders,
     blockers,
     interactables,
+    // Una sola pantalla (la pared este): la usan el VJ (consola) y "ver en grande"
     screen: screenApi,
+    stage: screenApi,
     // Cabina del DJ: dónde se para (mirando a la pista), dónde se baja y los dos parlantes [izq., der.]
     dj: {
       spot: { x: 17.05, y: 0.4, z: 0, yaw: -Math.PI / 2 },
@@ -704,30 +827,29 @@ export function buildMuseum(scene, renderer, quality) {
       setBooth,
       setMusic(level) { music.level = level; music.on = level >= 0; },
     },
-    stage: stageApi,
     // Consola de artistas: cartel con quién tiene cada parte, y las luces que mandan por OSC
     artists: { setSign: setArtists, setLights(s) { lightOverride = s; } },
     bounds: { minY: 0.2, maxY: H - 0.2 },
-    spawn: { x: 3, z: 0, yaw: Math.PI / 2 },
+    spawn: { x: X0 + 2.5, z: 0, yaw: -Math.PI / 2 },
     update(dt, t) { for (const fn of animated) fn(dt, t); },
     // Día y noche: hours = hora del día (0..24). El sol entra por el tragaluz de día;
-    // de noche el cielo se oscurece y se encienden más las luces del techo y los focos.
+    // de noche se encienden las luces de la fiesta.
     setTime(hours) {
       const elev = Math.sin(((hours - 6.5) / 13) * Math.PI);      // >0 entre 6:30 y 19:30
       const day = THREE.MathUtils.smoothstep(elev, -0.05, 0.35);  // 0 noche … 1 día
       const golden = day * (1 - THREE.MathUtils.smoothstep(elev, 0.1, 0.45)); // amanecer/atardecer
       const k = ((hours - 6.5) / 13) * Math.PI;                   // recorrido del sol de este a oeste
-      sun.position.set(-Math.cos(k) * 10, 4 + Math.max(elev, 0) * 10, 5);
+      sun.position.set(-Math.cos(k) * 10, 4 + Math.max(elev, 0) * 10, 5).add(sun.target.position);
       sun.intensity = (high ? 3 : 1.6) * day;
       sun.color.set(0xffe2b8).lerp(new THREE.Color(0xff8a4a), golden);
       hemi.intensity = (high ? 0.85 : 1.1) * (0.4 + 0.6 * day);
       scene.environmentIntensity = 0.2 + 0.25 * day;
-      const night = new THREE.Color(0x0b1236), dawn = new THREE.Color(0xff9e6b), noon = new THREE.Color(0xd6e8ff);
-      sky.material.color.copy(night).lerp(noon, day).lerp(dawn, golden * 0.8).multiplyScalar(0.3 + 1.2 * day);
+      const nightSky = new THREE.Color(0x0b1236), dawn = new THREE.Color(0xff9e6b), noon = new THREE.Color(0xd6e8ff);
+      sky.material.color.copy(nightSky).lerp(noon, day).lerp(dawn, golden * 0.8).multiplyScalar(0.3 + 1.2 * day);
       shaft.material.uniforms.opacity.value = 0.04 * day;
       shaft.material.uniforms.color.value.set(0xffe6bf).lerp(new THREE.Color(0xff9a5a), golden);
-      panelMat.emissiveIntensity = 1.3 + 1.2 * (1 - day);
       poolMat.opacity = 0.2 + 0.25 * (1 - day);
+      night = 1 - day;
     },
   };
 }

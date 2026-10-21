@@ -67,7 +67,7 @@
   <div id="dock">
     <button id="btn-inv" class="pill" title="Inventario (I)"><span class="lbl">Inventario</span> <kbd>I</kbd></button>
     <button id="btn-friends" class="pill" title="Amigos (F)"><span class="lbl">Amigos</span> <kbd>F</kbd><b class="count" id="friends-count" hidden></b></button>
-    <button id="btn-mundi" class="pill" title="Mundi: salas y mapas (Y)"><span class="lbl">Mundi</span> <kbd>Y</kbd></button>
+    <button id="btn-mundi" class="pill" title="Mapa: salas (Y)"><span class="lbl">Mapa</span> <kbd>Y</kbd></button>
   </div>
 
   <!-- Debajo del chat: voz y audio -->
@@ -80,7 +80,14 @@
   <div id="stamina"><div class="fill"></div></div>
   <div id="toasts"></div>
   <div id="prompt"><kbd>E</kbd><span id="prompt-text"></span></div>
-  <div id="hint" class="pill">Click: mirar · WASD moverse · Shift correr · Espacio saltar/trepar · C agacharse · E usar · Rueda: cámara · V hablar · R gestos · Tab sala · Y mundi · Esc menú · Enter chat</div>
+  <!-- Controles: aparecen al entrar (y con /controls o desde el menú) -->
+  <div id="controls" class="overlay">
+    <div class="card controls-card">
+      <h1 class="display">Controles</h1>
+      <div id="controls-list" class="keys"></div>
+      <button class="cta" id="controls-ok">¡A jugar!</button>
+    </div>
+  </div>
 
   <div id="chat">
     <div id="messages"></div>
@@ -181,19 +188,19 @@
     <div class="mtab keys" data-mtab="controls" hidden>
       <dl>
         <dt>WASD</dt><dd>Moverse</dd>
-        <dt>Shift</dt><dd>Correr (gasta stamina)</dd>
+        <dt>Shift</dt><dd>Trotar (gasta stamina)</dd>
         <dt>Espacio</dt><dd>Saltar · contra algo bajo, trepar</dd>
-        <dt>C / Ctrl</dt><dd>Agacharse</dd>
+        <dt>C</dt><dd>Agacharse</dd>
         <dt>E · click</dt><dd>Usar / ver lo que apuntás</dd>
         <dt>Rueda</dt><dd>Acercar la cámara → 1ª persona → zoom</dd>
         <dt>V (mantener)</dt><dd>Hablar</dd>
         <dt>M</dt><dd>Silenciar música / pantalla de la sala</dd>
         <dt>Tab (mantener)</dt><dd>Jugadores e info de la sala</dd>
-        <dt>Y</dt><dd>Mundi: salas y mapas</dd>
+        <dt>Y</dt><dd>Mapa: salas</dd>
         <dt>R</dt><dd>Gestos</dd>
         <dt>Esc</dt><dd>Este menú</dd>
         <dt>P · I · F</dt><dd>Personaje · Inventario · Amigos</dd>
-        <dt>Enter</dt><dd>Chat · /ayuda para ver comandos</dd>
+        <dt>Enter</dt><dd>Chat · /ayuda para ver comandos · /controls para ver esto</dd>
       </dl>
     </div>
     <button id="btn-settings-close" class="cta">Volver al juego</button>
@@ -210,9 +217,9 @@
     <button class="cta" data-close-panel>Cerrar</button>
   </aside>
 
-  <!-- Mundi: salas -->
+  <!-- Mapa: salas -->
   <aside id="mundi" class="panel">
-    <h1 class="display">Mundi</h1>
+    <h1 class="display">Mapa</h1>
     <p class="meta">Elegí a dónde ir. También podés escribir en el chat <b>/ir museo</b>, <b>/ir mi sala</b> o <b>/ir nombre</b>.</p>
     <div id="mundi-list"></div>
     <button class="cta" data-close-panel>Cerrar</button>
@@ -251,10 +258,7 @@
       <div class="who"><b>Luces</b><span></span></div><button class="act"></button>
     </div>
     <div class="part-row" data-part="escenario">
-      <div class="who"><b>Pantalla del escenario</b><span></span></div><button class="act"></button>
-    </div>
-    <div class="part-row" data-part="hall">
-      <div class="who"><b>Pantalla del hall</b><span></span></div><button class="act"></button>
+      <div class="who"><b>Pantalla</b><span></span></div><button class="act"></button>
     </div>
     <div class="bridge">
       <p class="meta">Puente OSC: <b id="bridge-status">sin usar</b></p>

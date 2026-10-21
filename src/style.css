@@ -21,7 +21,7 @@
 html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); touch-action: none; user-select: none; -webkit-user-select: none; }
 #app canvas { display: block; }
 .labels { position: fixed; inset: 0; pointer-events: none; z-index: 0; }
-#hud, #topbar, #dock, #voicebar, #chat, #touch, #hint, #prompt, #crosshair { z-index: 5; }
+#hud, #topbar, #dock, #voicebar, #chat, #touch, #prompt, #crosshair { z-index: 5; }
 .panel { z-index: 10; }
 .overlay { z-index: 20; }
 button { font: inherit; color: inherit; cursor: pointer; }
@@ -84,11 +84,6 @@ body.targeting #crosshair { transform: scale(1.8); background: var(--primary); }
 body.targeting #prompt { display: flex; }
 body.touch #prompt kbd { display: none; }
 
-#hint {
-  position: fixed; top: 58px; left: 50%; transform: translateX(-50%); width: max-content; max-width: calc(100vw - 24px);
-  padding: 7px 14px; font-size: 12.5px; color: var(--muted); text-align: center; pointer-events: none; transition: opacity .3s;
-}
-body.locked #hint, body.editing #hint, body.touch #hint, body.auth #hint, body.settings #hint { opacity: 0; }
 body.auth #chat, body.auth #topbar, body.auth #dock, body.auth #voicebar, body.auth #touch, body.auth #hud { display: none; }
 
 /* ---------- Chat ---------- */
@@ -244,7 +239,6 @@ body.touch.targeting #btn-use { background: var(--primary); color: var(--primary
 }
 @media (max-width: 760px) {
   #topbar { top: 52px; left: 12px; right: auto; flex-wrap: wrap; }
-  #hint { top: 100px; }
 }
 @media (max-width: 560px) {
   .panel { top: auto; left: 8px; right: 8px; bottom: 8px; width: auto; max-height: 60vh; padding: 14px; gap: 10px; }
@@ -359,7 +353,7 @@ body.touch #dock { display: none; }
   .trade-cols { grid-template-columns: 1fr; }
 }
 /* ---------- Menú, panel de sala, Mundi, expulsado ---------- */
-body.roompanel #roompanel, body.mundi #mundi, body.kicked #kicked, body.gestures #gestures, body.djing #djpanel, body.artists #artistpanel { display: flex; }
+body.roompanel #roompanel, body.mundi #mundi, body.kicked #kicked, body.controls #controls, body.gestures #gestures, body.djing #djpanel, body.artists #artistpanel { display: flex; }
 .part-row { display: flex; align-items: center; gap: 10px; padding: 10px; border-radius: 12px; background: rgba(255, 255, 255, 0.05); }
 .part-row .who { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .part-row .who span { color: var(--muted); font-size: 12.5px; }
@@ -399,6 +393,8 @@ body.roompanel #roompanel, body.mundi #mundi, body.kicked #kicked, body.gestures
 .toggles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .toggles .check { padding: 8px 10px; border-radius: 10px; background: rgba(255, 255, 255, 0.05); font-size: 13px; }
 .toggles .check input:disabled + span { opacity: .6; }
+.controls-card { width: min(520px, 100%); padding: 24px; display: flex; flex-direction: column; gap: 14px; max-height: calc(100vh - 32px); overflow-y: auto; }
+.controls-card h1 { margin: 0; font-size: 28px; }
 .kicked-card { width: min(420px, 100%); padding: 24px; display: flex; flex-direction: column; gap: 12px; text-align: center; }
 .kicked-card h1 { margin: 0; font-size: 28px; }
 .mundi-room { display: flex; align-items: center; gap: 10px; padding: 12px; border-radius: 14px; background: rgba(255, 255, 255, 0.05); margin-bottom: 8px; }

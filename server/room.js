@@ -20,7 +20,7 @@ const PICKUP_LOCK = 5_000, GROUND_LIFE = 60_000;
 const DEFAULT_SETTINGS = { chat: true, voice: true, screen: true, items: true, dj: true, artists: true };
 // Partes que toman los artistas en la consola (además de la pantalla del hall, que es this.screen)
 const PARTS = ['luces', 'escenario'];
-const SPAWN = { x: 3, z: 0 };
+const SPAWN = { x: -27.5, z: 0 }; // junto a la puerta de entrada (ver museum.js)
 
 // Estado de un jugador: [x, y, z, rotación, velocidad, pose]
 // pose: 0 parado, 1 agachado, 2 sentado, 3 trepando, 4 en el aire

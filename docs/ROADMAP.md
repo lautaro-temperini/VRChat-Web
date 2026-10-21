@@ -32,7 +32,9 @@
 - **Peinados rulos y coleta** con el estilo del pack (hacerlos en Blender). Hoy se muestran como
   corto y rodete, pero el dato guardado de cada cuenta no se toca.
 - **Salas de usuario tipo Fotolog/Instagram**: subir fotos que se cuelgan como cuadros, libro de visitas.
-- **Cartelera tipo muro** (Facebook/Twitter) en el hall.
+- **Parte social (a definir):** tablero de anuncios del dueño de la sala (tipo muro; ¿qué pueden hacer
+  los visitantes?), mesita de "me gusta"/tips, salas favoritas y una sala de xvvave (además del Museo).
+  El usuario lo planteó el 21/10 pero todavía no lo tiene claro.
 - **AR** en las dos direcciones (obras/avatar en tu habitación; fotos/escaneos del mundo real al juego).
 - **Editor avanzado (capa 2)** con sliders de cara y cuerpo.
 - **Nombre y marca definitivos** (hoy "Galería Online" es provisorio).
@@ -63,6 +65,12 @@
 | Pantalla del escenario | Nueva, detrás del DJ, solo video (sin audio) |
 | Luces + DJ | Si hay artista en luces, manda él (el latido con la música se apaga). Al soltar, vuelven a automático |
 | Artistas: cartel y avisos | Cartel en la consola con quién tiene cada parte + aviso en el chat al tomar/soltar |
+| Sala principal (planta) | 48 × 22 m. Hall (oeste): puerta doble de entrada, barra con banquetas (sur), baño con paredes de collage que sobresale al norte, esculturas junto a la pared del medio, plantas solo acá. Pista (este): paredes negras sin cuadros, balcón en U (2º piso) sobre tres paredes con sillones, escaleras desde el hall (norte y sur), cabina de VJ + luces abajo del balcón oeste, escenario con DJ |
+| Piso | Cemento pulido en todo el edificio; sin pista de baile de cuadrados |
+| Pantallas | Una sola: ocupa toda la pared del escenario (la del hall se sacó; ahí va la puerta). La toma un VJ, sin audio |
+| Luces de la pista | Tiras de LED pixel en el techo + beams. Se encienden de noche o con DJ/artista; de día, apagadas. Sin los 4 haces del escenario ni los paneles blancos del techo. Sin carteles "Cabina DJ"/"Visuales" (el DJ y el track se ven en un cartelito en la cabina) |
+| Moverse | Sin Shift camina (1,6 m/s); con Shift trota (3,2 m/s, gasta stamina). Saltar y agacharse, animación hecha por código |
+| Controles | Aparecen en un cartel al entrar (una vez por visita); después con /controls o desde el menú |
 | Estilo visual | ~~Estilizado tipo Fortnite~~ → **semi-realista tipo MetaPerson, no anime** (20/10). Posibles herramientas: Tripo o MCP de Blender |
 | Plataformas | PC y celular |
 | Público | Comunidad / amigos |
@@ -71,7 +79,7 @@
 | AFK | No se expulsa por AFK; solo una etiqueta "AFK" debajo del nombre. Se sale al cerrar la pestaña |
 | Cuentas | Invitado persistente o usuario + contraseña; no pedir datos al recargar |
 | Cámara | Cambio 1ª/3ª persona con la rueda (sin botón en PC; en celular sí) |
-| Teclas | E usar · P personaje · V (mantener) hablar · M silenciar música de la sala · Tab (mantener) jugadores/info · Esc menú con pestañas · I inventario · F amigos · Y Mundi · R gestos |
+| Teclas | E usar · P personaje · V (mantener) hablar · M silenciar música de la sala · Tab (mantener) jugadores/info · Esc menú con pestañas · I inventario · F amigos · Y Mapa · R gestos · C agacharse (Ctrl no: con Ctrl+W se cerraba la pestaña) |
 | Stamina | Correr gasta stamina (barra visible) |
 | Interactuar | E en cuadros: ficha + vista previa del sitio; E en jugadores: perfil con pestaña galería (estilo Second Life) |
 | Objetos en el suelo | Otro jugador puede juntarlo a los 5 s; si nadie lo junta en 60 s, **se pierde para siempre** |
@@ -83,7 +91,7 @@
 | Hablar | Con el micrófono abierto y quieto, el personaje usa la animación de hablar |
 | Mutear / ignorar | Mutear = silenciar su voz. Ignorar = silenciar voz y texto |
 | Moderación | Dueño de cada sala personal; el usuario "xvvave" es admin del Museo y de todas las salas. Expulsar, banear, silenciar, traer, mandar a la entrada, habilitar/deshabilitar chat/voz/pantalla/objetos |
-| Mapas | Botón Mundi + comandos en el chat (`/ir`, `/salas`) |
+| Mapas | Botón "Mapa" (antes Mundi) + comandos en el chat (`/ir`, `/salas`) |
 | Día y noche | Según la hora GMT-3 |
 | Web3 | No por ahora |
 | Próximo | Música del DJ, después puente OSC |
@@ -95,4 +103,4 @@
 | Tipo de cuerpo | Masculino / femenino; todo libre (cualquier cuerpo puede usar cualquier peinado y barba) |
 | Peinados | corto, largo, rapado, rodete. Rulos → corto y coleta → rodete hasta que existan (sin preferencia del usuario; opción reversible) |
 | Calidad gráfica | Siempre automática (sin selector): baja/media/alta según GPU, memoria y celular; si anda lento baja sola. KTX2 para celular más adelante (todavía no se instalan las herramientas) |
-| Botones | PC: Gestos, Sala, Personaje y Ajustes arriba a la derecha; Inventario, Amigos y Mundi abajo a la derecha; Hablar y Audio debajo del chat. Celular: todo arriba con íconos (mochila, celular, mundo); Hablar y Audio arriba del chat |
+| Botones | PC: Gestos, Sala, Personaje y Ajustes arriba a la derecha; Inventario, Amigos y Mapa abajo a la derecha; Hablar y Audio debajo del chat. Celular: todo arriba con íconos (mochila, celular, mundo); Hablar y Audio arriba del chat |

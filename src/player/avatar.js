@@ -439,7 +439,8 @@ export class Avatar {
     const w = this.weights;
     for (const [name, id] of Object.entries(POSE)) w[name] = damp(w[name], pose === id ? 1 : 0, 12, dt);
     const grounded = pose === POSE.stand || pose === POSE.crouch;
-    this.amount = damp(this.amount, grounded ? Math.min(speed / 4.5, 1.4) : 0, 10, dt);
+    // Cuánto "camina" (0..1+): agachado se mueve más lento, así que la referencia es otra
+    this.amount = damp(this.amount, grounded ? Math.min(speed / (pose === POSE.crouch ? 1.4 : 4.5), 1.4) : 0, 10, dt);
     const a = this.amount, am = Math.min(a, 1);
     const sprint = THREE.MathUtils.clamp((speed - 5.2) / 1.5, 0, 1) * am;
     this.phase += dt * speed * (pose === POSE.crouch ? 3.4 : 2.3) / this.scale;
@@ -511,12 +512,12 @@ export class Avatar {
     const base = 1 - ga;
     const target = {};
     for (const k of Object.keys(LOCO)) target[k] = 0;
-    const stand = blend(speed, [[0, 'idle'], [1.6, 'walk'], [3, 'jog'], [4.6, 'sprint']]);
+    const stand = blend(speed, [[0, 'idle'], [1.6, 'walk'], [3.2, 'jog']]);
     if (this.talking) { stand.talk = stand.idle; stand.idle = 0; }
     for (const [k, v] of Object.entries(stand)) target[k] += v * w.stand;
-    const crouch = blend(speed, [[0, 'crouch'], [1, 'crouchWalk']]);
-    for (const [k, v] of Object.entries(crouch)) target[k] += v * w.crouch;
-    target.air += w.air;
+    // Agacharse y saltar se hacen por código (abajo); mientras tanto la base es quieto
+    const proc = Math.min(1, w.crouch + w.air);
+    target.idle += proc;
     target.climb += w.climb;
     // Trepar dura lo que tarda el juego en subirte (0,42 s): la animación arranca de cero cada vez
     if (A.actions.climb) {
@@ -548,6 +549,15 @@ export class Avatar {
     const root = R.bones.root;
     root.bone.position.copy(root.restPos).add(_v.set(0, Math.min(J.y, 0) * 0.5, 0).applyQuaternion(root.parentInv));
     R.euler('root', 0, 0, J.tilt);
+
+    // Agachado y en el aire: la pose hecha por código, mezclada encima según cuánto pesa
+    if (proc > 0.001) {
+      const saved = PROC_BONES.map((n) => R.bones[n].bone.quaternion.clone());
+      const savedPos = root.bone.position.clone();
+      this.applyPose(J, Math.min(this.amount, 1));
+      PROC_BONES.forEach((n, k) => { const b = R.bones[n].bone; b.quaternion.copy(saved[k].slerp(b.quaternion, proc)); });
+      root.bone.position.lerpVectors(savedPos, root.bone.position, proc);
+    }
   }
 
   // Pasa los ángulos a los huesos del modelo
@@ -582,6 +592,7 @@ export class Avatar {
 }
 const _v = new THREE.Vector3(), _q2 = new THREE.Quaternion(), _q3 = new THREE.Quaternion();
 const ARM_BONES = ['upperarm_l', 'lowerarm_l', 'upperarm_r', 'lowerarm_r'];
+const PROC_BONES = ['root', 'spine_02', 'neck_01', 'thigh_l', 'calf_l', 'thigh_r', 'calf_r', ...ARM_BONES];
 
 // Pesos para mezclar animaciones según un valor (ej. velocidad): [[valor, nombre], …] ordenados
 function blend(x, points) {

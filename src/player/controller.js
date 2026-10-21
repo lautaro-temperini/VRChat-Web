@@ -2,7 +2,8 @@ import * as THREE from 'three';
 import { POSE } from './avatar.js';
 
 // Movimiento (m/s, m/s²)
-const JOG = 4.6, SPRINT = 6.8, CROUCH = 2.2;
+const WALK = 1.6, JOG = 3.2, CROUCH = 1.2; // sin Shift camina; con Shift trota (gasta stamina)
+const BODY = 1.75; // alto del cuerpo: para pasar por debajo de cosas que flotan (el balcón)
 const ACCEL = 45, DECEL = 32, AIR_ACCEL = 9, GRAVITY = 24, JUMP = 7.6;
 const COYOTE = 0.12;      // segundos para saltar después de salir de un borde
 const JUMP_BUFFER = 0.15; // segundos que "recuerda" el salto si lo apretaste antes de tocar el piso
@@ -113,7 +114,7 @@ export class PlayerController {
   }
 
   get crouched() {
-    return (this.crouchToggle || this.touchCrouch || this.keys.has('ControlLeft') || this.keys.has('ControlRight')) && !this.sitting && !this.booth && !this.mantle;
+    return (this.crouchToggle || this.touchCrouch) && !this.sitting && !this.booth && !this.mantle;
   }
 
   jump() { this.jumpBuffer = JUMP_BUFFER; }
@@ -208,6 +209,13 @@ export class PlayerController {
     let ground = 0, hit = null;
     for (let pass = 0; pass < 2; pass++) {
       for (const b of this.world.colliders) {
+        // Algo que flota (el balcón): si estoy por debajo, no me afecta… salvo que choque la cabeza
+        if (b.bottom !== undefined && p.y + BODY <= b.bottom) continue;
+        if (b.bottom !== undefined && p.y < b.bottom && p.x > b.minX && p.x < b.maxX && p.z > b.minZ && p.z < b.maxZ) {
+          p.y = b.bottom - BODY;
+          if (this.velY > 0) this.velY = 0;
+          continue;
+        }
         // Lo bajo se pisa (escalón); lo alto empuja
         if (b.top <= p.y + STEP) {
           if (p.x > b.minX && p.x < b.maxX && p.z > b.minZ && p.z < b.maxZ) ground = Math.max(ground, b.top);
@@ -275,7 +283,7 @@ export class PlayerController {
     } else {
       const wantsRun = this.keys.has('ShiftLeft') || this.keys.has('ShiftRight') || this.stick.length() > 0.92;
       const running = wantsRun && len > 0.3 && !this.exhausted && !this.crouched && this.stamina > 0;
-      if (running && this.grounded && this.vel.length() > JOG * 0.8) {
+      if (running && this.grounded && this.vel.length() > WALK * 1.2) {
         this.stamina = Math.max(0, this.stamina - dt / SPRINT_TIME);
         this.restDelay = REST_DELAY;
         if (this.stamina === 0) this.exhausted = true;
@@ -284,7 +292,7 @@ export class PlayerController {
         if (this.restDelay <= 0) this.stamina = Math.min(1, this.stamina + dt / REGEN_TIME);
         if (this.exhausted && this.stamina >= RECOVER_AT) this.exhausted = false;
       }
-      const maxSpeed = this.crouched ? CROUCH : running ? SPRINT : JOG;
+      const maxSpeed = this.crouched ? CROUCH : running ? JOG : WALK;
       const tx = dirX * maxSpeed, tz = dirZ * maxSpeed;
       // Acelerar hacia la velocidad deseada (con menos control en el aire)
       const speeding = tx * tx + tz * tz >= this.vel.lengthSq() - 0.01;

@@ -261,7 +261,7 @@ export function djSign(title, sub = '') {
 }
 
 // Cartel de la consola de artistas: quién tiene las luces y las pantallas
-export function artistsSign({ luces, escenario, hall } = {}) {
+export function artistsSign({ luces, escenario } = {}) {
   const [c, g] = canvas(1024, 256);
   g.fillStyle = 'rgba(7,6,15,0.75)'; g.fillRect(0, 0, 1024, 256);
   g.textAlign = 'left'; g.textBaseline = 'middle';
@@ -276,8 +276,130 @@ export function artistsSign({ luces, escenario, hall } = {}) {
     if (w > 950) g.font = `600 ${Math.floor(40 * 950 / w)}px "Segoe UI", Arial, sans-serif`;
     g.fillText(text, 36, y);
   };
-  row('Luces', luces, 116);
-  row('Pantalla del escenario', escenario, 168);
-  row('Pantalla del hall', hall, 220);
+  row('Luces', luces, 128);
+  row('Pantalla', escenario, 196);
+  return toTexture(c);
+}
+
+// Cemento pulido: gris con manchas suaves, poros y alguna fisura fina. Empalma en los bordes
+// (todo se dibuja también corrido un ancho/alto), así no se notan las uniones al repetirla.
+export function concrete() {
+  const S = 1024;
+  const [c, g] = canvas(S, S);
+  const rand = rng(11);
+  const wrap = (draw) => { for (const dx of [-S, 0, S]) for (const dy of [-S, 0, S]) { g.save(); g.translate(dx, dy); draw(); g.restore(); } };
+  g.fillStyle = '#8b8b8a';
+  g.fillRect(0, 0, S, S);
+  for (let i = 0; i < 60; i++) {
+    const x = rand() * S, y = rand() * S, r = 120 + rand() * 300;
+    const v = rand() > 0.5 ? 255 : 20, a = 0.025 + rand() * 0.035;
+    wrap(() => {
+      const grd = g.createRadialGradient(x, y, 0, x, y, r);
+      grd.addColorStop(0, `rgba(${v},${v},${v},${a})`);
+      grd.addColorStop(1, `rgba(${v},${v},${v},0)`);
+      g.fillStyle = grd;
+      g.fillRect(x - r, y - r, r * 2, r * 2);
+    });
+  }
+  for (let i = 0; i < 9000; i++) {
+    const v = rand() > 0.5 ? 190 : 70;
+    g.fillStyle = `rgba(${v},${v},${v},${0.06 + rand() * 0.1})`;
+    const sz = 0.6 + rand() * 1.6;
+    g.fillRect(rand() * S, rand() * S, sz, sz);
+  }
+  g.strokeStyle = 'rgba(40,40,40,0.14)';
+  g.lineWidth = 1;
+  for (let i = 0; i < 4; i++) {
+    const pts = [[rand() * S, rand() * S]];
+    for (let k = 0; k < 14; k++) { const [x, y] = pts[pts.length - 1]; pts.push([x + (rand() - 0.5) * 60, y + (rand() - 0.3) * 40]); }
+    wrap(() => { g.beginPath(); g.moveTo(...pts[0]); for (const p of pts) g.lineTo(...p); g.stroke(); });
+  }
+  const t = toTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  return t;
+}
+
+// Collage para las paredes del baño: recortes de colores, "fotos", palabras y cinta
+export function collage(seed = 3) {
+  const [c, g] = canvas(1024, 1024);
+  const rand = rng(seed);
+  g.fillStyle = '#efe6d6';
+  g.fillRect(0, 0, 1024, 1024);
+  const colors = ['#e63946', '#ffd23f', '#3a7bd5', '#2a9d8f', '#ff6fb5', '#1d1d22', '#f4a261', '#8a4be2', '#ffffff'];
+  const words = ['ARTE', 'NOCHE', 'BAILÁ', 'SALÓN', 'AMOR', 'RUIDO', 'FIESTA', 'MUSEO', 'LUZ', 'VOS', '¿Y AHORA?', 'XX', 'CHAU', 'HOLA', 'POP', 'ON AIR'];
+  const piece = (draw) => {
+    const x = rand() * 1024, y = rand() * 1024, w = 90 + rand() * 260, h = 70 + rand() * 220;
+    g.save();
+    g.translate(x, y);
+    g.rotate((rand() - 0.5) * 0.7);
+    g.shadowColor = 'rgba(0,0,0,0.35)'; g.shadowBlur = 8; g.shadowOffsetY = 3;
+    draw(w, h);
+    g.restore();
+  };
+  for (let i = 0; i < 90; i++) {
+    const kind = rand();
+    piece((w, h) => {
+      if (kind < 0.45) {
+        // Recorte de color con rayas o lunares
+        g.fillStyle = colors[Math.floor(rand() * colors.length)];
+        g.fillRect(-w / 2, -h / 2, w, h);
+        g.shadowColor = 'transparent';
+        g.fillStyle = colors[Math.floor(rand() * colors.length)];
+        if (rand() > 0.5) for (let k = -w / 2; k < w / 2; k += 18) g.fillRect(k, -h / 2, 7, h);
+        else for (let k = 0; k < 12; k++) { g.beginPath(); g.arc((rand() - 0.5) * w, (rand() - 0.5) * h, 6 + rand() * 10, 0, Math.PI * 2); g.fill(); }
+      } else if (kind < 0.75) {
+        // "Foto": cielo y suelo con un sol, con borde blanco
+        g.fillStyle = '#fff';
+        g.fillRect(-w / 2 - 8, -h / 2 - 8, w + 16, h + 26);
+        g.shadowColor = 'transparent';
+        const sky = g.createLinearGradient(0, -h / 2, 0, h / 2);
+        sky.addColorStop(0, `hsl(${rand() * 360} 60% 60%)`);
+        sky.addColorStop(1, `hsl(${rand() * 360} 50% 30%)`);
+        g.fillStyle = sky;
+        g.fillRect(-w / 2, -h / 2, w, h);
+        g.fillStyle = `hsl(${rand() * 360} 80% 70%)`;
+        g.beginPath(); g.arc((rand() - 0.5) * w * 0.6, -h * 0.15, Math.min(w, h) * 0.15, 0, Math.PI * 2); g.fill();
+      } else {
+        // Palabra recortada de revista
+        const word = words[Math.floor(rand() * words.length)];
+        g.font = `900 ${40 + rand() * 50}px "Arial Black", Impact, sans-serif`;
+        const tw = g.measureText(word).width;
+        g.fillStyle = colors[Math.floor(rand() * colors.length)];
+        g.fillRect(-tw / 2 - 10, -40, tw + 20, 80);
+        g.shadowColor = 'transparent';
+        g.fillStyle = rand() > 0.5 ? '#111' : '#fff';
+        g.textAlign = 'center'; g.textBaseline = 'middle';
+        g.fillText(word, 0, 2);
+      }
+    });
+    // Cinta
+    if (rand() > 0.6) {
+      g.save();
+      g.translate(rand() * 1024, rand() * 1024);
+      g.rotate((rand() - 0.5) * 1.2);
+      g.fillStyle = 'rgba(255,245,200,0.55)';
+      g.fillRect(-35, -10, 70, 20);
+      g.restore();
+    }
+  }
+  const t = toTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  return t;
+}
+
+// Cartelito del DJ en el frente de la cabina (nombre y track); vacío si no hay DJ
+export function boothSign(name, track) {
+  const [c, g] = canvas(1024, 256);
+  g.fillStyle = '#050508'; g.fillRect(0, 0, 1024, 256);
+  g.textAlign = 'center'; g.textBaseline = 'middle';
+  const fit = (text, size, y, color) => {
+    g.font = `800 ${size}px "Segoe UI", Arial, sans-serif`;
+    const w = g.measureText(text).width;
+    if (w > 960) g.font = `800 ${Math.floor(size * 960 / w)}px "Segoe UI", Arial, sans-serif`;
+    g.fillStyle = color;
+    g.fillText(text, 512, y);
+  };
+  fit(`DJ ${name}`, 96, track ? 84 : 128, '#ffffff');
+  if (track) fit(`♪ ${track}`, 62, 188, '#ff7af0');
   return toTexture(c);
 }
