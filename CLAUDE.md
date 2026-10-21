@@ -23,19 +23,33 @@ Guía para trabajar en este proyecto con Claude Code. Leé también [docs/ROADMA
 - **Cliente:** Three.js + Vite, JavaScript sin framework. Post-procesado (GTAO + bloom con umbral
   alto, para que brillen solo los neones) solo en calidad "alta".
 - **Servidor:** Cloudflare Worker + Durable Objects con SQLite (plan gratuito).
-  - `Accounts` (una instancia global): usuarios, sesiones, inventario, amigos, presencia.
+  - `Accounts` (una instancia global): usuarios, sesiones, inventario, amigos, presencia y toda la
+    red social (fotos, notas, muro, me gusta, corazones, favoritas, avisos, restringidos).
   - `Room` (una por sala): tiempo real por WebSocket con hibernación.
-- **Voz y pantalla:** WebRTC P2P en malla; la sala solo pasa las señales. Sin TURN todavía.
+- **Voz y pantalla:** WebRTC P2P en malla; la sala solo pasa las señales. Sin TURN todavía. Próximo:
+  servidor de audio (SFU) para ocultar las IPs y escuchar solo a los más cercanos / grupos.
 
 ## Comandos
 
 ```bash
 npm run dev      # cliente (5173) + servidor (8787) juntos
+npm run dev:alt  # segunda copia: servidor en el 8788 con sus propios datos
+npm run puente   # puente OSC para artistas
 npm run build    # compila el cliente en dist/
 npm run deploy   # build + wrangler deploy
 ```
 
 ## Cosas a saber
+
+- **Ramas:** se trabaja sobre `main` (todas las ramas anteriores ya se juntaron ahí).
+- **Cuentas:** registro con mail + nickname único; se entra con cualquiera de los dos. Invitado =
+  cuenta sin `username` (`isGuest` en `accounts.js`): sin objetos, intercambios, muro, galería, me gusta,
+  corazones ni sala propia (cada método lo frena con `guestError()`). Registrarse conserva el id.
+- **Cuidarse** (`src/ui/roompanel.js`): mutear (voz) e ignorar (voz + texto) se guardan en el navegador;
+  restringir (oculta sus publicaciones del muro) vive en la cuenta (rutas `blocks`/`block`). Reportar está
+  postergado: las rutas `report`/`reports` existen en el servidor pero no hay botón.
+- **Antiflood** del chat en `server/room.js` (`FLOOD_MAX`, `FLOOD_WINDOW`, `REPEAT_WINDOW`).
+- **No pisables:** `noStand` en los colliders (obras, cabinas, atril); el controlador no te deja parado encima.
 
 - **Windows:** wrangler falla con SQLite si la ruta del proyecto es muy larga; por eso
   `scripts/dev-server.js` guarda el estado local en `%TEMP%/galeria-state`.
@@ -54,11 +68,12 @@ npm run deploy   # build + wrangler deploy
 - **Protocolo de la sala** (mensajes `t`): `join`, `s` (estado `[x,y,z,yaw,vel,pose]`), `afk`,
   `mic`, `look`, `chat`, `rtc`, `screen`, `drop`, `pickup`, `mod`, `trade`, `emote` (gestos), `dj` (cabina: on/off, track), `part` (consola de artistas: luces / escenario), `luces` (estado de las luces por OSC).
 - **Puente OSC:** `npm run puente` (sin dependencias) recibe OSC en el puerto 9000 y lo pasa a la pestaña
-  del juego por http://127.0.0.1:9001. Direcciones en `src/net/osc.js`. El servidor nunca
-  confía en el cliente para nombre, ropa ni objetos: los lee de `Accounts`.
+  del juego por http://127.0.0.1:9001. Direcciones en `src/net/osc.js`.
+- El servidor nunca confía en el cliente para nombre, ropa ni objetos: los lee de `Accounts`.
 - **Catálogos compartidos** (objetos, peinados, validaciones) en `server/shared.js`, importados
   también por el cliente.
-- **Admins:** `wrangler.jsonc` → `vars.ADMIN_IDS`. El dueño de una sala `u-<id>` es esa cuenta.
+- **Admins:** `wrangler.jsonc` → `vars.ADMIN_IDS`. El dueño de una sala `u-<id>` es esa cuenta. Los
+  admins entran también a salas cerradas.
 - La interfaz de avatar (`setLook`, `setEquip`, `gesture(nombre)`, `update(dt, {speed, pose, turn, landing})`,
   `root`, `scale`, `phase`, `mats.skin/shirt`) la usan el controlador, los jugadores remotos y los brazos
   de 1ª persona. El modelo (Quaternius) se carga en segundo plano: `avatar.model` es `null` hasta entonces.

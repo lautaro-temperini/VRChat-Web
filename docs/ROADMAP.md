@@ -9,9 +9,10 @@ y las salas giran alrededor de exponer, descubrir y coleccionar arte.
 ## Plan acordado (21/10/2026), en orden
 
 1. **Base para abrir al público**: registro con mail y nickname único; voz con IP oculta y grupos
-   (escuchar a los más cercanos, party/grupo privado vs. público); antiflood en el chat; restringir
-   (ocultar todo de una persona) + reportar a un admin; aviso +18 y condiciones de uso; obras y cabinas
-   no trepables; **juntar las ramas** (`claude/quirky-knuth-uxmxve` + `feat/red-social`).
+   (escuchar a los más cercanos, party/grupo privado vs. público); antiflood en el chat; mutear,
+   ignorar y restringir; aviso +18 y condiciones de uso; obras y cabinas no trepables; juntar las ramas.
+   ✅ Hecho todo menos la **voz con IP oculta y grupos**: falta el servidor de audio (SFU, Cloudflare
+   Realtime o LiveKit). El usuario tiene que activarlo y pasar las claves. Reportar quedó postergado.
 2. **Museo rotativo con postulaciones**: cada obra dura 24 h, cola con prioridad para usuarios.
    Cuadros (arte digital, shaders, diseños) y esculturas (modelos 3D, instalaciones interactivas).
    Empezar por imágenes y modelos 3D; shaders e instalaciones después (corren código: aislar y limitar).
@@ -26,12 +27,24 @@ y las salas giran alrededor de exponer, descubrir y coleccionar arte.
 
 Pendiente transversal: **primera prueba con personas reales** (inauguración con 5–10 artistas exponiendo).
 
-> **Pedidos nuevos del usuario (20/10): ver [PEDIDOS.md](PEDIDOS.md)** — música del DJ, OSC, editor de sala
-> y modelos subidos por usuarios, tipos de cuerpo, más peinados/cejas/ropa, selector RGB, estilo tipo MetaPerson.
+## Pedidos del 20/10 todavía pendientes
+
+La música del DJ y el puente OSC ya están hechos. Falta:
+
+- **Editor de sala dentro del juego** (elegir objetos de un catálogo, moverlos, rotarlos, escalarlos; se
+  guarda por sala) y **modelos subidos por usuarios** si cumplen requisitos. **Consultar los requisitos**;
+  propuesta NO decidida: GLB/glTF, tamaño máximo, tope de triángulos, texturas hasta 2K, escala en metros,
+  sin scripts, licencia propia o CC0. Almacenamiento sugerido: R2, validación en el servidor.
+- **Personaje**: tipos de cuerpo (flaco, gordo, musculoso, atlético…; consultar la lista final; morph
+  targets o bases distintas, escalar huesos no alcanza), más peinados, cejas, ropa y accesorios, selector
+  RGB completo. Personalización objetivo: contextura, altura, peinados, ojos, piel, boca, nariz, cejas,
+  orejas, forma de la cara, aros, lentes, gorro, remera, buzo, pantalones, zapatos.
+- **Más adelante**: avatares propios (esqueleto estándar) y después gestos/scripts propios (gestos como
+  datos; scripts solo en un entorno aislado). Consultar.
 
 ## Próximos pasos
 
-### En curso
+### Hecho
 1. **Personaje realista estilizado (Quaternius).** ✅ Primera versión hecha (`src/player/avatar.js`,
    reemplaza al personaje hecho por código). Modelos en `public/models/quaternius/` (CC0).
    - Ropa pintada por el sombreador según el hueso que mueve cada vértice (torso, brazos, piernas, pies).
@@ -57,10 +70,9 @@ Pendiente transversal: **primera prueba con personas reales** (inauguración con
   tiene capucha ni bolsillo) y la ropa se ve pegada al cuerpo. "Luego lo vemos".
 - **Peinados rulos y coleta** con el estilo del pack (hacerlos en Blender). Hoy se muestran como
   corto y rodete, pero el dato guardado de cada cuenta no se toca.
-- **Salas de usuario tipo Fotolog/Instagram**: subir fotos que se cuelgan como cuadros, libro de visitas.
-- **Parte social (a definir):** tablero de anuncios del dueño de la sala (tipo muro; ¿qué pueden hacer
-  los visitantes?), mesita de "me gusta"/tips, salas favoritas y una sala de xvvave (además del Museo).
-  El usuario lo planteó el 21/10 pero todavía no lo tiene claro.
+- **Fotos colgadas como cuadros** en la sala propia (la galería, el atril y el muro ya están; esto
+  llega con el editor).
+- **Diseño de la sala de xvvave** (distinta del Museo).
 - **AR** en las dos direcciones (obras/avatar en tu habitación; fotos/escaneos del mundo real al juego).
 - **Editor avanzado (capa 2)** con sliders de cara y cuerpo.
 - **Nombre y marca definitivos** (hoy "Galería Online" es provisorio).
@@ -99,11 +111,12 @@ Pendiente transversal: **primera prueba con personas reales** (inauguración con
 | Controles | Aparecen en un cartel al entrar (una vez por visita); después con /controls o desde el menú |
 | Estilo visual | ~~Estilizado tipo Fortnite~~ → **semi-realista tipo MetaPerson, no anime** (20/10). Posibles herramientas: Tripo o MCP de Blender |
 | Plataformas | PC y celular |
-| Público | Comunidad / amigos |
+| Público | ~~Comunidad / amigos~~ → público (ver "Visión y público") |
 | Personalización | Dos capas: básica (ropa + rasgos) y avanzada (completa) |
 | Hosting | Gratis (Cloudflare); local primero |
 | AFK | No se expulsa por AFK; solo una etiqueta "AFK" debajo del nombre. Se sale al cerrar la pestaña |
-| Cuentas | Invitado persistente o usuario + contraseña; no pedir datos al recargar |
+| Cuentas | Invitado persistente o cuenta registrada; no pedir datos al recargar. El registro es con mail (ver "Registro") |
+| Invitados | Solo para probar: miran, chatean y se mueven; sin objetos, intercambios, muro, galería ni sala propia. Sin verificar el mail por ahora |
 | Cámara | Cambio 1ª/3ª persona con la rueda (sin botón en PC; en celular sí) |
 | Teclas | E usar · P personaje · V (mantener) hablar · M silenciar música de la sala · Tab (mantener) jugadores/info · Esc menú con pestañas · I inventario · F amigos · Y Mapa · R gestos · C agacharse (Ctrl no: con Ctrl+W se cerraba la pestaña) |
 | Stamina | Correr gasta stamina (barra visible) |
@@ -121,7 +134,6 @@ Pendiente transversal: **primera prueba con personas reales** (inauguración con
 | Mapas | Botón "Mapa" (antes Mundi) + comandos en el chat (`/ir`, `/salas`) |
 | Día y noche | Según la hora GMT-3 |
 | Web3 | No por ahora |
-| Próximo | Música del DJ, después puente OSC |
 | Editor de sala | Editor básico dentro del juego; cualquiera puede subir modelos si cumplen requisitos (requisitos a definir con el usuario) |
 | Cuerpos | Tipos de cuerpo distintos (flaco, gordo, musculoso, atlético…), no solo ancho |
 | Colores | Selector RGB completo (cuadradito "RGB +") en vez de filas de muestras |
