@@ -1,5 +1,31 @@
 # Roadmap y decisiones
 
+## Visión (21/10/2026)
+
+**Exposición artística digital gamificada, pública, para artistas de 20 a 40 años (+18).**
+El núcleo es el **Museo con obras del público** (rotan cada 24 h); lo social, la economía, las misiones
+y las salas giran alrededor de exponer, descubrir y coleccionar arte.
+
+## Plan acordado (21/10/2026), en orden
+
+1. **Base para abrir al público**: registro con mail y nickname único; voz con IP oculta y grupos
+   (escuchar a los más cercanos, party/grupo privado vs. público); antiflood en el chat; restringir
+   (ocultar todo de una persona) + reportar a un admin; aviso +18 y condiciones de uso; obras y cabinas
+   no trepables; **juntar las ramas** (`claude/quirky-knuth-uxmxve` + `feat/red-social`).
+2. **Museo rotativo con postulaciones**: cada obra dura 24 h, cola con prioridad para usuarios.
+   Cuadros (arte digital, shaders, diseños) y esculturas (modelos 3D, instalaciones interactivas).
+   Empezar por imágenes y modelos 3D; shaders e instalaciones después (corren código: aislar y limitar).
+   **Consultar**: aprobación o entrada directa, cantidad de lugares, postulaciones por persona, qué pasa
+   si no hay postulaciones, cómo se ve la cola.
+3. **Progresión y misiones ligadas al arte** (descubrir, exponer, curar, asistir a eventos; no tiempo
+   conectado), con objetos de recompensa. Niveles que dan objetos nuevos.
+4. **Editor de salas** y salas distintas entre sí (solo el Museo es igual para todos), con plantillas.
+5. **Proceso de arte**: IA (Tripo/Meshy) para muebles, decoración y esculturas; Blender para cuerpos
+   y ropa; **diseños de artistas como objetos del juego** (entran a la base y se pueden intercambiar).
+   Más mapas públicos para exploradores. **Consultar** cómo se reparten las copias de un diseño.
+
+Pendiente transversal: **primera prueba con personas reales** (inauguración con 5–10 artistas exponiendo).
+
 > **Pedidos nuevos del usuario (20/10): ver [PEDIDOS.md](PEDIDOS.md)** — música del DJ, OSC, editor de sala
 > y modelos subidos por usuarios, tipos de cuerpo, más peinados/cejas/ropa, selector RGB, estilo tipo MetaPerson.
 
@@ -120,3 +146,15 @@
 | Muro del celular | Reemplaza "Mis notas" (cuadro para escribir arriba). Muestra notas y fotos tuyas y de amigos; abajo "Destacados" con lo más nuevo del resto |
 | Me gusta en el muro | Corazón en cada nota y cada foto (uno por persona, se puede sacar). No genera aviso |
 | Fotos en el muro | Cada foto aparece solo para quien puede ver la galería de su dueño |
+| Visión y público | Público, artistas de 20 a 40 años, +18. "Exposición artística digital gamificada" |
+| Obras del Museo | Del público (el admin puede cargar algunas). Cada obra 24 h; postulaciones en cola con prioridad para usuarios |
+| Salas | Todas distintas; solo el Museo (home de todos) es igual para todos |
+| Economía | Sí. Fuentes: misiones/niveles y diseños subidos por artistas, que pasan a ser objetos intercambiables |
+| Registro | Con mail (frena las cuentas múltiples; 3–4 por persona no rompen nada) y nickname único |
+| Movimiento | Agacharse, sentarse y trepar se quedan (naturales). La stamina se recupera con un trago, comida, un beso… (a definir; el beso con consentimiento) |
+| Contenido | +18; no se modera el contenido en sí, pero hay restringir + reportar a un admin (contenido ilegal o robo de obras) |
+| Soltar objetos | Es la única forma de deshacerse de un objeto. Regalar = intercambio donde el otro no pone nada (ya funciona) |
+| Cabinas y obras | No trepables (los parlantes sí) |
+| Moderación del Museo | Ignorar/restringir + antiflood + reportes; no depende de que el admin esté conectado |
+| Personajes | Mejorar con Blender + Tripo/Meshy (IA para objetos y decoración; cuerpos y ropa en Blender) |
+| Exploradores | Más mapas públicos |
