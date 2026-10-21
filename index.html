@@ -355,16 +355,64 @@
     <button class="cta" data-close-panel>Listo</button>
   </aside>
 
-  <!-- Amigos y salas -->
-  <aside id="friends" class="panel">
-    <h1 class="display">Amigos</h1>
-    <div class="rooms">
-      <button class="act" id="go-museum">Museo</button>
-      <button class="act" id="go-home">Mi sala</button>
+  <!-- Celular: la red social (inicio = amigos). El personaje lo saca y los demás lo ven. -->
+  <aside id="friends" class="phone">
+    <div class="phone-status"><span id="phone-clock"></span><span class="phone-notch"></span><span>5G ▮▮▮</span></div>
+    <div class="phone-screen">
+      <section class="app" data-app="amigos">
+        <h1 class="display">Amigos</h1>
+        <input id="friend-search" type="search" maxlength="20" placeholder="Buscar gente por nombre o @usuario" autocomplete="off" />
+        <div id="search-results"></div>
+        <div id="friends-list"></div>
+      </section>
+      <section class="app" data-app="notas" hidden>
+        <h1 class="display">Mis notas</h1>
+        <p class="meta">Las leen los que visitan tu sala, en el atril. Solo vos escribís.</p>
+        <form id="mynotes-form" class="compose">
+          <textarea id="mynotes-input" maxlength="280" rows="3" placeholder="¿Qué estás haciendo?"></textarea>
+          <div class="compose-row"><span class="meta" id="mynotes-count">0/280</span><button class="act on">Publicar</button></div>
+        </form>
+        <div id="mynotes-list"></div>
+      </section>
+      <section class="app" data-app="galeria" hidden>
+        <h1 class="display">Mi galería</h1>
+        <div id="phone-gallery"></div>
+      </section>
+      <section class="app" data-app="avisos" hidden>
+        <h1 class="display">Avisos</h1>
+        <div id="notif-list"></div>
+      </section>
     </div>
-    <div id="friends-list"></div>
-    <button class="cta" data-close-panel>Listo</button>
+    <nav class="phone-dock">
+      <button data-app="amigos" class="on" title="Amigos">👥<span>Amigos</span></button>
+      <button data-app="notas" title="Mis notas">📝<span>Notas</span></button>
+      <button data-app="galeria" title="Mi galería">🖼️<span>Galería</span></button>
+      <button data-app="avisos" title="Avisos">🔔<span>Avisos</span><b class="count" id="notif-count" hidden></b></button>
+      <button data-close-panel title="Guardar el celular">✕<span>Guardar</span></button>
+    </nav>
   </aside>
+
+  <!-- Atril: notas del dueño de la sala y corazones -->
+  <div id="notes" class="overlay">
+    <div class="sheet book">
+      <button class="close" data-close aria-label="Cerrar">✕</button>
+      <p class="kicker" id="notes-sub"></p>
+      <h1 class="display" id="notes-title"></h1>
+      <div class="hearts-row">
+        <b id="notes-hearts">♥ 0</b>
+        <button class="act on" id="notes-heart">Dejar un corazón ♥</button>
+      </div>
+      <form id="notes-form" class="compose only-mine">
+        <textarea id="notes-input" maxlength="280" rows="2" placeholder="Escribí una nota para los que visitan tu sala…"></textarea>
+        <div class="compose-row"><span class="meta" id="notes-count">0/280</span><button class="act on">Publicar</button></div>
+      </form>
+      <div id="notes-list" class="notes-list"></div>
+      <p class="hint-close"><kbd>E</kbd> o <kbd>Esc</kbd> para cerrar</p>
+    </div>
+  </div>
+
+  <!-- Foto en grande -->
+  <div id="photoview"><img id="photoview-img" alt="" /></div>
 
   <!-- Intercambio -->
   <div id="trade" class="overlay">

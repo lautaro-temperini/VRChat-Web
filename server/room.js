@@ -89,7 +89,7 @@ export class Room extends DurableObject {
   publicInfo(m) {
     return {
       id: m.id, userId: m.userId, name: m.name, look: m.look, equip: m.equip ?? [],
-      afk: !!m.afk, mic: m.mic ?? 'off', silenced: !!this.silenced?.[m.userId], mod: !!m.mod,
+      afk: !!m.afk, mic: m.mic ?? 'off', silenced: !!this.silenced?.[m.userId], mod: !!m.mod, phone: !!m.phone,
       s: this.states.get(m.id) ?? null,
     };
   }
@@ -178,6 +178,13 @@ export class Room extends DurableObject {
         ws.close(4003, 'baneado');
         return;
       }
+      // Sala personal: el dueño elige quién entra (todos, amigos o nadie más). Los admins siempre.
+      const owner = await this.ownerId();
+      if (owner && !(await this.isMod({ userId: user.id })) && !(await this.accounts().canEnter(owner, user.id))) {
+        this.send(ws, { t: 'error', code: 'private' });
+        ws.close(4004, 'sala privada');
+        return;
+      }
       Object.assign(meta, { joined: true, userId: user.id, name: user.name, look: user.look, equip: user.equip, afk: !!msg.afk, mic: 'off' });
       meta.mod = await this.isMod(meta);
       ws.serializeAttachment(meta);
@@ -205,6 +212,13 @@ export class Room extends DurableObject {
         if (!s) return;
         this.states.set(meta.id, s);
         this.broadcast({ t: 's', id: meta.id, s }, ws);
+        break;
+      }
+      case 'phone': {
+        // Sacó o guardó el celular (red social): los demás ven al personaje con el teléfono
+        meta.phone = !!msg.v;
+        ws.serializeAttachment(meta);
+        this.broadcast({ t: 'phone', id: meta.id, v: meta.phone }, ws);
         break;
       }
       case 'afk': {

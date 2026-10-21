@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { buildAccessory } from './accessories.js';
 import { ITEMS, EMOTES } from '../../server/shared.js';
 import { LOCO, locomotionClips, gestureClip } from './anims.js';
@@ -212,6 +213,19 @@ class Rig {
 
 export const POSE = { stand: 0, crouch: 1, sit: 2, climb: 3, air: 4 };
 
+// Celular (en coordenadas del modelo en pose T, colgado de la mano derecha):
+// largo a lo largo de Z, pantalla mirando a +X; al doblar el brazo queda vertical mirando la cara.
+function phoneMesh() {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new RoundedBoxGeometry(0.012, 0.075, 0.15, 2, 0.006), new THREE.MeshStandardMaterial({ color: 0x15151a, roughness: 0.3, metalness: 0.5 }));
+  const screen = new THREE.Mesh(new THREE.PlaneGeometry(0.135, 0.064), new THREE.MeshBasicMaterial({ color: 0x8fd0ff }));
+  screen.rotation.y = Math.PI / 2;
+  screen.position.x = 0.0065;
+  body.castShadow = true;
+  g.add(body, screen);
+  return g;
+}
+
 // Gestos hechos por código: aplaudir (no hay animación) y los demás mientras cargan las animaciones.
 // Devuelven ángulos de los brazos [derecho, izquierdo] y del cuerpo, con la misma convención de update().
 const GESTURES = {
@@ -246,6 +260,8 @@ export class Avatar {
     this.scale = 1;
     this.gest = null;   // gesto en curso: { name, t, action? }
     this.talking = false; // hablando por voz: usa la animación de hablar cuando está quieto
+    this.phone = false;   // con el celular en la mano (red social abierta): los demás lo ven
+    this.phoneW = 0;
     this.gestW = 0;     // cuánto pesa el gesto (para entrar y salir suave)
     this.gestPose = null;
     this.model = null;  // { scene, rig, gltf, meshes, body }
@@ -335,6 +351,11 @@ export class Avatar {
     const anchor = (bone, [x, y, z, s]) => { const g = rig.holder(bone, [x, y, z]); g.scale.setScalar(s); return g; };
     const anchors = { head: anchor('Head', def.head), face: anchor('Head', def.face), chest: anchor('spine_03', def.chest) };
     const model = { type, scene, rig, gltf, meshes, body, anchors, anim: null, legY: rig.bones.thigh_l.bone.getWorldPosition(new THREE.Vector3()).y };
+    // Celular en la mano derecha (en pose T la mano apunta a -X; ver applyPhone)
+    const hand = rig.bones.hand_r.worldPos;
+    model.phone = rig.holder('hand_r', [hand.x - 0.06, hand.y - 0.035, hand.z]);
+    model.phone.add(phoneMesh());
+    model.phone.visible = false;
     this.model = model;
     // Animaciones: hasta que cargan, el personaje se mueve con la animación hecha por código
     locomotionClips(type, rig).then((clips) => {
@@ -500,6 +521,24 @@ export class Avatar {
     J.neck = damp(J.neck, -lean * 0.7, 10, dt);
     if (this.model?.anim) this.animate(dt, speed, gw);
     else this.applyPose(J, am);
+    // Celular: pisa el brazo derecho y baja un poco la cabeza (también caminando)
+    this.phoneW = damp(this.phoneW, this.phone ? 1 : 0, 8, dt);
+    if (this.model) {
+      this.model.phone.visible = this.phoneW > 0.35;
+      if (this.phoneW > 0.001) this.applyPhone(this.phoneW);
+    }
+  }
+
+  // Brazo derecho sosteniendo el celular frente al pecho, cabeza mirándolo
+  applyPhone(w) {
+    const R = this.model.rig;
+    const names = ['upperarm_r', 'lowerarm_r', 'neck_01'];
+    const saved = names.map((n) => R.bones[n].bone.quaternion.clone());
+    const side = -1; // derecho
+    R.set('upperarm_r', _q2.setFromEuler(_e.set(-0.5, 0, 0.32)).multiply(ARM_DOWN[side]));
+    R.set('lowerarm_r', _q3.copy(ARM_DOWN_INV[side]).multiply(qx(-1.65)).multiply(ARM_DOWN[side]));
+    R.euler('neck_01', 0.38, 0, 0);
+    names.forEach((n, k) => { const b = R.bones[n].bone; b.quaternion.copy(saved[k].slerp(b.quaternion, w)); });
   }
 
   // Con las animaciones cargadas: mezcla según velocidad y pose, más el gesto encima

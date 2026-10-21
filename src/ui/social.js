@@ -103,9 +103,6 @@ export function createSocial({ net, ui, me, room, onEquip, onDrop }) {
     const r = await api('friends');
     if (!r.ok) return;
     friendsData = r;
-    const n = r.incoming.length;
-    $('friends-count').hidden = !n;
-    $('friends-count').textContent = n;
     // Avisar solicitudes nuevas (no las que ya se vieron)
     const ids = new Set(r.incoming.map((f) => f.id));
     if (seenIncoming) {
@@ -172,10 +169,15 @@ export function createSocial({ net, ui, me, room, onEquip, onDrop }) {
         ['Rechazar', () => respond(f.id, false)],
       ]);
     }
-    section('Amigos', friendsData.friends, (f) => [
+    const friendButtons = (f) => [
       ...(f.room && f.room !== room ? [['Ir', () => go(f.room), 'on']] : []),
       ['Su sala', () => go(roomOf(f.id))],
-    ], 'Todavía no tenés amigos. Apretá E sobre alguien y "Agregar amigo".');
+    ];
+    const online = friendsData.friends.filter((f) => f.room);
+    const offline = friendsData.friends.filter((f) => !f.room);
+    section(`Conectados (${online.length})`, online, friendButtons,
+      friendsData.friends.length ? 'Ninguno de tus amigos está conectado ahora.' : 'Todavía no tenés amigos. Buscalos arriba o apretá E sobre alguien y "Agregar amigo".');
+    if (offline.length) section(`Desconectados (${offline.length})`, offline, friendButtons);
     if (friendsData.outgoing.length) {
       section('Enviadas', friendsData.outgoing, (f) => [
         ['Cancelar', async () => { await api('friendremove', { method: 'POST', body: { id: f.id } }); refreshFriends(); }],
@@ -189,8 +191,6 @@ export function createSocial({ net, ui, me, room, onEquip, onDrop }) {
     await refreshFriends();
     renderFriends();
   }
-  $('go-museum').onclick = () => go('museo');
-  $('go-home').onclick = () => { if (me()) go(roomOf(me().id)); };
 
   // Botones del perfil de otro jugador
   function profileActions(player, profile) {

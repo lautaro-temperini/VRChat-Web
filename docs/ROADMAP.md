@@ -104,3 +104,16 @@
 | Peinados | corto, largo, rapado, rodete. Rulos → corto y coleta → rodete hasta que existan (sin preferencia del usuario; opción reversible) |
 | Calidad gráfica | Siempre automática (sin selector): baja/media/alta según GPU, memoria y celular; si anda lento baja sola. KTX2 para celular más adelante (todavía no se instalan las herramientas) |
 | Botones | PC: Gestos, Sala, Personaje y Ajustes arriba a la derecha; Inventario, Amigos y Mapa abajo a la derecha; Hablar y Audio debajo del chat. Celular: todo arriba con íconos (mochila, celular, mundo); Hablar y Audio arriba del chat |
+| Red social: dónde | **Celular** (centro personal, desde cualquier sala) **y atril** (en cada sala personal). El Mapa queda aparte, fuera del celular |
+| Celular | Inicio = Amigos (conectados primero) + buscador de gente. Apps: Notas (mías), Galería (mía), Avisos. Al abrirlo el personaje lo saca y los demás lo ven (también caminando) |
+| Notas del dueño | Tipo Twitter: solo escribe el dueño; los visitantes solo leen (en el atril de su sala) |
+| Atril | Libro abierto en la sala personal; E para leer las notas. Contador de corazones arriba |
+| Corazones | Uno por visitante por sala; cuentan para la sala y para el dueño. El dueño no se puede dar a sí mismo |
+| Galería del perfil | Subir y borrar fotos, hasta 30. Visibilidad la elige el dueño (todos / amigos / solo yo). No se cuelgan en la sala por defecto: el dueño decide qué objeto con imagen la muestra (llega con el editor) |
+| Salas favoritas | Dentro del Mapa, con lista propia arriba; se puede marcar la sala actual |
+| Avisos | Solo solicitudes de amistad (enviadas y aceptadas), en el celular |
+| Agregar amigos | Desde el perfil (E sobre alguien) y desde el buscador del celular |
+| Mi sala | En el Mapa: nombre, descripción y quién puede entrar (abierta / solo amigos / cerrada) |
+| Salas de jugadores | Plantillas primero (loft, galería, club, depto, terraza…), caja editable después. Modo edición con muebles, colores y materiales |
+| Paquete inicial | 15 objetos al azar entre muebles e indumentaria (cuando existan los muebles) |
+| Sala de xvvave | Distinta del Museo (diseño a definir con el usuario) |

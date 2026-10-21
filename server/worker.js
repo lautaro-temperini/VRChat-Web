@@ -56,6 +56,21 @@ async function linkPreview(raw) {
 async function api(request, env, path) {
   const accounts = env.ACCOUNTS.get(env.ACCOUNTS.idFromName('global'));
   const token = bearer(request);
+  const q = new URL(request.url).searchParams;
+
+  // Fotos: se suben y se bajan como archivo (no JSON)
+  if (path === 'photo' && request.method === 'GET') {
+    const p = await accounts.photoGet(token, q.get('id'));
+    if (!p) return new Response('No encontrada', { status: 404 });
+    return new Response(p.data, { headers: { 'content-type': p.mime, 'cache-control': 'private, max-age=86400' } });
+  }
+  if (path === 'photo' && request.method === 'POST') {
+    const mime = (request.headers.get('content-type') ?? '').split(';')[0].trim();
+    const data = await request.arrayBuffer();
+    const result = await accounts.photoAdd(token, mime, data, Number(q.get('w')), Number(q.get('h')));
+    return json(result, result.ok ? 200 : 400);
+  }
+
   let body = {};
   if (request.method !== 'GET') {
     try { body = await request.json(); } catch { body = {}; }
@@ -79,6 +94,22 @@ async function api(request, env, path) {
     case 'POST friendrespond': result = await accounts.friendRespond(token, String(body.id ?? ''), !!body.accept); break;
     case 'POST friendremove': result = await accounts.friendRemove(token, String(body.id ?? '')); break;
     case 'GET preview': result = await linkPreview(new URL(request.url).searchParams.get('url')); break;
+    // Red social
+    case 'GET photos': result = await accounts.photoList(token, q.get('id')); break;
+    case 'POST photodelete': result = await accounts.photoDelete(token, body.id); break;
+    case 'POST galleryprivacy': result = await accounts.setGalleryPrivacy(token, body.privacy); break;
+    case 'GET notes': result = await accounts.notesList(q.get('id')); break;
+    case 'POST note': result = await accounts.noteAdd(token, body.text); break;
+    case 'POST notedelete': result = await accounts.noteDelete(token, body.id); break;
+    case 'GET hearts': result = await accounts.hearts(token, q.get('id')); break;
+    case 'POST heart': result = await accounts.heartGive(token, String(body.id ?? '')); break;
+    case 'GET roominfo': result = await accounts.roomInfo(q.get('id')); break;
+    case 'PUT myroom': result = await accounts.setMyRoom(token, body); break;
+    case 'GET favorites': result = await accounts.favorites(token); break;
+    case 'POST favorite': result = await accounts.setFavorite(token, body.room, !!body.on); break;
+    case 'GET search': result = await accounts.search(token, q.get('q')); break;
+    case 'GET notifications': result = await accounts.notifications(token); break;
+    case 'POST notificationsseen': result = await accounts.notificationsSeen(token); break;
     default: return json({ ok: false, error: 'No encontrado' }, 404);
   }
   return json(result, result.ok ? 200 : 400);

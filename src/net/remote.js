@@ -6,13 +6,14 @@ import { Avatar, POSE } from '../player/avatar.js';
 // y las suaviza para que el movimiento se vea continuo.
 
 export class RemotePlayer {
-  constructor(scene, { id, userId, name, look, equip, s, afk, mic, mod, silenced }) {
+  constructor(scene, { id, userId, name, look, equip, s, afk, mic, mod, silenced, phone }) {
     this.id = id;
     this.userId = userId;
     this.mod = !!mod;           // moderador de esta sala
     this.silenced = !!silenced; // silenciado por un moderador
     this.scene = scene;
     this.avatar = new Avatar(look, equip);
+    this.avatar.phone = !!phone; // con el celular en la mano
     this.target = new THREE.Vector3();
     this.yaw = 0;
     this.targetYaw = 0;

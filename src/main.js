@@ -20,6 +20,10 @@ import { EMOTES, DANCES } from '../server/shared.js';
 import { UI_ICONS } from './ui/icons.js';
 import { createRoomPanel } from './ui/roompanel.js';
 import { Ground } from './world/ground.js';
+import { buildLectern } from './world/lectern.js';
+import { createPhone } from './ui/phone.js';
+import { createNotes } from './ui/notes.js';
+import { renderGallery } from './ui/gallery.js';
 import { detectQuality, FpsWatch } from './quality.js';
 import { Bridge, applyOsc, defaultLights } from './net/osc.js';
 
@@ -134,7 +138,7 @@ for (const b of document.querySelectorAll('button.pill:not(.icon)')) {
 
 // ---------- Estado de la interfaz ----------
 // Un solo panel/superposición abierto a la vez. Mientras hay uno, el jugador no se mueve.
-const OVERLAYS = ['editing', 'settings', 'inspecting', 'profiling', 'auth', 'inventory', 'friends', 'trading', 'viewing', 'roompanel', 'mundi', 'gestures', 'djing', 'artists', 'controls', 'kicked'];
+const OVERLAYS = ['editing', 'settings', 'inspecting', 'profiling', 'auth', 'inventory', 'friends', 'trading', 'viewing', 'roompanel', 'mundi', 'gestures', 'djing', 'artists', 'controls', 'kicked', 'notes'];
 // Paneles que no frenan al personaje (se puede seguir caminando con WASD)
 const NON_BLOCKING = ['inventory', 'friends', 'roompanel', 'editing', 'gestures', 'artists'];
 function openOverlay(cls) {
@@ -148,12 +152,19 @@ function closeOverlays() {
   refreshState();
 }
 const overlayOpen = () => OVERLAYS.some((c) => body.classList.contains(c));
+let sendPhone = null; // se define cuando existe la conexión con la sala
 function refreshState() {
   // Antes de entrar, el editor muestra el personaje en vitrina; ya adentro se puede caminar con el editor abierto
   ctrl.enabled = joined && !body.classList.contains('auth');
   if (!body.classList.contains('editing')) ctrl.showcase = false;
   ctrl.paused = OVERLAYS.some((c) => body.classList.contains(c) && !NON_BLOCKING.includes(c)) || ctrl.typing;
   body.classList.toggle('playing', ctrl.enabled && !ctrl.paused);
+  // Celular abierto = el personaje lo tiene en la mano (y los demás lo ven)
+  const phoneOut = body.classList.contains('friends');
+  if (phoneOut !== me.phone) {
+    me.phone = phoneOut;
+    sendPhone?.(phoneOut);
+  }
 }
 
 // ---------- Pantalla de entrada (invitado / login / registro) ----------
@@ -408,21 +419,43 @@ renderer.domElement.addEventListener('drop', (e) => {
   if (p) social.dropByIid(iid, p);
 });
 
-// Mapa: lista de salas
-function openMundi() {
+// Mapa: favoritas (arriba de todo), el Museo, tu sala (con sus ajustes) y las salas de tus amigos.
+// La estrella marca/desmarca favorita, también la sala en la que estás.
+let favorites = [];
+const PRIVACY_LABEL = { todos: 'Abierta a todos', amigos: 'Solo amigos', cerrada: 'Cerrada (solo vos)' };
+async function openMundi() {
+  openOverlay('mundi');
+  const [fav, mine] = await Promise.all([api('favorites'), account ? api(`roominfo?id=${account.id}`) : null]);
+  if (fav.ok) favorites = fav.favorites;
+  const isFav = (target) => favorites.some((f) => f.room === target);
   const list = $('mundi-list');
   list.innerHTML = '';
+  const section = (title) => {
+    const h = document.createElement('h2');
+    h.className = 'sub-h';
+    h.textContent = title;
+    list.append(h);
+  };
   const add = (title, sub, target) => {
     const el = document.createElement('div');
     el.className = `mundi-room ${target === room ? 'here' : ''}`;
+    const star = document.createElement('button');
+    star.className = `star ${isFav(target) ? 'on' : ''}`;
+    star.title = isFav(target) ? 'Sacar de favoritas' : 'Agregar a favoritas';
+    star.textContent = isFav(target) ? '★' : '☆';
+    star.onclick = async () => {
+      const r = await api('favorite', { method: 'POST', body: { room: target, on: !isFav(target) } });
+      if (!r.ok) return toast(r.error);
+      openMundi();
+    };
     const who = document.createElement('div');
     who.className = 'who';
     const b = document.createElement('b');
     b.textContent = title;
     const s = document.createElement('span');
-    s.textContent = target === room ? 'Estás acá' : sub;
+    s.textContent = target === room ? `Estás acá${sub ? ` · ${sub}` : ''}` : sub;
     who.append(b, s);
-    el.append(who);
+    el.append(star, who);
     if (target !== room) {
       const go = document.createElement('button');
       go.className = 'act on';
@@ -431,11 +464,62 @@ function openMundi() {
       el.append(go);
     }
     list.append(el);
+    return el;
   };
+  const hearts = (n) => (n ? `♥ ${n}` : '');
+
+  if (favorites.length) {
+    section('Favoritas');
+    for (const f of favorites) add(f.name, [f.ownerName && `de ${f.ownerName}`, hearts(f.hearts)].filter(Boolean).join(' · '), f.room);
+  }
+  section('Salas');
   add('Museo', 'Sala pública', 'museo');
-  if (account) add('Tu sala', 'Tu sala personal', `u-${account.id}`);
-  for (const f of social.friends.friends) add(`Sala de ${f.name}`, f.room ? social.roomLabel(f.room).replace(/^En /, `${f.name} está en `) : 'Su sala personal', `u-${f.id}`);
-  openOverlay('mundi');
+  if (account && mine?.ok) {
+    const myRoom = `u-${account.id}`;
+    const el = add(mine.room.name, ['Tu sala', PRIVACY_LABEL[mine.room.privacy], hearts(mine.room.hearts)].filter(Boolean).join(' · '), myRoom);
+    // Ajustes de tu sala: nombre, descripción y quién puede entrar
+    const edit = document.createElement('button');
+    edit.className = 'act';
+    edit.textContent = 'Editar';
+    edit.onclick = () => {
+      const form = document.createElement('form');
+      form.className = 'room-form';
+      form.innerHTML = `
+        <label class="field">Nombre de la sala<input name="name" maxlength="32" placeholder="Sala de ${account.name.replace(/[<>"]/g, '')}"></label>
+        <label class="field">Descripción<input name="desc" maxlength="140" placeholder="¿De qué se trata tu sala?"></label>
+        <label class="field">Quién puede entrar<select name="privacy">
+          <option value="todos">Abierta a todos</option><option value="amigos">Solo amigos</option><option value="cerrada">Cerrada (solo vos)</option>
+        </select></label>
+        <div class="compose-row"><button type="button" class="act" data-cancel>Cancelar</button><button class="act on">Guardar</button></div>`;
+      form.name.value = mine.room.customName ?? '';
+      form.desc.value = mine.room.desc ?? '';
+      form.privacy.value = mine.room.privacy;
+      form.querySelector('[data-cancel]').onclick = () => openMundi();
+      form.onsubmit = async (e) => {
+        e.preventDefault();
+        const r = await api('myroom', { method: 'PUT', body: { name: form.name.value, desc: form.desc.value, privacy: form.privacy.value } });
+        if (!r.ok) return toast(r.error);
+        toast('Guardaste los cambios de tu sala.');
+        if (room === myRoom) { roomTitle = r.room.name; setStatus(); }
+        openMundi();
+      };
+      el.after(form);
+      edit.remove();
+    };
+    el.append(edit);
+    if (mine.room.desc) { const d = document.createElement('p'); d.className = 'meta room-desc'; d.textContent = mine.room.desc; el.after(d); }
+  }
+  const friends = social.friends.friends;
+  if (friends.length) {
+    section('Salas de tus amigos');
+    for (const f of friends) add(`Sala de ${f.name}`, f.room ? social.roomLabel(f.room).replace(/^En /, `${f.name} está en `) : 'Su sala personal', `u-${f.id}`);
+  }
+  // La sala actual, si no aparece en ninguna lista, igual se puede marcar como favorita
+  const listed = ['museo', account && `u-${account.id}`, ...favorites.map((f) => f.room), ...friends.map((f) => `u-${f.id}`)];
+  if (!listed.includes(room)) {
+    section('Estás en');
+    add(roomTitle, '', room);
+  }
 }
 const toggleMundi = () => (body.classList.contains('mundi') ? closeOverlays() : openMundi());
 $('btn-mundi').onclick = toggleMundi;
@@ -491,13 +575,38 @@ const social = createSocial({
   onDrop: (it, at) => dropItem(it, at),
 });
 $('btn-inv').onclick = () => (body.classList.contains('inventory') ? closeOverlays() : social.openInventory());
-$('btn-friends').onclick = () => (body.classList.contains('friends') ? closeOverlays() : social.openFriends());
+
+// Celular (la red social): inicio = amigos. Mientras está abierto, el personaje lo tiene en la mano.
+const phone = createPhone({ social, me: () => account, go: (target) => social.go(target) });
+sendPhone = (v) => { if (net.ready) net.send({ t: 'phone', v }); };
+async function openPhone() {
+  await social.openFriends();
+  phone.open();
+}
+const togglePhone = () => (body.classList.contains('friends') ? closeOverlays() : openPhone());
+$('btn-friends').onclick = togglePhone;
 for (const b of document.querySelectorAll('[data-close-panel]')) b.onclick = closeOverlays;
 
-// Nombre de la sala (las salas personales se llaman como su dueño)
+// Nombre de la sala (las salas personales usan el nombre que les puso su dueño)
 let roomTitle = room === 'museo' ? 'Museo' : room;
-if (room.startsWith('u-')) {
-  api(`profile?id=${room.slice(2)}`).then((r) => { if (r.ok) { roomTitle = `Sala de ${r.profile.name}`; setStatus(); } });
+const roomOwner = room.startsWith('u-') ? room.slice(2) : null;
+if (roomOwner) {
+  api(`profile?id=${roomOwner}`).then((r) => { if (r.ok) { roomTitle = r.profile.roomName; setStatus(); } });
+}
+
+// Atril de la sala personal: E para leer las notas del dueño y dejar un corazón
+let lectern = null;
+const notes = createNotes({
+  ui: { openOverlay, closeOverlays, isOpen: (cls) => body.classList.contains(cls) },
+  onHearts: (n) => lectern?.setHearts(n),
+});
+if (roomOwner) {
+  lectern = buildLectern(scene, { x: -24.5, z: -4.2, yaw: Math.atan2(-3, 4.2) });
+  world.colliders.push(lectern.collider);
+  const item = { object: lectern.group, kind: 'atril', prompt: 'Leer las notas' };
+  lectern.group.traverse((o) => { o.userData.interact = item; });
+  world.interactables.push(item);
+  notes.hearts(roomOwner);
 }
 
 // Controles: al entrar (una vez por visita), con /controls o desde el menú
@@ -516,7 +625,8 @@ function join() {
   if (!controlsShown) { controlsShown = true; setTimeout(openControls, 400); }
   net.connect(() => ({ token: session.token, s: ctrl.state(), afk }));
   social.refreshFriends();
-  setInterval(() => social.refreshFriends(), 25_000);
+  phone.refreshBadge();
+  setInterval(() => { social.refreshFriends(); phone.refreshBadge(); }, 25_000);
 }
 
 function setStatus() {
@@ -554,6 +664,7 @@ net
     for (const p of m.players) rtc.playerJoined(p.id);
     if (rtc.mic) net.send({ t: 'mic', v: rtc.micState });
     roomPanel.setRoom(m.room ?? {});
+    if (me.phone) net.send({ t: 'phone', v: true });
     roomPanel.applyMutes();
     ground.clear();
     for (const g of m.ground ?? []) ground.add(g);
@@ -604,6 +715,7 @@ net
   })
   .on('s', ({ id, s }) => remotes.get(id)?.setState(s))
   .on('afk', ({ id, v }) => remotes.get(id)?.setAfk(v))
+  .on('phone', ({ id, v }) => { const r = remotes.get(id); if (r) r.avatar.phone = v; })
   .on('look', ({ id, name: n, look: l, equip }) => { const r = remotes.get(id); if (r) { r.setLook(l, equip); r.setName(n); } })
   .on('mic', ({ id, v }) => remotes.get(id)?.setMic(v))
   .on('emote', ({ id, e }) => remotes.get(id)?.avatar.gesture(e))
@@ -670,6 +782,7 @@ net
   .on('error', (m) => {
     if (m.code === 'auth') { session.token = null; location.reload(); }
     if (m.code === 'banned') showKicked('Estás baneado de esta sala', 'El dueño de la sala o un admin te baneó.');
+    if (m.code === 'private') showKicked('Sala privada', 'El dueño de esta sala eligió que solo entren sus amigos, o nadie más.');
   })
   .on('status', setStatus);
 
@@ -812,6 +925,7 @@ function interact() {
     ctrl.sit(seat);
   } else if (t.kind === 'player') openProfile(t.player);
   else if (t.kind === 'screen') useScreen();
+  else if (t.kind === 'atril') notes.open(roomOwner, account?.id === roomOwner);
   else if (t.kind === 'dj') openDJPanel();
   else if (t.kind === 'artists') openArtists();
   else if (t.kind === 'pickup') net.send({ t: 'pickup', iid: t.ground.iid });
@@ -1044,7 +1158,7 @@ async function openProfile(player) {
   $('profile-actions').hidden = true;
   showProfileTab('about');
   const g = $('profile-gallery');
-  g.innerHTML = '<div class="empty">Todavía no subió fotos.<br>Muy pronto cada uno va a tener su galería, como en Fotolog.</div>';
+  g.innerHTML = '';
   openOverlay('profiling');
   if (!player.userId) return;
   const r = await api(`profile?id=${encodeURIComponent(player.userId)}`);
@@ -1052,7 +1166,8 @@ async function openProfile(player) {
   const p = r.profile;
   $('profile-user').textContent = p.username ? `@${p.username}` : 'Invitado';
   $('profile-bio').textContent = p.bio;
-  $('profile-since').textContent = `Miembro desde ${new Date(p.created).toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })}`;
+  $('profile-since').textContent = `Miembro desde ${new Date(p.created).toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })}${p.hearts ? ` · ♥ ${p.hearts} en su sala` : ''}`;
+  renderGallery(g, p.id);
   social.profileActions(player, p);
 }
 function showProfileTab(tab) {
@@ -1090,7 +1205,7 @@ addEventListener('keydown', (e) => {
     if (!e.repeat && joined) talk(true);
     return;
   }
-  const viewing = ['inspecting', 'profiling', 'viewing'].some((c) => body.classList.contains(c));
+  const viewing = ['inspecting', 'profiling', 'viewing', 'notes'].some((c) => body.classList.contains(c));
   if (e.code === 'KeyE') {
     e.preventDefault();
     if (viewing) closeOverlays();
@@ -1108,7 +1223,7 @@ addEventListener('keydown', (e) => {
   } else if (e.code === 'KeyI') {
     body.classList.contains('inventory') ? closeOverlays() : social.openInventory();
   } else if (e.code === 'KeyF') {
-    body.classList.contains('friends') ? closeOverlays() : social.openFriends();
+    togglePhone();
   } else if (e.code === 'KeyY') {
     toggleMundi();
   } else if (e.code === 'KeyR') {

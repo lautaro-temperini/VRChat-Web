@@ -39,6 +39,13 @@ npm run deploy   # build + wrangler deploy
 
 - **Windows:** wrangler falla con SQLite si la ruta del proyecto es muy larga; por eso
   `scripts/dev-server.js` guarda el estado local en `%TEMP%/galeria-state`.
+- **Dos copias a la vez** (ej. la del usuario en `E:\Proyectos` y una rama de prueba): `npm run dev:alt`
+  usa el servidor de salas en el puerto 8788 con su propia carpeta de datos (`GAME_PORT`). Si dos
+  `npm run dev` comunes corren juntos, el segundo NO toma el 8787 y su página habla con el primero.
+- **Red social** (`src/ui/phone.js`, `notes.js`, `gallery.js`, `src/world/lectern.js`): el celular es el
+  panel `#friends`; mensaje de sala `phone` (el personaje lo saca). Rutas: `photos`, `photo` (archivo),
+  `notes`/`note`, `hearts`/`heart`, `roominfo`/`myroom`, `favorites`/`favorite`, `search`, `notifications`.
+  Las fotos se guardan en SQLite del Durable Object de cuentas (no R2, para no necesitar tarjeta).
 - **PowerShell 5.1** lee UTF-8 sin BOM como ANSI y rompe los acentos: para editar archivos con
   scripts usar `[IO.File]::ReadAllText/WriteAllText` con UTF-8, o las herramientas de edición.
 - **Pruebas:** en desarrollo existe `window.__game` (ctrl, world, remotes, rtc, social, net,

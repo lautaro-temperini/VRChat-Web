@@ -29,6 +29,9 @@ function sameText(a, b) {
 
 const USERNAME = /^[a-z0-9_.]{3,20}$/;
 const ONLINE_WINDOW = 90_000; // ms: si la sala no avisó en este tiempo, está desconectado
+const PHOTO_LIMIT = 30;           // fotos por usuario (decisión del usuario)
+const PHOTO_BYTES = 700 * 1024;   // el cliente achica y comprime antes de subir
+const NOTE_LENGTH = 280;          // largo máximo de una nota
 
 export class Accounts extends DurableObject {
   constructor(ctx, env) {
@@ -55,10 +58,40 @@ export class Accounts extends DurableObject {
         user_id TEXT PRIMARY KEY, room TEXT NOT NULL, updated INTEGER NOT NULL
       );
     `);
+    // Red social: fotos de la galería, notas del dueño, corazones del atril, favoritas y avisos
+    this.sql.exec(`
+      CREATE TABLE IF NOT EXISTS photos (
+        id TEXT PRIMARY KEY, owner TEXT NOT NULL, mime TEXT NOT NULL, data BLOB NOT NULL,
+        w INTEGER NOT NULL, h INTEGER NOT NULL, created INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS photos_owner ON photos (owner);
+      CREATE TABLE IF NOT EXISTS notes (
+        id TEXT PRIMARY KEY, owner TEXT NOT NULL, text TEXT NOT NULL, created INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS notes_owner ON notes (owner, created);
+      CREATE TABLE IF NOT EXISTS hearts (
+        owner TEXT NOT NULL, from_user TEXT NOT NULL, created INTEGER NOT NULL,
+        PRIMARY KEY (owner, from_user)
+      );
+      CREATE TABLE IF NOT EXISTS favorites (
+        user_id TEXT NOT NULL, room TEXT NOT NULL, created INTEGER NOT NULL,
+        PRIMARY KEY (user_id, room)
+      );
+      CREATE TABLE IF NOT EXISTS notifications (
+        id TEXT PRIMARY KEY, user_id TEXT NOT NULL, type TEXT NOT NULL, from_user TEXT NOT NULL,
+        created INTEGER NOT NULL, seen INTEGER NOT NULL DEFAULT 0
+      );
+      CREATE INDEX IF NOT EXISTS notifications_user ON notifications (user_id, created);
+    `);
     // Columnas agregadas después de la primera versión
     const cols = this.sql.exec('PRAGMA table_info(users)').toArray().map((c) => c.name);
-    if (!cols.includes('bio')) this.sql.exec("ALTER TABLE users ADD COLUMN bio TEXT NOT NULL DEFAULT ''");
-    if (!cols.includes('starter')) this.sql.exec('ALTER TABLE users ADD COLUMN starter INTEGER NOT NULL DEFAULT 0');
+    const addCol = (name, def) => { if (!cols.includes(name)) this.sql.exec(`ALTER TABLE users ADD COLUMN ${name} ${def}`); };
+    addCol('bio', "TEXT NOT NULL DEFAULT ''");
+    addCol('starter', 'INTEGER NOT NULL DEFAULT 0');
+    addCol('room_name', "TEXT NOT NULL DEFAULT ''");
+    addCol('room_desc', "TEXT NOT NULL DEFAULT ''");
+    addCol('room_privacy', "TEXT NOT NULL DEFAULT 'todos'");     // todos | amigos | cerrada
+    addCol('gallery_privacy', "TEXT NOT NULL DEFAULT 'todos'");  // todos | amigos | nadie
   }
 
   // ---------- Usuarios y sesiones ----------
@@ -159,8 +192,11 @@ export class Accounts extends DurableObject {
     return {
       ok: true,
       profile: {
-        id: row.id, username, name, look, bio, created, equip, gallery: [],
+        id: row.id, username, name, look, bio, created, equip,
         relation: viewer ? (viewer.id === row.id ? 'self' : this.relation(viewer.id, row.id)) : 'none',
+        hearts: this.heartCount(row.id),
+        roomName: this.roomTitle(row),
+        galleryPrivacy: row.gallery_privacy,
       },
     };
   }
@@ -291,15 +327,20 @@ export class Accounts extends DurableObject {
     if (!this.row(otherId) || otherId === me.id) return { ok: false, error: 'No existe ese perfil.' };
     const rel = this.relation(me.id, otherId);
     if (rel === 'incoming') return this.friendRespond(token, otherId, true); // ya te había invitado: aceptar
-    if (rel === 'none') this.sql.exec("INSERT INTO friends (a, b, status, created) VALUES (?, ?, 'pending', ?)", me.id, otherId, Date.now());
+    if (rel === 'none') {
+      this.sql.exec("INSERT INTO friends (a, b, status, created) VALUES (?, ?, 'pending', ?)", me.id, otherId, Date.now());
+      this.notify(otherId, 'friend_request', me.id);
+    }
     return { ok: true, relation: this.relation(me.id, otherId) };
   }
 
   async friendRespond(token, otherId, accept) {
     const me = await this.userFromToken(token);
     if (!me) return { ok: false, error: 'Sesión vencida.' };
-    if (accept) this.sql.exec("UPDATE friends SET status = 'accepted' WHERE a = ? AND b = ?", otherId, me.id);
-    else this.sql.exec('DELETE FROM friends WHERE a = ? AND b = ?', otherId, me.id);
+    if (accept) {
+      const changed = this.sql.exec("UPDATE friends SET status = 'accepted' WHERE a = ? AND b = ? AND status = 'pending'", otherId, me.id).rowsWritten;
+      if (changed) this.notify(otherId, 'friend_accepted', me.id);
+    } else this.sql.exec('DELETE FROM friends WHERE a = ? AND b = ?', otherId, me.id);
     return { ok: true, relation: this.relation(me.id, otherId) };
   }
 
@@ -308,6 +349,217 @@ export class Accounts extends DurableObject {
     if (!me) return { ok: false, error: 'Sesión vencida.' };
     this.sql.exec('DELETE FROM friends WHERE (a = ? AND b = ?) OR (a = ? AND b = ?)', me.id, otherId, otherId, me.id);
     return { ok: true, relation: 'none' };
+  }
+
+  // ---------- Privacidad ----------
+  // todos: cualquiera · amigos: el dueño y sus amigos · cerrada/nadie: solo el dueño
+
+  allowed(viewerId, ownerId, privacy) {
+    if (viewerId && viewerId === ownerId) return true;
+    if (privacy === 'todos') return true;
+    if (privacy === 'amigos') return !!viewerId && this.relation(viewerId, ownerId) === 'friends';
+    return false;
+  }
+
+  // ¿Puede este usuario entrar a la sala personal de ownerId? (la usa la sala al entrar)
+  async canEnter(ownerId, userId) {
+    const owner = this.row(ownerId);
+    if (!owner) return true; // sala de una cuenta que no existe: sin dueño, abierta
+    return this.allowed(userId, ownerId, owner.room_privacy);
+  }
+
+  // ---------- Galería de fotos del perfil (hasta 30, visibilidad la elige el dueño) ----------
+
+  async photoList(token, ownerId) {
+    const owner = this.row(ownerId);
+    if (!owner) return { ok: false, error: 'No existe ese perfil.' };
+    const viewer = await this.userFromToken(token);
+    const mine = viewer?.id === ownerId;
+    if (!this.allowed(viewer?.id, ownerId, owner.gallery_privacy)) {
+      return { ok: true, hidden: true, privacy: owner.gallery_privacy, photos: [] };
+    }
+    const photos = this.sql.exec('SELECT id, w, h, created FROM photos WHERE owner = ? ORDER BY created DESC', ownerId).toArray();
+    return { ok: true, mine, privacy: owner.gallery_privacy, max: PHOTO_LIMIT, photos };
+  }
+
+  async photoGet(token, id) {
+    const p = this.sql.exec('SELECT * FROM photos WHERE id = ?', String(id ?? '')).toArray()[0];
+    if (!p) return null;
+    const viewer = await this.userFromToken(token);
+    if (!this.allowed(viewer?.id, p.owner, this.row(p.owner)?.gallery_privacy)) return null;
+    return { mime: p.mime, data: p.data };
+  }
+
+  async photoAdd(token, mime, data, w, h) {
+    const me = await this.userFromToken(token);
+    if (!me) return { ok: false, error: 'Sesión vencida.' };
+    if (!['image/jpeg', 'image/webp', 'image/png'].includes(mime)) return { ok: false, error: 'Formato no permitido (JPG, PNG o WebP).' };
+    if (!(data instanceof ArrayBuffer) || data.byteLength === 0 || data.byteLength > PHOTO_BYTES) return { ok: false, error: 'La foto es demasiado pesada.' };
+    const count = this.sql.exec('SELECT COUNT(*) AS n FROM photos WHERE owner = ?', me.id).one().n;
+    if (count >= PHOTO_LIMIT) return { ok: false, error: `Llegaste al máximo de ${PHOTO_LIMIT} fotos. Borrá alguna para subir otra.` };
+    const id = randomHex(8);
+    this.sql.exec('INSERT INTO photos (id, owner, mime, data, w, h, created) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      id, me.id, mime, data, Math.round(w) || 0, Math.round(h) || 0, Date.now());
+    return { ok: true, id };
+  }
+
+  async photoDelete(token, id) {
+    const me = await this.userFromToken(token);
+    if (!me) return { ok: false, error: 'Sesión vencida.' };
+    this.sql.exec('DELETE FROM photos WHERE id = ? AND owner = ?', String(id ?? ''), me.id);
+    return { ok: true };
+  }
+
+  async setGalleryPrivacy(token, value) {
+    const me = await this.userFromToken(token);
+    if (!me) return { ok: false, error: 'Sesión vencida.' };
+    if (!['todos', 'amigos', 'nadie'].includes(value)) return { ok: false, error: 'Opción no válida.' };
+    this.sql.exec('UPDATE users SET gallery_privacy = ? WHERE id = ?', value, me.id);
+    return { ok: true, privacy: value };
+  }
+
+  // ---------- Notas del dueño (las lee cualquiera; solo escribe el dueño) ----------
+
+  async notesList(ownerId) {
+    const owner = this.row(ownerId);
+    if (!owner) return { ok: false, error: 'No existe ese perfil.' };
+    const notes = this.sql.exec('SELECT id, text, created FROM notes WHERE owner = ? ORDER BY created DESC LIMIT 100', ownerId).toArray();
+    return { ok: true, owner: { id: owner.id, name: owner.name, room: this.roomTitle(owner) }, notes };
+  }
+
+  async noteAdd(token, text) {
+    const me = await this.userFromToken(token);
+    if (!me) return { ok: false, error: 'Sesión vencida.' };
+    const clean = String(text ?? '').replace(/[\u0000-\u0009\u000b-\u001f]/g, '').trim().slice(0, NOTE_LENGTH);
+    if (!clean) return { ok: false, error: 'La nota está vacía.' };
+    const id = randomHex(8);
+    this.sql.exec('INSERT INTO notes (id, owner, text, created) VALUES (?, ?, ?, ?)', id, me.id, clean, Date.now());
+    return { ok: true, note: { id, text: clean, created: Date.now() } };
+  }
+
+  async noteDelete(token, id) {
+    const me = await this.userFromToken(token);
+    if (!me) return { ok: false, error: 'Sesión vencida.' };
+    this.sql.exec('DELETE FROM notes WHERE id = ? AND owner = ?', String(id ?? ''), me.id);
+    return { ok: true };
+  }
+
+  // ---------- Corazones del atril: uno por visitante; cuentan para la sala y para el dueño ----------
+
+  heartCount(ownerId) {
+    return this.sql.exec('SELECT COUNT(*) AS n FROM hearts WHERE owner = ?', ownerId).one().n;
+  }
+
+  async hearts(token, ownerId) {
+    const viewer = await this.userFromToken(token);
+    const mine = !!viewer && this.sql.exec('SELECT 1 FROM hearts WHERE owner = ? AND from_user = ?', ownerId, viewer.id).toArray().length > 0;
+    return { ok: true, count: this.heartCount(ownerId), given: mine, self: viewer?.id === ownerId };
+  }
+
+  async heartGive(token, ownerId) {
+    const me = await this.userFromToken(token);
+    if (!me) return { ok: false, error: 'Sesión vencida.' };
+    if (!this.row(ownerId)) return { ok: false, error: 'No existe esa sala.' };
+    if (me.id === ownerId) return { ok: false, error: 'No podés dejarte un corazón a vos mismo.' };
+    this.sql.exec('INSERT OR IGNORE INTO hearts (owner, from_user, created) VALUES (?, ?, ?)', ownerId, me.id, Date.now());
+    return { ok: true, count: this.heartCount(ownerId), given: true };
+  }
+
+  // ---------- Mi sala: nombre, descripción y quién puede entrar ----------
+
+  roomTitle(row) {
+    return row.room_name || `Sala de ${row.name}`;
+  }
+
+  async roomInfo(ownerId) {
+    const owner = this.row(ownerId);
+    if (!owner) return { ok: false, error: 'No existe esa sala.' };
+    return {
+      ok: true,
+      room: { owner: owner.id, ownerName: owner.name, name: this.roomTitle(owner), customName: owner.room_name, desc: owner.room_desc, privacy: owner.room_privacy, hearts: this.heartCount(owner.id) },
+    };
+  }
+
+  async setMyRoom(token, { name, desc, privacy } = {}) {
+    const me = await this.userFromToken(token);
+    if (!me) return { ok: false, error: 'Sesión vencida.' };
+    if (privacy !== undefined && !['todos', 'amigos', 'cerrada'].includes(privacy)) return { ok: false, error: 'Opción no válida.' };
+    const clean = (s, n) => String(s ?? '').replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, n);
+    this.sql.exec('UPDATE users SET room_name = ?, room_desc = ?, room_privacy = ? WHERE id = ?',
+      name !== undefined ? clean(name, 32) : me.room_name,
+      desc !== undefined ? clean(desc, 140) : me.room_desc,
+      privacy ?? me.room_privacy, me.id);
+    return this.roomInfo(me.id);
+  }
+
+  // ---------- Salas favoritas (se guardan desde el Mapa) ----------
+
+  roomLabel(room) {
+    if (room === 'museo') return { name: 'Museo', hearts: null };
+    if (room.startsWith('u-')) {
+      const owner = this.row(room.slice(2));
+      if (owner) return { name: this.roomTitle(owner), hearts: this.heartCount(owner.id), ownerName: owner.name };
+    }
+    return { name: `Sala ${room}`, hearts: null };
+  }
+
+  async favorites(token) {
+    const me = await this.userFromToken(token);
+    if (!me) return { ok: false, error: 'Sesión vencida.' };
+    const rows = this.sql.exec('SELECT room FROM favorites WHERE user_id = ? ORDER BY created DESC', me.id).toArray();
+    return { ok: true, favorites: rows.map(({ room }) => ({ room, ...this.roomLabel(room) })) };
+  }
+
+  async setFavorite(token, room, on) {
+    const me = await this.userFromToken(token);
+    if (!me) return { ok: false, error: 'Sesión vencida.' };
+    room = String(room ?? '').toLowerCase();
+    if (!/^[a-z0-9-]{1,32}$/.test(room)) return { ok: false, error: 'Sala no válida.' };
+    if (on) this.sql.exec('INSERT OR IGNORE INTO favorites (user_id, room, created) VALUES (?, ?, ?)', me.id, room, Date.now());
+    else this.sql.exec('DELETE FROM favorites WHERE user_id = ? AND room = ?', me.id, room);
+    return this.favorites(token);
+  }
+
+  // ---------- Buscador de gente (para agregar amigos) ----------
+
+  async search(token, q) {
+    const me = await this.userFromToken(token);
+    if (!me) return { ok: false, error: 'Sesión vencida.' };
+    const term = String(q ?? '').trim().toLowerCase().replace(/^@/, '').slice(0, 20);
+    if (term.length < 2) return { ok: true, results: [] };
+    const like = `%${term.replace(/[%_]/g, '')}%`;
+    const rows = this.sql.exec(
+      'SELECT id, name, username FROM users WHERE id != ? AND (LOWER(name) LIKE ? OR username LIKE ?) ORDER BY username IS NULL, name LIMIT 20',
+      me.id, like, like,
+    ).toArray();
+    return { ok: true, results: rows.map((r) => ({ id: r.id, name: r.name, username: r.username ?? null, relation: this.relation(me.id, r.id), room: this.where(r.id) })) };
+  }
+
+  // ---------- Avisos (por ahora: solicitudes de amistad enviadas y aceptadas) ----------
+
+  notify(userId, type, fromId) {
+    this.sql.exec('INSERT INTO notifications (id, user_id, type, from_user, created) VALUES (?, ?, ?, ?, ?)', randomHex(8), userId, type, fromId, Date.now());
+  }
+
+  async notifications(token) {
+    const me = await this.userFromToken(token);
+    if (!me) return { ok: false, error: 'Sesión vencida.' };
+    const rows = this.sql.exec('SELECT * FROM notifications WHERE user_id = ? ORDER BY created DESC LIMIT 30', me.id).toArray();
+    const unseen = this.sql.exec('SELECT COUNT(*) AS n FROM notifications WHERE user_id = ? AND seen = 0', me.id).one().n;
+    return {
+      ok: true, unseen,
+      items: rows.map((r) => {
+        const from = this.row(r.from_user);
+        return { id: r.id, type: r.type, created: r.created, seen: !!r.seen, from: from ? { id: from.id, name: from.name, username: from.username ?? null } : null };
+      }),
+    };
+  }
+
+  async notificationsSeen(token) {
+    const me = await this.userFromToken(token);
+    if (!me) return { ok: false, error: 'Sesión vencida.' };
+    this.sql.exec('UPDATE notifications SET seen = 1 WHERE user_id = ?', me.id);
+    return { ok: true };
   }
 
   // ---------- Presencia (las salas avisan quién está adentro) ----------
