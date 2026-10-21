@@ -77,9 +77,14 @@ async function api(request, env, path) {
   }
   let result;
   switch (`${request.method} ${path}`) {
-    case 'POST guest': result = await accounts.guest(body.name, body.look); break;
-    case 'POST register': result = await accounts.register(token, body.username, body.password, body.name, body.look); break;
-    case 'POST login': result = await accounts.login(body.username, body.password); break;
+    case 'POST guest': result = await accounts.guest(body.name, body.look, !!body.terms); break;
+    case 'POST register': result = await accounts.register(token, { email: body.email, nick: body.nick, password: body.password, look: body.look, terms: !!body.terms }); break;
+    case 'POST login': result = await accounts.login(body.login ?? body.username, body.password); break;
+    case 'GET blocks': result = await accounts.blocks(token); break;
+    case 'POST block': result = await accounts.setBlock(token, String(body.id ?? ''), !!body.on); break;
+    case 'POST report': result = await accounts.report(token, body); break;
+    case 'GET reports': result = await accounts.reports(token); break;
+    case 'POST reportresolve': result = await accounts.resolveReport(token, body.id); break;
     case 'POST logout': result = await accounts.logout(token); break;
     case 'GET me': {
       const user = await accounts.auth(token);

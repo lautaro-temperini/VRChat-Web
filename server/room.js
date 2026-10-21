@@ -17,6 +17,8 @@ const DEAD_AFTER = 3 * 60_000;
 const MIC_STATES = ['off', 'on'];
 // Objetos en el suelo: otro jugador puede juntarlo a los 5 s; a los 60 s se pierde.
 const PICKUP_LOCK = 5_000, GROUND_LIFE = 60_000;
+// Antiflood del chat
+const FLOOD_MAX = 5, FLOOD_WINDOW = 10_000, REPEAT_WINDOW = 30_000;
 const DEFAULT_SETTINGS = { chat: true, voice: true, screen: true, items: true, dj: true, artists: true };
 // Partes que toman los artistas en la consola (además de la pantalla del hall, que es this.screen)
 const PARTS = ['luces', 'escenario'];
@@ -36,6 +38,8 @@ export class Room extends DurableObject {
   constructor(ctx, env) {
     super(ctx, env);
     this.states = new Map();   // últimas posiciones (en memoria)
+    this.chatTimes = new Map(); // antiflood: horarios de los últimos mensajes de cada uno
+    this.lastText = new Map();  // antiflood: último mensaje de cada uno
     this.lastSeen = new Map(); // última señal de cada conexión
     this.screen = null;        // { id, streamId } de quien comparte pantalla
     this.dj = null;            // { id, name, streamId, track } de quien pasa música en la cabina
@@ -89,7 +93,7 @@ export class Room extends DurableObject {
   publicInfo(m) {
     return {
       id: m.id, userId: m.userId, name: m.name, look: m.look, equip: m.equip ?? [],
-      afk: !!m.afk, mic: m.mic ?? 'off', silenced: !!this.silenced?.[m.userId], mod: !!m.mod, phone: !!m.phone,
+      afk: !!m.afk, mic: m.mic ?? 'off', silenced: !!this.silenced?.[m.userId], mod: !!m.mod, phone: !!m.phone, guest: !!m.guest,
       s: this.states.get(m.id) ?? null,
     };
   }
@@ -185,7 +189,7 @@ export class Room extends DurableObject {
         ws.close(4004, 'sala privada');
         return;
       }
-      Object.assign(meta, { joined: true, userId: user.id, name: user.name, look: user.look, equip: user.equip, afk: !!msg.afk, mic: 'off' });
+      Object.assign(meta, { joined: true, userId: user.id, name: user.name, look: user.look, equip: user.equip, guest: !!user.guest, afk: !!msg.afk, mic: 'off' });
       meta.mod = await this.isMod(meta);
       ws.serializeAttachment(meta);
       const s = cleanState(msg.s);
@@ -260,6 +264,14 @@ export class Room extends DurableObject {
         if (!this.settings.chat && !meta.mod) return this.notice(ws, 'El chat está deshabilitado en esta sala.');
         const text = String(msg.text ?? '').replace(/[\u0000-\u001f]/g, '').trim().slice(0, 300);
         if (!text) return;
+        // Antiflood: hasta 5 mensajes cada 10 s y no repetir el mismo mensaje en 30 s
+        const now = Date.now();
+        const recent = (this.chatTimes.get(meta.id) ?? []).filter((t) => now - t < FLOOD_WINDOW);
+        const last = this.lastText.get(meta.id);
+        if (recent.length >= FLOOD_MAX) return this.notice(ws, 'Estás mandando mensajes muy rápido. Esperá unos segundos.');
+        if (last && last.text === text.toLowerCase() && now - last.at < REPEAT_WINDOW) return this.notice(ws, 'Ya mandaste ese mensaje.');
+        this.chatTimes.set(meta.id, [...recent, now]);
+        this.lastText.set(meta.id, { text: text.toLowerCase(), at: now });
         const entry = { id: meta.id, userId: meta.userId, name: meta.name, text, ts: Date.now() };
         const chat = (await this.ctx.storage.get('chat')) ?? [];
         chat.push(entry);
@@ -489,6 +501,10 @@ export class Room extends DurableObject {
 
     switch (msg.op) {
       case 'invite': {
+        if (meta.guest || this.byId(msg.to)?.deserializeAttachment().guest) {
+          this.notice(ws, meta.guest ? 'Creá una cuenta para intercambiar objetos.' : 'Esa persona es invitada: todavía no puede intercambiar.');
+          return;
+        }
         const other = this.byId(msg.to);
         if (!other || msg.to === me || trade || this.tradeOf.has(msg.to)) {
           this.send(ws, { t: 'trade', op: 'busy' });

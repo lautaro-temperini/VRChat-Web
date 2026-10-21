@@ -6,11 +6,12 @@ import { Avatar, POSE } from '../player/avatar.js';
 // y las suaviza para que el movimiento se vea continuo.
 
 export class RemotePlayer {
-  constructor(scene, { id, userId, name, look, equip, s, afk, mic, mod, silenced, phone }) {
+  constructor(scene, { id, userId, name, look, equip, s, afk, mic, mod, silenced, phone, guest }) {
     this.id = id;
     this.userId = userId;
     this.mod = !!mod;           // moderador de esta sala
     this.silenced = !!silenced; // silenciado por un moderador
+    this.guest = !!guest;       // invitado (sin cuenta): se marca para que nadie se haga pasar por otro
     this.scene = scene;
     this.avatar = new Avatar(look, equip);
     this.avatar.phone = !!phone; // con el celular en la mano
@@ -35,6 +36,12 @@ export class RemotePlayer {
     const row = document.createElement('div');
     row.className = 'tagrow';
     row.append(this.micEl, this.nameEl);
+    if (this.guest) {
+      const g = document.createElement('span');
+      g.className = 'guest-tag';
+      g.textContent = 'Invitado';
+      row.append(g);
+    }
     this.tag.append(this.bubble, row, this.afkEl);
     this.label = new CSS2DObject(this.tag);
     this.label.position.y = 2.0;

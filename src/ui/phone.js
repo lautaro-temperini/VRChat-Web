@@ -30,8 +30,14 @@ export function createPhone({ social, me, go }) {
     app = name;
     for (const s of document.querySelectorAll('#friends .app')) s.hidden = s.dataset.app !== name;
     for (const b of document.querySelectorAll('.phone-dock [data-app]')) b.classList.toggle('on', b.dataset.app === name);
+    // Invitados: pueden leer el muro, pero no publicar ni tener galería
+    const guest = !!me()?.guest;
+    $('mynotes-form').hidden = guest;
     if (name === 'notas') renderMyNotes();
-    if (name === 'galeria' && me()) renderGallery($('phone-gallery'), me().id);
+    if (name === 'galeria' && me()) {
+      if (guest) $('phone-gallery').innerHTML = '<div class="guest-note">Los invitados no tienen galería. Creá tu cuenta (Personaje → Crear cuenta) para subir fotos y publicar en el muro.</div>';
+      else renderGallery($('phone-gallery'), me().id);
+    }
     if (name === 'avisos') renderNotifications(true);
     if (name === 'amigos') social.refreshFriends();
   }

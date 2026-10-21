@@ -11,6 +11,7 @@ const $ = (id) => document.getElementById(id);
 
 export function createSocial({ net, ui, me, room, onEquip, onDrop }) {
   let items = [];
+  let isGuest = false;
   let friendsData = { friends: [], incoming: [], outgoing: [] };
   let seenIncoming = null;
   let trade = null;
@@ -19,7 +20,7 @@ export function createSocial({ net, ui, me, room, onEquip, onDrop }) {
 
   async function loadInventory() {
     const r = await api('inventory');
-    if (r.ok) items = r.items;
+    if (r.ok) { items = r.items; isGuest = !!r.guest; }
     return items;
   }
 
@@ -36,6 +37,7 @@ export function createSocial({ net, ui, me, room, onEquip, onDrop }) {
   function renderInventory() {
     const grid = $('inv-grid');
     grid.innerHTML = '';
+    if (isGuest) { grid.innerHTML = '<div class="empty">Los invitados no tienen objetos. Creá tu cuenta (Personaje → Crear cuenta) y recibís tus primeros objetos.</div>'; return; }
     if (!items.length) grid.innerHTML = '<div class="empty">No tenés objetos todavía.</div>';
     for (const it of items) {
       const c = card(it, {

@@ -175,10 +175,15 @@ function showAuth(tab, upgrade = false) {
   for (const b of authEl.querySelectorAll('.tab')) b.classList.toggle('active', b.dataset.tab === tab);
   $('auth-submit').textContent = { guest: 'Entrar como invitado', login: 'Entrar', register: 'Crear cuenta' }[tab];
   $('auth-pass').autocomplete = tab === 'register' ? 'new-password' : 'current-password';
+  $('auth-user-label').textContent = tab === 'login' ? 'Mail o nickname' : 'Nickname';
+  $('auth-user').placeholder = tab === 'login' ? 'vos@mail.com o tu_nick' : 'tu_nick';
   $('auth-error').textContent = '';
   openOverlay('auth');
-  setTimeout(() => $(tab === 'guest' ? 'auth-name' : 'auth-user').focus(), 50);
+  setTimeout(() => $(tab === 'guest' ? 'auth-name' : tab === 'register' ? 'auth-email' : 'auth-user').focus(), 50);
 }
+// Condiciones de uso (se abren desde la casilla de +18)
+$('open-terms').onclick = (e) => { e.preventDefault(); $('terms').classList.add('show'); };
+$('close-terms').onclick = () => $('terms').classList.remove('show');
 for (const b of authEl.querySelectorAll('.tab')) b.onclick = () => showAuth(b.dataset.tab, 'upgrade' in authEl.dataset);
 $('auth-cancel').onclick = () => openEditor();
 
@@ -189,11 +194,11 @@ $('auth-form').onsubmit = async (e) => {
   btn.disabled = true;
   let r;
   if (tab === 'guest') {
-    r = await api('guest', { method: 'POST', body: { name: $('auth-name').value, look } });
+    r = await api('guest', { method: 'POST', body: { name: $('auth-name').value, look, terms: $('auth-terms').checked } });
   } else if (tab === 'login') {
-    r = await api('login', { method: 'POST', body: { username: $('auth-user').value, password: $('auth-pass').value } });
+    r = await api('login', { method: 'POST', body: { login: $('auth-user').value, password: $('auth-pass').value } });
   } else {
-    r = await api('register', { method: 'POST', body: { username: $('auth-user').value, password: $('auth-pass').value, name: name || $('auth-user').value, look } });
+    r = await api('register', { method: 'POST', body: { email: $('auth-email').value, nick: $('auth-user').value, password: $('auth-pass').value, look, terms: $('auth-terms').checked } });
   }
   btn.disabled = false;
   $('auth-pass').value = '';
@@ -474,7 +479,7 @@ async function openMundi() {
   }
   section('Salas');
   add('Museo', 'Sala pública', 'museo');
-  if (account && mine?.ok) {
+  if (account && !account.guest && mine?.ok) {
     const myRoom = `u-${account.id}`;
     const el = add(mine.room.name, ['Tu sala', PRIVACY_LABEL[mine.room.privacy], hearts(mine.room.hearts)].filter(Boolean).join(' · '), myRoom);
     // Ajustes de tu sala: nombre, descripción y quién puede entrar
@@ -626,6 +631,7 @@ function join() {
   net.connect(() => ({ token: session.token, s: ctrl.state(), afk }));
   social.refreshFriends();
   phone.refreshBadge();
+  roomPanel.syncBlocks();
   setInterval(() => { social.refreshFriends(); phone.refreshBadge(); }, 25_000);
 }
 

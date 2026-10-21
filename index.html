@@ -111,7 +111,7 @@
         <svg class="mark big"><use href="#logo" /></svg>
         <div>
           <h1 class="display">Galería Online</h1>
-          <p class="sub">Un museo para pasar el rato con amigos.</p>
+          <p class="sub">Exposición de arte digital: recorré, exponé y conocé artistas.</p>
         </div>
       </div>
       <div class="tabs" id="auth-tabs">
@@ -122,14 +122,19 @@
       <label class="field only-guest">Tu nombre
         <input id="auth-name" maxlength="20" placeholder="¿Cómo te llamás?" />
       </label>
-      <label class="field no-guest">Usuario
-        <input id="auth-user" maxlength="20" autocomplete="username" placeholder="tu_usuario" />
+      <label class="field only-register">Mail
+        <input id="auth-email" type="email" maxlength="120" autocomplete="email" placeholder="vos@mail.com" />
+      </label>
+      <label class="field no-guest"><span id="auth-user-label">Nickname</span>
+        <input id="auth-user" maxlength="120" autocomplete="username" placeholder="tu_nick" />
       </label>
       <label class="field no-guest">Contraseña
         <input id="auth-pass" type="password" maxlength="200" autocomplete="current-password" placeholder="Mínimo 6 caracteres" />
       </label>
-      <p class="note only-guest">Tu personaje queda guardado en este navegador. Cuando quieras, creás una cuenta para no perderlo y usarlo en otros dispositivos.</p>
+      <p class="note only-guest">Como invitado podés mirar, chatear y moverte. Para tener objetos, intercambiar, publicar y tener tu sala, creá una cuenta.</p>
+      <p class="note only-register">El nickname es único: es el nombre que ven los demás (3 a 20 letras, números, punto o guion bajo).</p>
       <p class="note only-upgrade">Tu personaje de invitado pasa a esta cuenta.</p>
+      <label class="check no-login"><input type="checkbox" id="auth-terms" /> <span>Tengo 18 años o más y acepto las <button type="button" class="link" id="open-terms">condiciones de uso</button></span></label>
       <p class="error" id="auth-error"></p>
       <button class="cta" id="auth-submit">Entrar</button>
       <button type="button" class="link" id="auth-cancel">Volver</button>
@@ -412,6 +417,25 @@
 
   <!-- Foto en grande -->
   <div id="photoview"><img id="photoview-img" alt="" /></div>
+
+  <!-- Condiciones de uso (borrador: revisar con alguien que sepa de lo legal antes de abrir) -->
+  <div id="terms">
+    <div class="card terms-card">
+      <h1 class="display">Condiciones de uso</h1>
+      <div class="terms-text">
+        <p><b>Solo para mayores de 18 años.</b> Puede haber contenido artístico para adultos.</p>
+        <p><b>Lo que subís es tuyo, y sos responsable.</b> Subí solo obras, fotos y diseños propios o que tengas
+          permiso para mostrar. No se permite contenido ilegal ni hacer pasar como propia la obra de otra persona.</p>
+        <p><b>Respeto.</b> No se permite el acoso, las amenazas, el spam ni hacerse pasar por otra persona.</p>
+        <p><b>Herramientas para cuidarte.</b> Podés mutear (su voz), ignorar (su voz y su texto) y restringir (sus
+          publicaciones). Los administradores pueden expulsar, banear o borrar contenido.</p>
+        <p><b>Voz y pantalla.</b> Si hablás o compartís pantalla, te escuchan y ven quienes estén en la sala.</p>
+        <p><b>Datos.</b> Guardamos tu mail, tu nickname, tu personaje y lo que publicás para que el juego funcione.
+          No los vendemos. Podés pedir que borremos tu cuenta.</p>
+      </div>
+      <button class="cta" id="close-terms">Entendido</button>
+    </div>
+  </div>
 
   <!-- Intercambio -->
   <div id="trade" class="overlay">

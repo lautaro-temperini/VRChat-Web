@@ -86,7 +86,11 @@ export function buildMuseum(scene, renderer, quality) {
     m.castShadow = high && (opts.cast ?? true);
     m.receiveShadow = high;
     scene.add(m);
-    if (opts.collide) collider(x - w / 2, x + w / 2, z - d / 2, z + d / 2, y + h / 2, opts.climb, opts.float ? y - h / 2 : undefined);
+    if (opts.collide) {
+      collider(x - w / 2, x + w / 2, z - d / 2, z + d / 2, y + h / 2, opts.climb, opts.float ? y - h / 2 : undefined);
+      // noStand: obras y cabinas, para que nadie se pare encima ni saltando
+      if (opts.noStand) Object.assign(colliders[colliders.length - 1], { climb: false, noStand: true });
+    }
     if (opts.block) blockers.push(m);
     return m;
   }
@@ -373,7 +377,7 @@ export function buildMuseum(scene, renderer, quality) {
   // ---------- Esculturas (del lado del hall de la pared del medio) ----------
   const sculptures = [];
   function pedestal(x, z, w, h, mesh, lift, key) {
-    const body = box(w, h - 0.05, w, x, (h - 0.05) / 2, z, pedestalMat, { collide: true, block: true, round: 0.025 });
+    const body = box(w, h - 0.05, w, x, (h - 0.05) / 2, z, pedestalMat, { collide: true, block: true, round: 0.025, noStand: true });
     const cap = box(w + 0.06, 0.05, w + 0.06, x, h - 0.025, z, pedestalMat, { round: 0.02 });
     mesh.position.set(x, h + lift, z);
     mesh.castShadow = high;
@@ -600,7 +604,7 @@ export function buildMuseum(scene, renderer, quality) {
 
   // ---------- Cabina de VJ y luces (abajo del balcón oeste, mirando a la pista) ----------
   const vjX = -3.1;
-  const desk = box(1.1, 1, 3.4, vjX, 0.5, 0, darkMat, { collide: true, block: true, climb: false, round: 0.05 });
+  const desk = box(1.1, 1, 3.4, vjX, 0.5, 0, darkMat, { collide: true, block: true, climb: false, round: 0.05, noStand: true });
   box(0.03, 0.03, 3.3, vjX + 0.56, 0.98, 0, neon(0x19d3ff), { cast: false });
   const deskItem = interactive(desk, { kind: 'artists' });
   for (const z of [-1, 0, 1]) {
@@ -621,7 +625,7 @@ export function buildMuseum(scene, renderer, quality) {
   box(0.04, 0.04, 9, 13.02, 0.36, 0, ledMat, { cast: false, round: 0.015 });
   box(4.6, 0.04, 0.04, 15.3, 0.36, -4.5, ledMat, { cast: false, round: 0.015 });
   box(4.6, 0.04, 0.04, 15.3, 0.36, 4.5, ledMat, { cast: false, round: 0.015 });
-  const booth = box(0.8, 1, 3, 16.2, 0.9, 0, darkMat, { collide: true, block: true, round: 0.05 });
+  const booth = box(0.8, 1, 3, 16.2, 0.9, 0, darkMat, { collide: true, block: true, round: 0.05, noStand: true });
   interactive(booth, { kind: 'dj' });
   const deckMat = new THREE.MeshStandardMaterial({ color: 0x2c2c30, metalness: 0.6, roughness: 0.4 });
   for (const z of [-0.85, 0.85]) {

@@ -71,7 +71,7 @@ Pendiente transversal: **primera prueba con personas reales** (inauguración con
 ### Técnicos
 - Servidor TURN (Cloudflare Calls) para que la voz/pantalla conecten en redes cerradas.
 - Comprimir modelos y texturas (KTX2/Draco) para celulares.
-- Mutear/ignorar hoy se guarda en el navegador (no en la cuenta).
+- Mutear/ignorar hoy se guarda en el navegador (no en la cuenta); restringir sí vive en la cuenta.
 - Los baneos son por cuenta: un invitado nuevo puede volver a entrar.
 
 ## Decisiones de diseño (tomadas por el usuario)
@@ -115,7 +115,8 @@ Pendiente transversal: **primera prueba con personas reales** (inauguración con
 | Bailes | 10 bailes: /bailar = uno al azar, /bailar N = ese; en el menú de la R cada uno con su nombre |
 | Aplaudir / festejar | Como no hay Clapping, se agregó /festejar (Cheering); aplaudir sigue hecho por código |
 | Hablar | Con el micrófono abierto y quieto, el personaje usa la animación de hablar |
-| Mutear / ignorar | Mutear = silenciar su voz. Ignorar = silenciar voz y texto |
+| Mutear / ignorar / restringir | Tres acciones distintas, solo para uno. Mutear = silenciar su voz. Ignorar = silenciar voz y texto en la sala. Restringir = que no aparezcan sus publicaciones (muro y fotos) |
+| Reportar | Postergado: por ahora no hay botón (el código del servidor queda guardado) |
 | Moderación | Dueño de cada sala personal; el usuario "xvvave" es admin del Museo y de todas las salas. Expulsar, banear, silenciar, traer, mandar a la entrada, habilitar/deshabilitar chat/voz/pantalla/objetos |
 | Mapas | Botón "Mapa" (antes Mundi) + comandos en el chat (`/ir`, `/salas`) |
 | Día y noche | Según la hora GMT-3 |
@@ -152,9 +153,9 @@ Pendiente transversal: **primera prueba con personas reales** (inauguración con
 | Economía | Sí. Fuentes: misiones/niveles y diseños subidos por artistas, que pasan a ser objetos intercambiables |
 | Registro | Con mail (frena las cuentas múltiples; 3–4 por persona no rompen nada) y nickname único |
 | Movimiento | Agacharse, sentarse y trepar se quedan (naturales). La stamina se recupera con un trago, comida, un beso… (a definir; el beso con consentimiento) |
-| Contenido | +18; no se modera el contenido en sí, pero hay restringir + reportar a un admin (contenido ilegal o robo de obras) |
+| Contenido | +18; no se modera el contenido en sí, pero hay mutear, ignorar y restringir; reportar queda para más adelante |
 | Soltar objetos | Es la única forma de deshacerse de un objeto. Regalar = intercambio donde el otro no pone nada (ya funciona) |
 | Cabinas y obras | No trepables (los parlantes sí) |
-| Moderación del Museo | Ignorar/restringir + antiflood + reportes; no depende de que el admin esté conectado |
+| Moderación del Museo | Ignorar/restringir + antiflood; no depende de que el admin esté conectado |
 | Personajes | Mejorar con Blender + Tripo/Meshy (IA para objetos y decoración; cuerpos y ropa en Blender) |
 | Exploradores | Más mapas públicos |

@@ -34,6 +34,7 @@ const PHOTO_BYTES = 700 * 1024;   // el cliente achica y comprime antes de subir
 const NOTE_LENGTH = 280;          // largo máximo de una nota
 const FEED_FRIENDS = 30;          // muro: publicaciones tuyas y de amigos
 const FEED_FEATURED = 15;         // muro: "Destacados" (lo más nuevo del resto)
+const REPORT_REASONS = ['acoso', 'ilegal', 'plagio', 'spam', 'suplantacion', 'otro'];
 
 export class Accounts extends DurableObject {
   constructor(ctx, env) {
@@ -98,6 +99,30 @@ export class Accounts extends DurableObject {
     addCol('room_desc', "TEXT NOT NULL DEFAULT ''");
     addCol('room_privacy', "TEXT NOT NULL DEFAULT 'todos'");     // todos | amigos | cerrada
     addCol('gallery_privacy', "TEXT NOT NULL DEFAULT 'todos'");  // todos | amigos | nadie
+    addCol('email', 'TEXT');                                     // cuentas registradas (sin verificar por ahora)
+    addCol('terms', 'INTEGER');                                  // cuándo aceptó +18 y condiciones
+    this.sql.exec('CREATE UNIQUE INDEX IF NOT EXISTS users_email ON users (email)');
+    // Restringir (ocultar todo de una persona) y reportes a los admins
+    this.sql.exec(`
+      CREATE TABLE IF NOT EXISTS blocks (
+        user_id TEXT NOT NULL, blocked_id TEXT NOT NULL, created INTEGER NOT NULL,
+        PRIMARY KEY (user_id, blocked_id)
+      );
+      CREATE TABLE IF NOT EXISTS reports (
+        id TEXT PRIMARY KEY, reporter TEXT NOT NULL, target TEXT NOT NULL, reason TEXT NOT NULL,
+        detail TEXT NOT NULL, room TEXT NOT NULL, created INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'abierto'
+      );
+    `);
+  }
+
+  // Invitado = cuenta sin registrar (sin nickname): solo para probar
+  isGuest(row) { return !row?.username; }
+  guestError() { return { ok: false, guest: true, error: 'Creá una cuenta (es gratis) para usar esto. Los invitados solo pueden mirar, chatear y moverse.' }; }
+  isAdmin(id) { return String(this.env.ADMIN_IDS ?? '').split(',').map((s) => s.trim()).includes(id); }
+
+  // ¿El nombre ya lo usa una cuenta registrada? (sin importar mayúsculas)
+  nameTaken(name, exceptId = '') {
+    return this.sql.exec('SELECT 1 FROM users WHERE username = ? AND id != ?', String(name).trim().toLowerCase(), exceptId).toArray().length > 0;
   }
 
   // ---------- Usuarios y sesiones ----------
@@ -110,6 +135,7 @@ export class Accounts extends DurableObject {
     return {
       id: row.id, username: row.username ?? null, name: row.name, look: JSON.parse(row.look),
       bio: row.bio ?? '', created: row.created, equip: this.equipped(row.id),
+      guest: this.isGuest(row), admin: this.isAdmin(row.id),
     };
   }
 
@@ -127,38 +153,51 @@ export class Accounts extends DurableObject {
     return rows[0] ?? null;
   }
 
-  async guest(name, look) {
+  // Invitado: solo para probar (sin objetos, intercambio, muro ni sala propia). Tiene que aceptar +18.
+  async guest(name, look, terms) {
+    if (!terms) return { ok: false, error: 'Para entrar tenés que confirmar que sos mayor de 18 y aceptar las condiciones.' };
+    const clean = cleanName(name);
+    if (this.nameTaken(clean)) return { ok: false, error: 'Ese nombre es de una cuenta registrada. Elegí otro o iniciá sesión.' };
     const id = randomHex(8);
-    this.sql.exec('INSERT INTO users (id, name, look, created) VALUES (?, ?, ?, ?)',
-      id, cleanName(name), JSON.stringify(cleanLook(look)), Date.now());
-    this.giveStarter(id);
+    this.sql.exec('INSERT INTO users (id, name, look, created, terms) VALUES (?, ?, ?, ?, ?)',
+      id, clean, JSON.stringify(cleanLook(look)), Date.now(), Date.now());
     return { ok: true, token: await this.newSession(id), user: this.publicUser(this.row(id)) };
   }
 
-  // Crea una cuenta nueva, o convierte al invitado actual (token) en cuenta.
-  async register(token, username, password, name, look) {
-    username = String(username ?? '').trim().toLowerCase();
-    if (!USERNAME.test(username)) return { ok: false, error: 'El usuario debe tener 3 a 20 caracteres: letras, números, punto o guion bajo.' };
+  // Crea una cuenta (mail + nickname único + contraseña), o convierte al invitado actual en cuenta
+  // (conserva su personaje). El nickname es el nombre que ven los demás y no se repite.
+  async register(token, { email, nick, password, look, terms } = {}) {
+    email = String(email ?? '').trim().toLowerCase();
+    nick = String(nick ?? '').trim();
+    const username = nick.toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email) || email.length > 120) return { ok: false, error: 'Ese mail no parece válido.' };
+    if (!USERNAME.test(username)) return { ok: false, error: 'El nickname debe tener 3 a 20 caracteres: letras, números, punto o guion bajo.' };
     if (typeof password !== 'string' || password.length < 6 || password.length > 200) return { ok: false, error: 'La contraseña tiene que tener al menos 6 caracteres.' };
-    if (this.sql.exec('SELECT 1 FROM users WHERE username = ?', username).toArray().length) return { ok: false, error: 'Ese usuario ya existe.' };
+    if (!terms) return { ok: false, error: 'Tenés que confirmar que sos mayor de 18 y aceptar las condiciones.' };
+    if (this.sql.exec('SELECT 1 FROM users WHERE username = ?', username).toArray().length) return { ok: false, error: 'Ese nickname ya está en uso.' };
+    if (this.sql.exec('SELECT 1 FROM users WHERE email = ?', email).toArray().length) return { ok: false, error: 'Ya hay una cuenta con ese mail. Iniciá sesión.' };
 
     const salt = randomHex(16);
     const pass = await pbkdf2(password, salt);
     const current = await this.userFromToken(token);
-    if (current && !current.username) {
-      this.sql.exec('UPDATE users SET username = ?, pass = ?, salt = ? WHERE id = ?', username, pass, salt, current.id);
-      return { ok: true, token, user: this.publicUser(this.row(current.id)) };
+    let id;
+    if (current && this.isGuest(current)) {
+      id = current.id;
+      this.sql.exec('UPDATE users SET username = ?, name = ?, email = ?, pass = ?, salt = ?, terms = ? WHERE id = ?', username, nick, email, pass, salt, Date.now(), id);
+    } else {
+      id = randomHex(8);
+      this.sql.exec('INSERT INTO users (id, username, name, email, pass, salt, look, created, terms) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        id, username, nick, email, pass, salt, JSON.stringify(cleanLook(look)), Date.now(), Date.now());
+      token = null;
     }
-    const id = randomHex(8);
-    this.sql.exec('INSERT INTO users (id, username, pass, salt, name, look, created) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      id, username, pass, salt, cleanName(name || username), JSON.stringify(cleanLook(look)), Date.now());
-    this.giveStarter(id);
-    return { ok: true, token: await this.newSession(id), user: this.publicUser(this.row(id)) };
+    if (!this.row(id).starter) this.giveStarter(id); // los objetos iniciales llegan al registrarse
+    return { ok: true, token: token ?? await this.newSession(id), user: this.publicUser(this.row(id)) };
   }
 
-  async login(username, password) {
-    username = String(username ?? '').trim().toLowerCase();
-    const row = this.sql.exec('SELECT * FROM users WHERE username = ?', username).toArray()[0];
+  // Se entra con el mail o con el nickname
+  async login(login, password) {
+    const key = String(login ?? '').trim().toLowerCase();
+    const row = this.sql.exec('SELECT * FROM users WHERE username = ? OR email = ?', key, key).toArray()[0];
     const fail = { ok: false, error: 'Usuario o contraseña incorrectos.' };
     if (!row || typeof password !== 'string') return fail;
     if (!sameText(await pbkdf2(password, row.salt), row.pass)) return fail;
@@ -174,7 +213,21 @@ export class Accounts extends DurableObject {
     const row = await this.userFromToken(token);
     if (!row) return { ok: false, error: 'Sesión vencida.' };
     const cleanBio = String(bio ?? row.bio ?? '').replace(/[\u0000-\u0009\u000b-\u001f]/g, '').trim().slice(0, 280);
-    this.sql.exec('UPDATE users SET name = ?, look = ?, bio = ? WHERE id = ?', cleanName(name), JSON.stringify(cleanLook(look)), cleanBio, row.id);
+    let newName = cleanName(name ?? row.name);
+    if (this.isGuest(row)) {
+      if (newName !== row.name && this.nameTaken(newName)) return { ok: false, error: 'Ese nombre es de una cuenta registrada.' };
+      this.sql.exec('UPDATE users SET name = ?, look = ?, bio = ? WHERE id = ?', newName, JSON.stringify(cleanLook(look)), cleanBio, row.id);
+    } else {
+      // Cuenta registrada: el nombre visible es el nickname (único); cambiarlo cambia el nickname
+      // (cuentas viejas pueden tener nombre ≠ usuario: si no cambia el nombre, no se toca el usuario)
+      let username = row.username;
+      if (newName !== row.name) {
+        if (!USERNAME.test(newName.toLowerCase())) return { ok: false, error: 'El nickname debe tener 3 a 20 caracteres: letras, números, punto o guion bajo.' };
+        if (this.nameTaken(newName, row.id)) return { ok: false, error: 'Ese nickname ya está en uso.' };
+        username = newName.toLowerCase();
+      }
+      this.sql.exec('UPDATE users SET name = ?, username = ?, look = ?, bio = ? WHERE id = ?', newName, username, JSON.stringify(cleanLook(look)), cleanBio, row.id);
+    }
     return { ok: true, user: this.publicUser(this.row(row.id)) };
   }
 
@@ -232,6 +285,7 @@ export class Accounts extends DurableObject {
   async inventory(token) {
     const row = await this.userFromToken(token);
     if (!row) return { ok: false, error: 'Sesión vencida.' };
+    if (this.isGuest(row)) return { ok: true, guest: true, items: [] };
     if (!row.starter) this.giveStarter(row.id); // cuentas creadas antes del inventario
     return { ok: true, items: this.items(row.id) };
   }
@@ -239,6 +293,7 @@ export class Accounts extends DurableObject {
   async equip(token, iid, on) {
     const row = await this.userFromToken(token);
     if (!row) return { ok: false, error: 'Sesión vencida.' };
+    if (this.isGuest(row)) return this.guestError();
     const item = this.sql.exec('SELECT * FROM items WHERE iid = ? AND owner_id = ?', String(iid ?? ''), row.id).toArray()[0];
     if (!item) return { ok: false, error: 'Ese objeto no es tuyo.' };
     this.ctx.storage.transactionSync(() => {
@@ -263,6 +318,7 @@ export class Accounts extends DurableObject {
 
   // Intercambio: todo o nada. Si algún objeto ya no es de quien lo ofrece, se cancela.
   async trade(aId, aIids, bId, bIids) {
+    if (this.isGuest(this.row(aId)) || this.isGuest(this.row(bId))) return this.guestError();
     const owns = (uid, list) => list.every((iid) => this.sql.exec('SELECT 1 FROM items WHERE iid = ? AND owner_id = ?', iid, uid).toArray().length);
     if (!owns(aId, aIids) || !owns(bId, bIids)) return { ok: false, error: 'Algún objeto ya no está disponible.' };
     this.ctx.storage.transactionSync(() => {
@@ -277,6 +333,7 @@ export class Accounts extends DurableObject {
   // pasa a ser suyo; si vence sin que nadie lo junte, se borra.
 
   async dropItem(userId, iid) {
+    if (this.isGuest(this.row(userId))) return this.guestError();
     const item = this.sql.exec('SELECT * FROM items WHERE iid = ? AND owner_id = ?', String(iid ?? ''), userId).toArray()[0];
     if (!item) return { ok: false, error: 'Ese objeto no es tuyo.' };
     this.sql.exec("UPDATE items SET owner_id = ?, equipped = 0 WHERE iid = ?", `ground:${userId}`, item.iid);
@@ -284,6 +341,7 @@ export class Accounts extends DurableObject {
   }
 
   async pickupItem(userId, iid) {
+    if (this.isGuest(this.row(userId))) return this.guestError();
     const item = this.sql.exec("SELECT * FROM items WHERE iid = ? AND owner_id LIKE 'ground:%'", String(iid ?? '')).toArray()[0];
     if (!item) return { ok: false, error: 'Ese objeto ya no está.' };
     this.sql.exec('UPDATE items SET owner_id = ?, equipped = 0 WHERE iid = ?', userId, item.iid);
@@ -371,6 +429,7 @@ export class Accounts extends DurableObject {
   async canEnter(ownerId, userId) {
     const owner = this.row(ownerId);
     if (!owner) return true; // sala de una cuenta que no existe: sin dueño, abierta
+    if (this.isGuest(owner)) return userId === ownerId; // los invitados no tienen sala propia para recibir gente
     return this.allowed(userId, ownerId, owner.room_privacy);
   }
 
@@ -399,6 +458,7 @@ export class Accounts extends DurableObject {
   async photoAdd(token, mime, data, w, h) {
     const me = await this.userFromToken(token);
     if (!me) return { ok: false, error: 'Sesión vencida.' };
+    if (this.isGuest(me)) return this.guestError();
     if (!['image/jpeg', 'image/webp', 'image/png'].includes(mime)) return { ok: false, error: 'Formato no permitido (JPG, PNG o WebP).' };
     if (!(data instanceof ArrayBuffer) || data.byteLength === 0 || data.byteLength > PHOTO_BYTES) return { ok: false, error: 'La foto es demasiado pesada.' };
     const count = this.sql.exec('SELECT COUNT(*) AS n FROM photos WHERE owner = ?', me.id).one().n;
@@ -437,6 +497,7 @@ export class Accounts extends DurableObject {
   async noteAdd(token, text) {
     const me = await this.userFromToken(token);
     if (!me) return { ok: false, error: 'Sesión vencida.' };
+    if (this.isGuest(me)) return this.guestError();
     const clean = String(text ?? '').replace(/[\u0000-\u0009\u000b-\u001f]/g, '').trim().slice(0, NOTE_LENGTH);
     if (!clean) return { ok: false, error: 'La nota está vacía.' };
     const id = randomHex(8);
@@ -471,9 +532,10 @@ export class Accounts extends DurableObject {
     };
     const likesOf = (type, id) => this.sql.exec('SELECT COUNT(*) AS n FROM likes WHERE post_type = ? AND post_id = ?', type, id).one().n;
     const liked = (type, id) => this.sql.exec('SELECT 1 FROM likes WHERE post_type = ? AND post_id = ? AND user_id = ?', type, id, me.id).toArray().length > 0;
+    const blocked = this.blockedBy(me.id);
     const shape = (type, r, section) => {
       const a = author(r.owner);
-      if (!a) return null;
+      if (!a || blocked.has(r.owner)) return null; // restringido: no aparece nada suyo
       if (type === 'photo' && !this.allowed(me.id, r.owner, a.privacy)) return null;
       return {
         type, id: r.id, section, created: r.created, mine: r.owner === me.id,
@@ -496,6 +558,7 @@ export class Accounts extends DurableObject {
   async like(token, type, id, on) {
     const me = await this.userFromToken(token);
     if (!me) return { ok: false, error: 'Sesión vencida.' };
+    if (this.isGuest(me)) return this.guestError();
     if (!['note', 'photo'].includes(type)) return { ok: false, error: 'Publicación no válida.' };
     const table = type === 'note' ? 'notes' : 'photos';
     const post = this.sql.exec(`SELECT owner FROM ${table} WHERE id = ?`, String(id ?? '')).toArray()[0];
@@ -522,6 +585,7 @@ export class Accounts extends DurableObject {
   async heartGive(token, ownerId) {
     const me = await this.userFromToken(token);
     if (!me) return { ok: false, error: 'Sesión vencida.' };
+    if (this.isGuest(me)) return this.guestError();
     if (!this.row(ownerId)) return { ok: false, error: 'No existe esa sala.' };
     if (me.id === ownerId) return { ok: false, error: 'No podés dejarte un corazón a vos mismo.' };
     this.sql.exec('INSERT OR IGNORE INTO hearts (owner, from_user, created) VALUES (?, ?, ?)', ownerId, me.id, Date.now());
@@ -546,6 +610,7 @@ export class Accounts extends DurableObject {
   async setMyRoom(token, { name, desc, privacy } = {}) {
     const me = await this.userFromToken(token);
     if (!me) return { ok: false, error: 'Sesión vencida.' };
+    if (this.isGuest(me)) return this.guestError();
     if (privacy !== undefined && !['todos', 'amigos', 'cerrada'].includes(privacy)) return { ok: false, error: 'Opción no válida.' };
     const clean = (s, n) => String(s ?? '').replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, n);
     this.sql.exec('UPDATE users SET room_name = ?, room_desc = ?, room_privacy = ? WHERE id = ?',
@@ -623,6 +688,57 @@ export class Accounts extends DurableObject {
     if (!me) return { ok: false, error: 'Sesión vencida.' };
     this.sql.exec('UPDATE notifications SET seen = 1 WHERE user_id = ?', me.id);
     return { ok: true };
+  }
+
+  // ---------- Restringir: ocultar todo de una persona (voz, chat, muro, fotos) — solo para quien restringe ----------
+
+  blockedBy(userId) {
+    return new Set(this.sql.exec('SELECT blocked_id FROM blocks WHERE user_id = ?', userId).toArray().map((r) => r.blocked_id));
+  }
+
+  async blocks(token) {
+    const me = await this.userFromToken(token);
+    if (!me) return { ok: false, error: 'Sesión vencida.' };
+    const ids = [...this.blockedBy(me.id)];
+    return { ok: true, blocks: ids.map((id) => { const u = this.row(id); return { id, name: u?.name ?? '—' }; }) };
+  }
+
+  async setBlock(token, otherId, on) {
+    const me = await this.userFromToken(token);
+    if (!me) return { ok: false, error: 'Sesión vencida.' };
+    if (!otherId || otherId === me.id) return { ok: false, error: 'No válido.' };
+    if (on) this.sql.exec('INSERT OR IGNORE INTO blocks (user_id, blocked_id, created) VALUES (?, ?, ?)', me.id, otherId, Date.now());
+    else this.sql.exec('DELETE FROM blocks WHERE user_id = ? AND blocked_id = ?', me.id, otherId);
+    return this.blocks(token);
+  }
+
+  // ---------- Reportes: llegan a los admins (contenido ilegal, robo de obras, acoso…) ----------
+
+  async report(token, { target, reason, detail, room } = {}) {
+    const me = await this.userFromToken(token);
+    if (!me) return { ok: false, error: 'Sesión vencida.' };
+    if (!this.row(target) || target === me.id) return { ok: false, error: 'No válido.' };
+    if (!REPORT_REASONS.includes(reason)) return { ok: false, error: 'Elegí un motivo.' };
+    const today = this.sql.exec('SELECT COUNT(*) AS n FROM reports WHERE reporter = ? AND created > ?', me.id, Date.now() - 86_400_000).one().n;
+    if (today >= 10) return { ok: false, error: 'Mandaste muchos reportes hoy. Probá mañana.' };
+    this.sql.exec('INSERT INTO reports (id, reporter, target, reason, detail, room, created) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      randomHex(8), me.id, target, reason, String(detail ?? '').trim().slice(0, 500), String(room ?? '').slice(0, 40), Date.now());
+    return { ok: true };
+  }
+
+  async reports(token) {
+    const me = await this.userFromToken(token);
+    if (!me || !this.isAdmin(me.id)) return { ok: false, error: 'Solo para admins.' };
+    const rows = this.sql.exec("SELECT * FROM reports WHERE status = 'abierto' ORDER BY created DESC LIMIT 50").toArray();
+    const who = (id) => { const u = this.row(id); return u ? { id, name: u.name, username: u.username ?? null } : { id, name: '—' }; };
+    return { ok: true, reports: rows.map((r) => ({ id: r.id, reason: r.reason, detail: r.detail, room: r.room, created: r.created, reporter: who(r.reporter), target: who(r.target) })) };
+  }
+
+  async resolveReport(token, id) {
+    const me = await this.userFromToken(token);
+    if (!me || !this.isAdmin(me.id)) return { ok: false, error: 'Solo para admins.' };
+    this.sql.exec("UPDATE reports SET status = 'resuelto' WHERE id = ?", String(id ?? ''));
+    return this.reports(token);
   }
 
   // ---------- Presencia (las salas avisan quién está adentro) ----------

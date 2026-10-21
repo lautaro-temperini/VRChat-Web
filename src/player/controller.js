@@ -216,8 +216,8 @@ export class PlayerController {
           if (this.velY > 0) this.velY = 0;
           continue;
         }
-        // Lo bajo se pisa (escalón); lo alto empuja
-        if (b.top <= p.y + STEP) {
+        // Lo bajo se pisa (escalón); lo alto empuja. Obras y cabinas (noStand) siempre empujan.
+        if (b.top <= p.y + STEP && !b.noStand) {
           if (p.x > b.minX && p.x < b.maxX && p.z > b.minZ && p.z < b.maxZ) ground = Math.max(ground, b.top);
           continue;
         }

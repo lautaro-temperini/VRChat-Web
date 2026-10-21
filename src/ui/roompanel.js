@@ -1,12 +1,16 @@
 import { toast } from './toast.js';
+import { api } from '../net/api.js';
 
 // Panel de la sala (Tab): info de la sala, jugadores conectados y moderación.
-// - Mutear (solo para mí): no escucho su voz.
-// - Ignorar (solo para mí): no escucho su voz ni veo sus mensajes.
+// Tres acciones distintas, solo para mí:
+// - Mutear: no escucho su voz.
+// - Ignorar: no escucho su voz ni veo sus mensajes en la sala.
+// - Restringir (guardado en la cuenta): no veo sus publicaciones (muro y fotos).
 // - Moderación (dueño de la sala o admin): silenciar, traer, mandar a la entrada,
 //   expulsar, banear y habilitar/deshabilitar funciones de la sala.
 
 const $ = (id) => document.getElementById(id);
+const REASONS = { acoso: 'Acoso', ilegal: 'Contenido ilegal', plagio: 'Robo de obra', spam: 'Spam', suplantacion: 'Suplantación', otro: 'Otro' };
 const SETTINGS = [['chat', 'Chat de texto'], ['voice', 'Chat de voz'], ['screen', 'Compartir pantalla'], ['dj', 'Pasar música (DJ)'], ['artists', 'Consola de artistas'], ['items', 'Soltar objetos']];
 
 function loadSet(key) {
@@ -18,7 +22,17 @@ function saveSet(key, set) {
 
 export function createRoomPanel({ net, rtc, remotes, ui, me, roomTitle, openProfile }) {
   const muted = loadSet('muted');     // userIds
-  const ignored = loadSet('ignored'); // userIds
+  const ignored = loadSet('ignored'); // userIds ignorados (voz y texto)
+  const restricted = new Set();        // userIds restringidos (publicaciones; vive en la cuenta)
+  let reports = [];
+  // Traer la lista de restringidos de la cuenta
+  async function syncBlocks() {
+    const r = await api('blocks');
+    if (!r.ok) return;
+    restricted.clear();
+    for (const b of r.blocks) restricted.add(b.id);
+    render();
+  }
   let room = { settings: {}, mod: false, owner: null, silenced: false };
   let bans = {};
   let timer = null;
@@ -32,8 +46,10 @@ export function createRoomPanel({ net, rtc, remotes, ui, me, roomTitle, openProf
   }
 
   function toggle(set, key, userId) {
-    set.has(userId) ? set.delete(userId) : set.add(userId);
-    saveSet(key, set);
+    const on = !set.has(userId);
+    on ? set.add(userId) : set.delete(userId);
+    if (key === 'restricted') api('block', { method: 'POST', body: { id: userId, on } });
+    else saveSet(key, set);
     applyMutes();
     render();
   }
@@ -68,6 +84,8 @@ export function createRoomPanel({ net, rtc, remotes, ui, me, roomTitle, openProf
     if (p.silenced) tag('Silenciado', 'bad');
     if (!isMe && muted.has(p.userId)) tag('Muteado');
     if (!isMe && ignored.has(p.userId)) tag('Ignorado');
+    if (!isMe && restricted.has(p.userId)) tag('Restringido');
+    if (p.guest) tag('Invitado');
     top.append(name, tags);
     el.append(top);
     if (isMe) return el;
@@ -78,6 +96,7 @@ export function createRoomPanel({ net, rtc, remotes, ui, me, roomTitle, openProf
       btn('Perfil', () => openProfile(p.remote)),
       btn(muted.has(p.userId) ? 'Desmutear' : 'Mutear', () => toggle(muted, 'muted', p.userId)),
       btn(ignored.has(p.userId) ? 'Dejar de ignorar' : 'Ignorar', () => toggle(ignored, 'ignored', p.userId)),
+      btn(restricted.has(p.userId) ? 'Quitar restricción' : 'Restringir', () => toggle(restricted, 'restricted', p.userId)),
     );
     if (room.mod && !p.mod) {
       btns.append(
@@ -123,7 +142,7 @@ export function createRoomPanel({ net, rtc, remotes, ui, me, roomTitle, openProf
     const mine = me();
     list.append(row({ name: mine?.name ?? 'Vos', mod: room.mod, silenced: room.silenced, talking: rtc.talking }, true));
     for (const r of remotes.values()) {
-      list.append(row({ id: r.id, userId: r.userId, name: r.name, mod: r.mod, afk: r.afk, talking: r.speaking, silenced: r.silenced, remote: r }, false));
+      list.append(row({ id: r.id, userId: r.userId, name: r.name, mod: r.mod, afk: r.afk, talking: r.speaking, silenced: r.silenced, guest: r.guest, remote: r }, false));
     }
 
     const bansBox = $('rp-bans');
@@ -146,18 +165,41 @@ export function createRoomPanel({ net, rtc, remotes, ui, me, roomTitle, openProf
         bansBox.append(el);
       }
     }
+
+    // Reportes abiertos (solo admins)
+    if (me()?.admin && reports.length) {
+      const h = document.createElement('h2');
+      h.className = 'sub-h';
+      h.textContent = `Reportes (${reports.length})`;
+      bansBox.append(h);
+      for (const rep of reports) {
+        const el = document.createElement('div');
+        el.className = 'player-row';
+        const top = document.createElement('div');
+        top.className = 'top';
+        const n = document.createElement('b');
+        n.textContent = `${rep.target.name} · ${REASONS[rep.reason] ?? rep.reason}`;
+        top.append(n, btn('Resuelto', async () => { const r = await api('reportresolve', { method: 'POST', body: { id: rep.id } }); if (r.ok) { reports = r.reports; render(); } }));
+        const meta = document.createElement('span');
+        meta.className = 'meta';
+        meta.textContent = `Lo reportó ${rep.reporter.name} en ${rep.room || '—'}${rep.detail ? `: "${rep.detail}"` : ''}`;
+        el.append(top, meta);
+        bansBox.append(el);
+      }
+    }
   }
 
   function open() {
     ui.openOverlay('roompanel');
     if (room.mod) net.send({ t: 'mod', op: 'bans' });
+    if (me()?.admin) api('reports').then((r) => { if (r.ok) { reports = r.reports; render(); } });
     render();
     clearInterval(timer);
     timer = setInterval(() => (ui.isOpen('roompanel') ? render() : clearInterval(timer)), 1000);
   }
 
   return {
-    open, render, applyMutes, isIgnored,
+    open, render, applyMutes, isIgnored, syncBlocks,
     setRoom(r) { room = { ...room, ...r }; render(); },
     setBans(b) { bans = b ?? {}; render(); },
     get info() { return room; },

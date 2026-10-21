@@ -65,6 +65,6 @@ export function buildLectern(scene, { x, z, yaw }) {
   return {
     group: g,
     setHearts(n) { tag.textContent = `♥ ${n}`; },
-    collider: { minX: x - 0.35, maxX: x + 0.35, minZ: z - 0.35, maxZ: z + 0.35, top: 1.2, climb: false },
+    collider: { minX: x - 0.35, maxX: x + 0.35, minZ: z - 0.35, maxZ: z + 0.35, top: 1.2, climb: false, noStand: true },
   };
 }
