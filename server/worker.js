@@ -101,6 +101,8 @@ async function api(request, env, path) {
     case 'GET notes': result = await accounts.notesList(q.get('id')); break;
     case 'POST note': result = await accounts.noteAdd(token, body.text); break;
     case 'POST notedelete': result = await accounts.noteDelete(token, body.id); break;
+    case 'GET feed': result = await accounts.feed(token); break;
+    case 'POST like': result = await accounts.like(token, body.type, body.id, !!body.on); break;
     case 'GET hearts': result = await accounts.hearts(token, q.get('id')); break;
     case 'POST heart': result = await accounts.heartGive(token, String(body.id ?? '')); break;
     case 'GET roominfo': result = await accounts.roomInfo(q.get('id')); break;

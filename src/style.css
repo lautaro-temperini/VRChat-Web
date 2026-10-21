@@ -494,3 +494,14 @@ body.notes #notes { display: flex; }
 .room-form { display: flex; flex-direction: column; gap: 10px; padding: 12px; border-radius: 14px; background: rgba(255, 255, 255, 0.05); margin: -4px 0 10px; }
 .room-form input, .room-form select { padding: 9px 11px; border-radius: 10px; border: 1px solid var(--line); background: rgba(10, 6, 30, 0.55); color: var(--text); font: 600 14px var(--font); user-select: text; }
 .room-desc { margin: -4px 0 10px 12px; }
+
+/* ---------- Muro del celular ---------- */
+.feed .post { display: flex; flex-direction: column; gap: 6px; }
+.post-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.post-head .who { font: 800 14px var(--font); color: var(--text); text-decoration: none; padding: 0; }
+.post-head .who:hover { color: var(--accent); }
+.post-photo { width: 100%; border-radius: 10px; object-fit: cover; background: #0a0720; cursor: zoom-in; display: block; max-height: 340px; }
+.post-foot { display: flex; align-items: center; gap: 12px; }
+.like { background: none; border: 0; font: 800 15px var(--font); color: var(--muted); padding: 2px 0; }
+.like.on { color: #ff6fb5; }
+.feed-h { font: 400 15px var(--display); text-transform: uppercase; letter-spacing: .5px; color: var(--muted); margin: 14px 0 8px; }

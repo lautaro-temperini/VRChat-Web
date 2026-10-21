@@ -366,13 +366,12 @@
         <div id="friends-list"></div>
       </section>
       <section class="app" data-app="notas" hidden>
-        <h1 class="display">Mis notas</h1>
-        <p class="meta">Las leen los que visitan tu sala, en el atril. Solo vos escribís.</p>
+        <h1 class="display">Muro</h1>
         <form id="mynotes-form" class="compose">
-          <textarea id="mynotes-input" maxlength="280" rows="3" placeholder="¿Qué estás haciendo?"></textarea>
+          <textarea id="mynotes-input" maxlength="280" rows="3" placeholder="¿Qué estás haciendo? (también se lee en el atril de tu sala)"></textarea>
           <div class="compose-row"><span class="meta" id="mynotes-count">0/280</span><button class="act on">Publicar</button></div>
         </form>
-        <div id="mynotes-list"></div>
+        <div id="mynotes-list" class="feed"></div>
       </section>
       <section class="app" data-app="galeria" hidden>
         <h1 class="display">Mi galería</h1>
@@ -385,7 +384,7 @@
     </div>
     <nav class="phone-dock">
       <button data-app="amigos" class="on" title="Amigos">👥<span>Amigos</span></button>
-      <button data-app="notas" title="Mis notas">📝<span>Notas</span></button>
+      <button data-app="notas" title="Muro">📰<span>Muro</span></button>
       <button data-app="galeria" title="Mi galería">🖼️<span>Galería</span></button>
       <button data-app="avisos" title="Avisos">🔔<span>Avisos</span><b class="count" id="notif-count" hidden></b></button>
       <button data-close-panel title="Guardar el celular">✕<span>Guardar</span></button>

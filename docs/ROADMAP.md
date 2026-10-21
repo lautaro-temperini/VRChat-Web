@@ -117,3 +117,6 @@
 | Salas de jugadores | Plantillas primero (loft, galería, club, depto, terraza…), caja editable después. Modo edición con muebles, colores y materiales |
 | Paquete inicial | 15 objetos al azar entre muebles e indumentaria (cuando existan los muebles) |
 | Sala de xvvave | Distinta del Museo (diseño a definir con el usuario) |
+| Muro del celular | Reemplaza "Mis notas" (cuadro para escribir arriba). Muestra notas y fotos tuyas y de amigos; abajo "Destacados" con lo más nuevo del resto |
+| Me gusta en el muro | Corazón en cada nota y cada foto (uno por persona, se puede sacar). No genera aviso |
+| Fotos en el muro | Cada foto aparece solo para quien puede ver la galería de su dueño |

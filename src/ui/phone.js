@@ -1,9 +1,10 @@
-import { api } from '../net/api.js';
-import { renderGallery } from './gallery.js';
+import { api, photoUrl } from '../net/api.js';
+import { renderGallery, openPhoto } from './gallery.js';
 import { toast } from './toast.js';
 
 // El celular del jugador: la red social. Inicio = Amigos (conectados + buscador).
-// Apps: Notas (las mías, que se leen en el atril de mi sala), Galería (la mía) y Avisos.
+// Apps: Muro (tipo Facebook: lo tuyo y de amigos, después "Destacados"; tus notas también
+// se leen en el atril de tu sala), Galería (la mía) y Avisos.
 // El Mapa NO está acá: tiene su propio botón (decisión del usuario).
 
 const $ = (id) => document.getElementById(id);
@@ -94,31 +95,86 @@ export function createPhone({ social, me, go }) {
     }
   }
 
-  // ---------- Mis notas ----------
-  async function renderMyNotes() {
-    const list = $('mynotes-list');
-    if (!me()) return;
-    const r = await api(`notes?id=${encodeURIComponent(me().id)}`);
-    list.innerHTML = '';
-    if (!r.ok) return;
-    if (!r.notes.length) list.innerHTML = '<p class="meta">Todavía no escribiste notas.</p>';
-    for (const n of r.notes) {
-      const el = document.createElement('article');
-      el.className = 'note';
+  // ---------- Muro (tipo Facebook): lo tuyo y de tus amigos, después "Destacados" ----------
+  function post(it) {
+    const el = document.createElement('article');
+    el.className = 'note post';
+    const head = document.createElement('div');
+    head.className = 'post-head';
+    const who = document.createElement('button');
+    who.className = 'link who';
+    who.textContent = it.mine ? 'Vos' : it.author.name;
+    who.title = it.mine ? '' : `Ir a la sala de ${it.author.name}`;
+    if (!it.mine) who.onclick = () => go(`u-${it.author.id}`);
+    const when = document.createElement('span');
+    when.className = 'meta';
+    when.textContent = `${it.type === 'photo' ? 'subió una foto · ' : ''}${ago(it.created)}`;
+    head.append(who, when);
+    el.append(head);
+    if (it.type === 'note') {
       const p = document.createElement('p');
-      p.textContent = n.text;
-      const meta = document.createElement('span');
-      meta.className = 'meta';
-      meta.textContent = ago(n.created);
+      p.textContent = it.text;
+      el.append(p);
+    } else {
+      const img = document.createElement('img');
+      img.className = 'post-photo';
+      img.alt = '';
+      if (it.w && it.h) img.style.aspectRatio = `${it.w} / ${it.h}`;
+      photoUrl(it.id).then((url) => { if (url) img.src = url; });
+      img.onclick = () => img.src && openPhoto(img.src);
+      el.append(img);
+    }
+    const foot = document.createElement('div');
+    foot.className = 'post-foot';
+    const like = document.createElement('button');
+    like.className = `like ${it.liked ? 'on' : ''}`;
+    const paint = () => { like.textContent = `${it.liked ? '♥' : '♡'} ${it.likes || ''}`.trim(); like.classList.toggle('on', it.liked); };
+    paint();
+    like.onclick = async () => {
+      const r = await api('like', { method: 'POST', body: { type: it.type, id: it.id, on: !it.liked } });
+      if (!r.ok) return toast(r.error);
+      it.liked = r.liked;
+      it.likes = r.likes;
+      paint();
+    };
+    foot.append(like);
+    if (it.mine) {
       const del = document.createElement('button');
       del.className = 'link';
       del.textContent = 'Borrar';
-      del.onclick = async () => { await api('notedelete', { method: 'POST', body: { id: n.id } }); renderMyNotes(); };
-      meta.append(' · ', del);
-      el.append(p, meta);
-      list.append(el);
+      del.onclick = () => toast(it.type === 'note' ? '¿Borrar esta nota?' : '¿Borrar esta foto de tu galería?', { actions: [
+        { label: 'Borrar', yes: true, onClick: async () => { await api(it.type === 'note' ? 'notedelete' : 'photodelete', { method: 'POST', body: { id: it.id } }); renderFeed(); } },
+        { label: 'No' },
+      ] });
+      foot.append(del);
+    }
+    el.append(foot);
+    return el;
+  }
+
+  async function renderFeed() {
+    const list = $('mynotes-list');
+    const r = await api('feed');
+    list.innerHTML = '';
+    if (!r.ok) return;
+    const mine = r.items.filter((i) => i.section === 'amigos');
+    const featured = r.items.filter((i) => i.section === 'destacados');
+    if (!mine.length) {
+      const p = document.createElement('p');
+      p.className = 'meta';
+      p.textContent = 'Todavía no hay nada tuyo ni de tus amigos. Escribí algo arriba o subí una foto en Galería.';
+      list.append(p);
+    }
+    for (const it of mine) list.append(post(it));
+    if (featured.length) {
+      const h = document.createElement('h2');
+      h.className = 'feed-h';
+      h.textContent = 'Destacados';
+      list.append(h);
+      for (const it of featured) list.append(post(it));
     }
   }
+  const renderMyNotes = renderFeed;
   $('mynotes-form').onsubmit = async (e) => {
     e.preventDefault();
     const t = $('mynotes-input');

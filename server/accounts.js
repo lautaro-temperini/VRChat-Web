@@ -32,6 +32,8 @@ const ONLINE_WINDOW = 90_000; // ms: si la sala no avisó en este tiempo, está 
 const PHOTO_LIMIT = 30;           // fotos por usuario (decisión del usuario)
 const PHOTO_BYTES = 700 * 1024;   // el cliente achica y comprime antes de subir
 const NOTE_LENGTH = 280;          // largo máximo de una nota
+const FEED_FRIENDS = 30;          // muro: publicaciones tuyas y de amigos
+const FEED_FEATURED = 15;         // muro: "Destacados" (lo más nuevo del resto)
 
 export class Accounts extends DurableObject {
   constructor(ctx, env) {
@@ -82,6 +84,10 @@ export class Accounts extends DurableObject {
         created INTEGER NOT NULL, seen INTEGER NOT NULL DEFAULT 0
       );
       CREATE INDEX IF NOT EXISTS notifications_user ON notifications (user_id, created);
+      CREATE TABLE IF NOT EXISTS likes (
+        post_type TEXT NOT NULL, post_id TEXT NOT NULL, user_id TEXT NOT NULL, created INTEGER NOT NULL,
+        PRIMARY KEY (post_type, post_id, user_id)
+      );
     `);
     // Columnas agregadas después de la primera versión
     const cols = this.sql.exec('PRAGMA table_info(users)').toArray().map((c) => c.name);
@@ -406,7 +412,8 @@ export class Accounts extends DurableObject {
   async photoDelete(token, id) {
     const me = await this.userFromToken(token);
     if (!me) return { ok: false, error: 'Sesión vencida.' };
-    this.sql.exec('DELETE FROM photos WHERE id = ? AND owner = ?', String(id ?? ''), me.id);
+    const gone = this.sql.exec('DELETE FROM photos WHERE id = ? AND owner = ?', String(id ?? ''), me.id).rowsWritten;
+    if (gone) this.sql.exec("DELETE FROM likes WHERE post_type = 'photo' AND post_id = ?", String(id));
     return { ok: true };
   }
 
@@ -440,8 +447,64 @@ export class Accounts extends DurableObject {
   async noteDelete(token, id) {
     const me = await this.userFromToken(token);
     if (!me) return { ok: false, error: 'Sesión vencida.' };
-    this.sql.exec('DELETE FROM notes WHERE id = ? AND owner = ?', String(id ?? ''), me.id);
+    const gone = this.sql.exec('DELETE FROM notes WHERE id = ? AND owner = ?', String(id ?? ''), me.id).rowsWritten;
+    if (gone) this.sql.exec("DELETE FROM likes WHERE post_type = 'note' AND post_id = ?", String(id));
     return { ok: true };
+  }
+
+  // ---------- Muro del celular (tipo Facebook) ----------
+  // Arriba: lo tuyo y lo de tus amigos. Abajo, "Destacados": lo más nuevo del resto.
+  // Las fotos aparecen solo si quien mira puede ver la galería de su dueño.
+
+  async feed(token) {
+    const me = await this.userFromToken(token);
+    if (!me) return { ok: false, error: 'Sesión vencida.' };
+    const friendIds = this.sql.exec(
+      "SELECT CASE WHEN a = ? THEN b ELSE a END AS id FROM friends WHERE (a = ? OR b = ?) AND status = 'accepted'", me.id, me.id, me.id,
+    ).toArray().map((r) => r.id);
+    const circle = [me.id, ...friendIds];
+    const marks = circle.map(() => '?').join(',');
+    const authors = new Map();
+    const author = (id) => {
+      if (!authors.has(id)) { const u = this.row(id); authors.set(id, u ? { id: u.id, name: u.name, username: u.username ?? null, privacy: u.gallery_privacy } : null); }
+      return authors.get(id);
+    };
+    const likesOf = (type, id) => this.sql.exec('SELECT COUNT(*) AS n FROM likes WHERE post_type = ? AND post_id = ?', type, id).one().n;
+    const liked = (type, id) => this.sql.exec('SELECT 1 FROM likes WHERE post_type = ? AND post_id = ? AND user_id = ?', type, id, me.id).toArray().length > 0;
+    const shape = (type, r, section) => {
+      const a = author(r.owner);
+      if (!a) return null;
+      if (type === 'photo' && !this.allowed(me.id, r.owner, a.privacy)) return null;
+      return {
+        type, id: r.id, section, created: r.created, mine: r.owner === me.id,
+        author: { id: a.id, name: a.name, username: a.username },
+        ...(type === 'note' ? { text: r.text } : { w: r.w, h: r.h }),
+        likes: likesOf(type, r.id), liked: liked(type, r.id),
+      };
+    };
+    const pick = (inCircle, limit) => {
+      const cond = `owner ${inCircle ? '' : 'NOT '}IN (${marks})`;
+      const notes = this.sql.exec(`SELECT id, owner, text, created FROM notes WHERE ${cond} ORDER BY created DESC LIMIT ?`, ...circle, limit).toArray();
+      const photos = this.sql.exec(`SELECT id, owner, w, h, created FROM photos WHERE ${cond} ORDER BY created DESC LIMIT ?`, ...circle, limit).toArray();
+      const section = inCircle ? 'amigos' : 'destacados';
+      return [...notes.map((r) => shape('note', r, section)), ...photos.map((r) => shape('photo', r, section))]
+        .filter(Boolean).sort((x, y) => y.created - x.created).slice(0, limit);
+    };
+    return { ok: true, items: [...pick(true, FEED_FRIENDS), ...pick(false, FEED_FEATURED)] };
+  }
+
+  async like(token, type, id, on) {
+    const me = await this.userFromToken(token);
+    if (!me) return { ok: false, error: 'Sesión vencida.' };
+    if (!['note', 'photo'].includes(type)) return { ok: false, error: 'Publicación no válida.' };
+    const table = type === 'note' ? 'notes' : 'photos';
+    const post = this.sql.exec(`SELECT owner FROM ${table} WHERE id = ?`, String(id ?? '')).toArray()[0];
+    if (!post) return { ok: false, error: 'Esa publicación ya no existe.' };
+    if (type === 'photo' && !this.allowed(me.id, post.owner, this.row(post.owner)?.gallery_privacy)) return { ok: false, error: 'No podés ver esa foto.' };
+    if (on) this.sql.exec('INSERT OR IGNORE INTO likes (post_type, post_id, user_id, created) VALUES (?, ?, ?, ?)', type, String(id), me.id, Date.now());
+    else this.sql.exec('DELETE FROM likes WHERE post_type = ? AND post_id = ? AND user_id = ?', type, String(id), me.id);
+    const likes = this.sql.exec('SELECT COUNT(*) AS n FROM likes WHERE post_type = ? AND post_id = ?', type, String(id)).one().n;
+    return { ok: true, likes, liked: !!on };
   }
 
   // ---------- Corazones del atril: uno por visitante; cuentan para la sala y para el dueño ----------
