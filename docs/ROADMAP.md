@@ -156,7 +156,7 @@ La música del DJ y el puente OSC ya están hechos. Falta:
 | Mi sala | En el Mapa: nombre, descripción y quién puede entrar (abierta / solo amigos / cerrada) |
 | Salas de jugadores | Plantillas primero (loft, galería, club, depto, terraza…), caja editable después. Modo edición con muebles, colores y materiales |
 | Paquete inicial | 15 objetos al azar entre muebles e indumentaria (cuando existan los muebles) |
-| Sala de xvvave | Distinta del Museo (diseño a definir con el usuario) |
+| Sala de xvvave | Tipo club (detalles a definir con el usuario) |
 | Muro del celular | Reemplaza "Mis notas" (cuadro para escribir arriba). Muestra notas y fotos tuyas y de amigos; abajo "Destacados" con lo más nuevo del resto |
 | Me gusta en el muro | Corazón en cada nota y cada foto (uno por persona, se puede sacar). No genera aviso |
 | Fotos en el muro | Cada foto aparece solo para quien puede ver la galería de su dueño |
@@ -165,7 +165,7 @@ La música del DJ y el puente OSC ya están hechos. Falta:
 | Salas | Todas distintas; solo el Museo (home de todos) es igual para todos |
 | Economía | Sí. Fuentes: misiones/niveles y diseños subidos por artistas, que pasan a ser objetos intercambiables |
 | Registro | Con mail (frena las cuentas múltiples; 3–4 por persona no rompen nada) y nickname único |
-| Movimiento | Agacharse, sentarse y trepar se quedan (naturales). La stamina se recupera con **cualquier consumible** (trago, comida…) **o un gesto con consentimiento** (beso…); el efecto dura **2 minutos** |
+| Movimiento | Agacharse, sentarse y trepar se quedan (naturales). La stamina se recupera con **cualquier consumible** (trago, comida…) **o un gesto con consentimiento** (beso…): durante **2 minutos** la stamina no se gasta |
 | Contenido | +18; no se modera el contenido en sí, pero hay mutear, ignorar y restringir; reportar queda para más adelante |
 | Soltar objetos | Es la única forma de deshacerse de un objeto. Regalar = intercambio donde el otro no pone nada (ya funciona) |
 | Cabinas y obras | No trepables (los parlantes sí) |
@@ -182,7 +182,7 @@ La música del DJ y el puente OSC ya están hechos. Falta:
 | Títulos: perderlos | Solo un admin quita el título de Creador o Curador, a mano |
 | Bajar obras | Solo los admins pueden sacar una obra que ya entró (de la cola o del Museo) |
 | Registro de curadores | Los admins ven quién verificó y quién denegó cada obra |
-| Museo rotativo: por persona | Sin límite: cada uno postula las obras que quiera |
+| Museo rotativo: por persona | Hasta 5 postulaciones por día |
 | Curadores: arranque | Mientras no haya curadores, verifican los admins; además el admin puede nombrar curadores fundadores a mano |
 | Curadores: requisitos | Nivel + participación (propuesta a ajustar: nivel 10+ y haber visto 50 obras distintas del Museo) |
 | Progresión | Niveles por puntos (**privados**, solo los ve uno) + insignias por logros (**públicas**, se ven en el perfil) |

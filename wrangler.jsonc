@@ -12,7 +12,7 @@
   },
   // Cuentas con permisos de admin en todas las salas (IDs separados por coma).
   // 747ec0adf3e01ea1 = "xvvave"
-  "vars": { "ADMIN_IDS": "747ec0adf3e01ea1" },
+  "vars": { "ADMIN_IDS": "747ec0adf3e01ea1", "REALTIME_APP_ID": "bb94df5270bf9262c04397a77e843258" },
   "durable_objects": {
     "bindings": [
       { "name": "ROOMS", "class_name": "Room" },
