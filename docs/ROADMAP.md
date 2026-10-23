@@ -64,9 +64,9 @@ La música del DJ y el puente OSC ya están hechos. Falta:
    In Place en las de desplazamiento.
 
 ### Pendientes (a consultar antes de implementar)
-- **Modelos de personaje:** el pack gratis de Universal Base Characters trae solo los 2 cuerpos
-  Superhero (Regular/Teen están en la versión Source, USD 19,99). El usuario no quiere seguir por ahí:
-  investigar alternativas fuera de Quaternius.
+- **Modelos de personaje:** ✅ decidido (23/10): base **MakeHuman** (CC0), trabajada en Blender con el
+  MCP en la PC del usuario. Especificación de los archivos en `docs/ramas/personaje-blender.md`.
+  Hasta que estén, se sigue con los cuerpos Superhero (los tipos de cuerpo se aproximan ensanchando huesos).
 - **Ropa del personaje nuevo:** hoy remera y buzo solo cambian el largo de la manga (el buzo no
   tiene capucha ni bolsillo) y la ropa se ve pegada al cuerpo. "Luego lo vemos".
 - **Peinados rulos y coleta** con el estilo del pack (hacerlos en Blender). Hoy se muestran como
@@ -139,7 +139,7 @@ La música del DJ y el puente OSC ya están hechos. Falta:
 | Web3 | No por ahora |
 | Editor de sala | Editor básico dentro del juego; cualquiera puede subir modelos si cumplen requisitos (requisitos a definir con el usuario) |
 | Cuerpos | Tipos de cuerpo distintos (flaco, gordo, musculoso, atlético…), no solo ancho |
-| Colores | Selector RGB completo (cuadradito "RGB +") en vez de filas de muestras |
+| Colores | ~~Selector RGB completo en vez de filas de muestras~~ → Básico: filas de muestras; Avanzado: selector RGB completo (23/10) |
 | Contenido de usuarios | Primero modelos; gestos/scripts propios más adelante |
 | Personaje | Modelo Quaternius para todos (se reemplaza el hecho por código, sin respaldo) |
 | Tipo de cuerpo | Masculino / femenino; todo libre (cualquier cuerpo puede usar cualquier peinado y barba) |
@@ -174,6 +174,10 @@ La música del DJ y el puente OSC ya están hechos. Falta:
 | Cabinas y obras | No trepables (los parlantes sí) |
 | Moderación del Museo | Ignorar/restringir + antiflood; no depende de que el admin esté conectado |
 | Personajes | Mejorar con Blender + Tripo/Meshy (IA para objetos y decoración; cuerpos y ropa en Blender) |
+| Base del personaje | **MakeHuman** (CC0, semi-realista, tipos de cuerpo como deformaciones de una sola malla). Descartados: Meshy como cuerpo (malla única con pelo y ropa, un modelo por cuerpo), Ready Player Me (cerró), VRoid (anime), MB-Lab (AGPL) |
+| Blender: dónde | Con el MCP de Blender en la PC del usuario (no en la nube) |
+| Tipos de cuerpo | Flaco, promedio, gordo y musculoso. Básico: esos 4 fijos. Avanzado: dos deslizadores libres, peso (flaco ↔ gordo) y músculo (poco ↔ mucho) |
+| Contextura | Se saca del editor; las cuentas que la tenían quedan en "promedio" (el dato viejo se guarda sin usarse) |
 | Exploradores | Más mapas públicos |
 | Museo rotativo: lugares | Rotan los 9 cuadros y las 5 esculturas que ya hay; cada lugar rota por su cuenta cada 24 h. Mientras no haya obras del público, se ven las de ahora |
 | Museo rotativo: cola vacía | Si no hay nadie esperando, la obra actual se queda otras 24 h |
