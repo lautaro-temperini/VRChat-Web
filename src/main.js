@@ -18,8 +18,9 @@ import { createWorks } from './ui/works.js';
 import { RTC } from './net/rtc.js';
 import { createSocial } from './ui/social.js';
 import { toast } from './ui/toast.js';
+import { colorPicker } from './ui/colorpicker.js';
 import { guestGate, setRegister, lock } from './ui/guest.js';
-import { EMOTES, DANCES, ITEM_REACH } from '../server/shared.js';
+import { EMOTES, DANCES, ITEM_REACH, BODY_TYPES } from '../server/shared.js';
 import { UI_ICONS } from './ui/icons.js';
 import { createRoomPanel } from './ui/roompanel.js';
 import { Ground } from './world/ground.js';
@@ -283,28 +284,70 @@ const GROUPS = [
   ['top', 'Arriba'], ['shirt', 'Color de remera / buzo'], ['pants', 'Pantalón'], ['shoes', 'Zapatillas'],
 ];
 const CHIP_LABELS = { masc: 'masculino', fem: 'femenino', false: 'sin barba', true: 'con barba' };
+// Tipo de cuerpo del básico: el que coincide con los deslizadores del avanzado (si no, ninguno)
+const bodyTypeOf = (L) => Object.keys(BODY_TYPES).find((k) => Math.abs(BODY_TYPES[k].weight - L.weight) < 0.005 && Math.abs(BODY_TYPES[k].muscle - L.muscle) < 0.005);
+function swatchGroup(title, values, isSel, label, pick) {
+  const group = document.createElement('div');
+  group.className = 'group';
+  group.innerHTML = `<h2>${title}</h2>`;
+  const row = document.createElement('div');
+  row.className = 'swatches';
+  for (const value of values) {
+    const b = document.createElement('button');
+    if (String(value).startsWith('#')) { b.className = 'swatch'; b.style.background = value; b.title = value; }
+    else { b.className = 'chip'; b.textContent = label(value); }
+    if (isSel(value)) b.classList.add('sel');
+    b.onclick = () => { pick(value); renderSwatches(); };
+    row.append(b);
+  }
+  group.append(row);
+  return group;
+}
 function renderSwatches() {
   const root = $('swatches');
   root.innerHTML = '';
   for (const [key, title] of GROUPS) {
-    const group = document.createElement('div');
-    group.className = 'group';
-    group.innerHTML = `<h2>${title}</h2>`;
-    const row = document.createElement('div');
-    row.className = 'swatches';
-    for (const value of LOOK_OPTIONS[key]) {
-      const b = document.createElement('button');
-      if (String(value).startsWith('#')) { b.className = 'swatch'; b.style.background = value; b.title = value; }
-      else { b.className = 'chip'; b.textContent = CHIP_LABELS[value] ?? value; }
-      if (look[key] === value) b.classList.add('sel');
-      b.onclick = () => { setLook({ ...look, [key]: value }); renderSwatches(); };
-      row.append(b);
+    // Un color elegido en el avanzado que no está entre las muestras se ve primero, marcado
+    const values = String(look[key]).startsWith('#') && !LOOK_OPTIONS[key].includes(look[key]) ? [look[key], ...LOOK_OPTIONS[key]] : LOOK_OPTIONS[key];
+    root.append(swatchGroup(title, values, (v) => look[key] === v, (v) => CHIP_LABELS[v] ?? v, (v) => setLook({ ...look, [key]: v })));
+    if (key === 'body') {
+      const type = bodyTypeOf(look);
+      root.append(swatchGroup('Tipo de cuerpo', Object.keys(BODY_TYPES), (v) => v === type, (v) => BODY_TYPES[v].name,
+        (v) => setLook({ ...look, weight: BODY_TYPES[v].weight, muscle: BODY_TYPES[v].muscle })));
     }
-    group.append(row);
-    root.append(group);
   }
 }
-for (const key of ['height', 'build']) {
+// Avanzado: selector RGB completo por color (uno abierto a la vez)
+let openRgb = null;
+function renderAdvanced() {
+  $('weight').value = look.weight;
+  $('muscle').value = look.muscle;
+  const root = $('rgb-colors');
+  root.innerHTML = '';
+  for (const [key, title] of GROUPS) {
+    if (!String(look[key]).startsWith('#')) continue;
+    const row = document.createElement('button');
+    row.className = 'rgb-row';
+    row.innerHTML = `<span class="swatch" style="background:${look[key]}"></span>${title}<code>${look[key]}</code>`;
+    row.onclick = () => { openRgb = openRgb === key ? null : key; renderAdvanced(); };
+    root.append(row);
+    if (openRgb === key) {
+      root.append(colorPicker(look[key], (hex) => {
+        setLook({ ...look, [key]: hex });
+        row.firstElementChild.style.background = hex;
+        row.lastElementChild.textContent = hex;
+      }));
+    }
+  }
+}
+$('look-tabs').onclick = (e) => {
+  const tab = e.target.closest('[data-ltab]')?.dataset.ltab;
+  if (!tab) return;
+  for (const b of $('look-tabs').children) b.classList.toggle('active', b.dataset.ltab === tab);
+  for (const el of $('editor').querySelectorAll(':scope > [data-ltab]')) el.hidden = el.dataset.ltab !== tab;
+  if (tab === 'basic') renderSwatches(); else renderAdvanced();
+};
+for (const key of ['height', 'weight', 'muscle']) {
   $(key).oninput = (e) => {
     setLook({ ...look, [key]: Number(e.target.value) });
     if (key === 'height') $('height-val').textContent = `${look.height.toFixed(2)} m`;
@@ -316,10 +359,10 @@ function openEditor() {
   $('name').value = name;
   $('bio').value = bio;
   $('height').value = look.height;
-  $('build').value = look.build;
   $('height-val').textContent = `${look.height.toFixed(2)} m`;
   $('btn-enter').textContent = joined ? 'Guardar' : 'Entrar al museo';
   renderSwatches();
+  renderAdvanced();
   renderAccount();
   openOverlay('editing');
   ctrl.showcase = joined; // vitrina hasta que el personaje se mueva
