@@ -173,7 +173,15 @@ La música del DJ y el puente OSC ya están hechos. Falta:
 | Exploradores | Más mapas públicos |
 | Museo rotativo: lugares | Por ahora los que ya hay (9 cuadros y 2 esculturas) |
 | Museo rotativo: cola vacía | Si no hay nadie esperando, la obra actual se queda otras 24 h |
-| Museo rotativo: sin definir | Cómo entra una obra (la idea: abierto y libre, pero verificando que sean obras reales y no bromas) y cuántas puede postular cada persona. El usuario lo está pensando |
+| Museo rotativo: postular | Abierto: cualquiera postula. La cola tiene orden fijo (fecha de postulación, con prioridad para usuarios); verificar NO adelanta una obra, solo la deja lista para presentarse en su turno |
+| Museo rotativo: verificación | Las obras sin verificar quedan en la cola hasta que alguien las verifique o deniegue (no vencen). Si le llega el turno a una sin verificar, se presenta la siguiente verificada y la otra conserva el primer lugar |
+| Museo rotativo: votos | Verificar = 1 curador. Denegar = 2 curadores distintos; si no coinciden, decide un admin. Para denegar hay que elegir un motivo, que le llega al autor |
+| Curadores | Título que se gana automáticamente por méritos (antigüedad, participación, reputación; los números se definen con la progresión). Revisan obras que les tocan **al azar** (no eligen ni ven la lista) y **nunca de sus amigos**. No pueden aprobar las propias (salvo que también sean Creadores). No bajan obras |
+| Creadores | Título que se gana con **3 obras aceptadas seguidas** (un rechazo vuelve el contador a cero). Sus obras entran a la cola ya verificadas |
+| Títulos: perderlos | Solo un admin quita el título de Creador o Curador, a mano |
+| Bajar obras | Solo los admins pueden sacar una obra que ya entró (de la cola o del Museo) |
+| Registro de curadores | Los admins ven quién verificó y quién denegó cada obra |
+| Museo rotativo: sin definir | Cuántas obras puede postular cada persona (el usuario lo está pensando). Los requisitos exactos para ser Curador van con el punto 3 |
 | Voz: servidor | Servidor de audio (Cloudflare Realtime SFU) para que nadie vea la IP de otro |
 | Voz: a quién escuchás | Los 4 más cercanos **que estén hablando**, dentro de 10 m. Si uno se calla, entra el siguiente |
 | Voz: grupos | Se invita con E desde el perfil. Hasta 4 personas. Solo en la misma sala (si alguien se va, deja de escucharse) |
