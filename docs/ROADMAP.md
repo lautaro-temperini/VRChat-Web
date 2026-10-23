@@ -228,3 +228,18 @@ La música del DJ y el puente OSC ya están hechos. Falta:
 | Invitados: cómo se ve lo bloqueado | Las opciones se ven igual, con un candado 🔒; al tocarlas aparece "Para … tenés que crear una cuenta (es gratis)" con un botón "Crear cuenta" |
 | Voz: grupo | Suena como una llamada (sin distancia ni dirección). La invitación sin respuesta vence al minuto y no cuenta como rechazo. Quien está en un grupo figura "En grupo" y no se lo puede invitar a otro hasta que salga |
 | Ingreso | Mail + contraseña, **Google** y **Discord** (Facebook no). Después de entrar con Google/Discord se elige el nickname único. Mismo mail confirmado por Google/Discord = la misma cuenta |
+| Editor: plantilla club | Un club nuevo y más chico: la parte de la pista (sin hall ni 2º piso). Luces y parlantes básicos por defecto. La cabina, los sillones, los parlantes y las pantallas son muebles que se pueden mover o cambiar |
+| Editor: pantallas | Mueble "Pantalla", hasta 2 por sala, tamaño a elección, en cualquier pared o donde se quiera. Cada una la toma su propio VJ o repite el video de la otra (lo elige el dueño) |
+| Editor: equipo de DJ | Cabina de DJ, consola de artistas, parlantes y pantallas se pueden poner en cualquier plantilla (una cabina y una consola por sala) |
+| Editor: herramientas | Mover, rotar y cambiar color (RGB libre). Encastre a grilla de 25 cm y giros de 15° (con una tecla para moverlo libre). Sin escalar (salvo el tamaño de las pantallas) |
+| Editor: celular | Tocar y arrastrar: tocás un mueble, lo arrastrás por el piso y aparecen botones grandes (rotar, color, guardar, listo) |
+| Editor: fotos colgadas | Mueble básico "Cuadro" con una foto de tu galería elegida por el dueño; con E se abre la ficha. Solo fotos visibles para todos |
+| Editor: modelos | Muebles hechos por código para arrancar; después se reemplazan por un pack (a aprobar) sin tocar las salas guardadas |
+| Editor: salas existentes | La primera vez que el dueño entra a su sala elige la plantilla; hasta entonces se ve el loft |
+| Editor: catálogo básico | Living (sillón de 3, sillón individual, puf, mesa ratona, alfombra), comedor/bar (mesa, silla, banqueta alta, barra chica), arte (cuadro, pedestal, atril, cartel de neón), deco y luz (planta, lámpara de pie, estante, cama, panel) |
+| Editor: atril | Opcional: es un mueble más. Sin atril, los visitantes no ven las notas ni dan corazones |
+| Editor: tamaño de las plantillas | Chicas, alrededor de 12 × 10 m |
+| Editor: superponer | Los muebles se pueden superponer; solo no se pueden sacar de la sala |
+| Editor: especiales de ejemplo | Trono dorado, bola de espejos, sillón de terciopelo con neón y escultura de neón |
+| Paquete inicial (activado) | Las cuentas nuevas reciben 15 objetos al azar entre prendas y muebles especiales |
+| Editor: cambiar de plantilla (muebles básicos) | Se borran (con confirmación); arrancás con lo que trae la plantilla nueva |
