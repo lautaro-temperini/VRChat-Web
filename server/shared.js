@@ -67,3 +67,91 @@ export function cleanLook(look) {
   if (build !== undefined) out.build = build;
   return out;
 }
+
+// ---------- Editor de salas ----------
+// Plantillas de las salas personales (u-<id>). Medidas en metros, centradas en 0,0:
+// x de -w/2 a w/2, z de -d/2 a d/2. La entrada está al sur (z = d/2), mirando al norte.
+export const ROOM_TEMPLATES = {
+  loft: { name: 'Loft', w: 12, d: 10, h: 4.2 },
+  galeria: { name: 'Galería', w: 12, d: 10, h: 4.5 },
+  club: { name: 'Club', w: 12, d: 10, h: 5 },
+  terraza: { name: 'Terraza', w: 12, d: 10, h: 0 }, // al aire libre: sin techo
+};
+export const ROOM_MAX_PIECES = 100;
+
+// Catálogo de muebles. Se referencian por id (la progresión los da como premio por id).
+// cat: living · comedor · arte · deco · equipo · especial
+// mount: floor (en el piso) · wall (colgado de una pared: cuadros, pantallas, carteles)
+// special: sale del inventario (y vuelve al levantarlo); los demás son libres para todos
+// max: cuántos puede haber por sala; color: el de fábrica (el dueño lo cambia con RGB libre)
+// size: [ancho, profundidad] aproximado, para que no quede afuera de la sala
+export const FURNITURE = {
+  sofa: { name: 'Sillón de 3', cat: 'living', mount: 'floor', color: '#2f3a48', size: [2.4, 0.95] },
+  sillon: { name: 'Sillón individual', cat: 'living', mount: 'floor', color: '#7a4a3a', size: [1, 0.95] },
+  puf: { name: 'Puf', cat: 'living', mount: 'floor', color: '#c9a14a', size: [0.7, 0.7] },
+  mesaRatona: { name: 'Mesa ratona', cat: 'living', mount: 'floor', color: '#4a2c1b', size: [1.2, 0.7] },
+  alfombra: { name: 'Alfombra', cat: 'living', mount: 'floor', color: '#8a3b3b', size: [3, 2] },
+  mesa: { name: 'Mesa', cat: 'comedor', mount: 'floor', color: '#5a3a24', size: [1.6, 0.9] },
+  silla: { name: 'Silla', cat: 'comedor', mount: 'floor', color: '#1d1d22', size: [0.5, 0.5] },
+  banqueta: { name: 'Banqueta alta', cat: 'comedor', mount: 'floor', color: '#8a1c1c', size: [0.45, 0.45] },
+  barra: { name: 'Barra chica', cat: 'comedor', mount: 'floor', color: '#4a2c1b', size: [2.4, 0.7] },
+  cuadro: { name: 'Cuadro', cat: 'arte', mount: 'wall', color: '#141414', size: [1.2, 0.1] },
+  pedestal: { name: 'Pedestal', cat: 'arte', mount: 'floor', color: '#f2f0ec', size: [0.6, 0.6] },
+  atril: { name: 'Atril', cat: 'arte', mount: 'floor', color: '#4a2c1b', size: [0.7, 0.7], max: 1 },
+  neon: { name: 'Cartel de neón', cat: 'arte', mount: 'wall', color: '#ff4fd8', size: [1.2, 0.1] },
+  planta: { name: 'Planta', cat: 'deco', mount: 'floor', color: '#3f7a3a', size: [0.6, 0.6] },
+  lampara: { name: 'Lámpara de pie', cat: 'deco', mount: 'floor', color: '#f2e6c9', size: [0.5, 0.5] },
+  estante: { name: 'Estante', cat: 'deco', mount: 'floor', color: '#4a2c1b', size: [1.2, 0.4] },
+  cama: { name: 'Cama', cat: 'deco', mount: 'floor', color: '#d9d2c5', size: [1.6, 2.1] },
+  panel: { name: 'Panel', cat: 'deco', mount: 'floor', color: '#e9e3d6', size: [1.4, 0.1] },
+  cabina: { name: 'Cabina de DJ', cat: 'equipo', mount: 'floor', color: '#1b1b20', size: [2, 0.9], max: 1 },
+  consola: { name: 'Consola de artistas', cat: 'equipo', mount: 'floor', color: '#1b1b20', size: [1.4, 0.8], max: 1 },
+  parlante: { name: 'Parlante', cat: 'equipo', mount: 'floor', color: '#151518', size: [0.7, 0.6] },
+  pantalla: { name: 'Pantalla', cat: 'equipo', mount: 'wall', color: '#0b0b0d', size: [4, 0.1], max: 2 },
+  trono: { name: 'Trono dorado', cat: 'especial', mount: 'floor', color: '#d4a74a', size: [1, 0.9], special: true },
+  espejos: { name: 'Bola de espejos', cat: 'especial', mount: 'floor', color: '#d9d9d9', size: [0.6, 0.6], special: true },
+  sillonNeon: { name: 'Sillón de terciopelo con neón', cat: 'especial', mount: 'floor', color: '#5b1a6e', size: [2.2, 0.95], special: true },
+  esculturaNeon: { name: 'Escultura de neón', cat: 'especial', mount: 'floor', color: '#19d3ff', size: [0.8, 0.8], special: true },
+};
+export const FURNITURE_CATS = { living: 'Living', comedor: 'Comedor y bar', arte: 'Arte', deco: 'Deco y luz', equipo: 'Música y pantallas', especial: 'Especiales' };
+export const SPECIAL_FURNITURE = Object.keys(FURNITURE).filter((k) => FURNITURE[k].special);
+// Pantallas: tamaño (ancho en metros) y qué muestran: su propio VJ o lo mismo que la otra pantalla
+export const SCREEN_WIDTH = [1, 8];
+export const SCREEN_MODES = ['propia', 'espejo'];
+
+// Lo que trae cada plantilla al elegirla: [tipo, x, z, rotación (grados), y (solo los de pared)]
+export const TEMPLATE_PIECES = {
+  loft: [['alfombra', -1.5, -1, 0], ['sofa', -1.5, 0.2, 180], ['mesaRatona', -1.5, -1.2, 0], ['sillon', -3.6, -1.2, 90], ['lampara', 0.4, 0.4, 0],
+    ['planta', -5.3, -4.3, 0], ['cama', 3.8, -3.6, 0], ['estante', 1.5, -4.75, 0], ['mesa', 3.2, 1.6, 0], ['silla', 3.2, 2.3, 180], ['silla', 3.2, 0.9, 0],
+    ['atril', 4.6, 3.6, -40], ['cuadro', -1.5, -5, 0, 1.7]],
+  galeria: [['pedestal', -2, -1, 0], ['pedestal', 2, -1, 0], ['pedestal', 0, 1.5, 0], ['cuadro', -3.5, -5, 0, 1.6], ['cuadro', 0, -5, 0, 1.6], ['cuadro', 3.5, -5, 0, 1.6],
+    ['cuadro', -6, -1.5, 90, 1.6], ['cuadro', 6, -1.5, -90, 1.6], ['panel', 0, -2.8, 0], ['banqueta', -4.5, 3.6, 0], ['planta', 5.3, 4.3, 0], ['atril', -4.8, 3.4, 40]],
+  club: [['cabina', 0, -3.6, 0], ['parlante', -2.4, -4.3, 0], ['parlante', 2.4, -4.3, 0], ['pantalla', 0, -5, 0, 2.9], ['consola', 4.6, 2.6, -90],
+    ['sofa', -5.4, 0.5, 90], ['sofa', 5.4, -1.5, -90], ['barra', -4, 4.3, 180], ['banqueta', -4.8, 3.6, 0], ['banqueta', -3.2, 3.6, 0], ['atril', 4.8, 4.2, -30]],
+  terraza: [['alfombra', 0, 0.3, 0], ['sofa', 0, 1.6, 180], ['mesaRatona', 0, 0.4, 0], ['puf', -1, -0.6, 0], ['puf', 1, -0.6, 0], ['planta', -5.3, -4.3, 0],
+    ['planta', 5.3, -4.3, 0], ['planta', -5.3, 1, 0], ['lampara', 2.6, -1.8, 0], ['mesa', 3.6, 2.4, 0], ['silla', 3.6, 3.1, 180], ['silla', 3.6, 1.7, 0], ['atril', -4.6, 3.6, 40]],
+};
+
+// Valida un mueble que manda el cliente. Devuelve el mueble limpio o null.
+// { id, type, x, y, z, r (radianes), c (color), iid? (especial), photo? (cuadro), w? y m? (pantalla) }
+export function cleanPiece(p, template) {
+  const def = FURNITURE[p?.type];
+  const t = ROOM_TEMPLATES[template];
+  if (!def || !t) return null;
+  const num = (v, d = 0) => (Number.isFinite(Number(v)) ? Number(v) : d);
+  const out = { id: String(p.id ?? '').replace(/[^a-z0-9]/gi, '').slice(0, 12), type: p.type };
+  if (!out.id) return null;
+  const hx = t.w / 2, hz = t.d / 2;
+  out.x = Math.round(Math.min(hx, Math.max(-hx, num(p.x))) * 1000) / 1000;
+  out.z = Math.round(Math.min(hz, Math.max(-hz, num(p.z))) * 1000) / 1000;
+  out.y = def.mount === 'wall' ? Math.round(Math.min(Math.max(t.h, 4) - 0.3, Math.max(0.3, num(p.y, 1.6))) * 1000) / 1000 : 0;
+  out.r = Math.round((((num(p.r) % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2)) * 10000) / 10000;
+  out.c = typeof p.c === 'string' && /^#[0-9a-f]{6}$/i.test(p.c) ? p.c.toLowerCase() : def.color;
+  if (def.special) out.iid = String(p.iid ?? '').slice(0, 32);
+  if (p.type === 'cuadro' && p.photo) out.photo = String(p.photo).slice(0, 40);
+  if (p.type === 'pantalla') {
+    out.w = Math.round(Math.min(SCREEN_WIDTH[1], Math.max(SCREEN_WIDTH[0], num(p.w, 3.6))) * 100) / 100;
+    out.m = SCREEN_MODES.includes(p.m) ? p.m : 'espejo';
+  }
+  return out;
+}

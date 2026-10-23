@@ -1,6 +1,7 @@
 import { DurableObject } from 'cloudflare:workers';
-import { cleanName, cleanLook, ITEMS, STARTER_ITEMS } from './shared.js';
+import { cleanName, cleanLook, ITEMS, STARTER_ITEMS, FURNITURE, SPECIAL_FURNITURE } from './shared.js';
 import { setupWorks, worksMethods } from './works.js';
+import { accountsEditorMethods } from './editor.js';
 
 // Cuentas de usuario (una sola instancia global con base SQLite).
 // - Invitado: se crea sin usuario ni contraseña; el navegador guarda su token.
@@ -402,8 +403,12 @@ export class Accounts extends DurableObject {
   // ---------- Inventario ----------
 
   giveStarter(userId) {
-    const types = [...STARTER_ITEMS].sort(() => Math.random() - 0.5).slice(0, 3);
-    for (const type of types) this.addItem(userId, type, pick(ITEMS[type].colors));
+    // Paquete inicial: 15 objetos al azar entre prendas y muebles especiales (se pueden repetir)
+    const pool = [...STARTER_ITEMS, ...SPECIAL_FURNITURE];
+    for (let i = 0; i < 15; i++) {
+      const type = pick(pool);
+      this.addItem(userId, type, ITEMS[type] ? pick(ITEMS[type].colors) : FURNITURE[type].color);
+    }
     this.sql.exec('UPDATE users SET starter = 1 WHERE id = ?', userId);
   }
 
@@ -435,6 +440,7 @@ export class Accounts extends DurableObject {
     if (this.isGuest(row)) return this.guestError();
     const item = this.sql.exec('SELECT * FROM items WHERE iid = ? AND owner_id = ?', String(iid ?? ''), row.id).toArray()[0];
     if (!item) return { ok: false, error: 'Ese objeto no es tuyo.' };
+    if (!ITEMS[item.type]) return { ok: false, error: 'Los muebles se ponen desde el editor de tu sala.' };
     this.ctx.storage.transactionSync(() => {
       if (on) {
         // Uno por lugar: sacar lo que haya en el mismo lugar del cuerpo
@@ -938,3 +944,6 @@ export class Accounts extends DurableObject {
 
 // Museo rotativo: postular, revisar, rotar (server/works.js)
 Object.assign(Accounts.prototype, worksMethods);
+
+// Editor de salas: muebles especiales que salen del inventario (server/editor.js)
+Object.assign(Accounts.prototype, accountsEditorMethods);

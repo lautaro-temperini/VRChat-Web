@@ -1,5 +1,6 @@
 import { DurableObject } from 'cloudflare:workers';
 import { cleanName, cleanLook, cleanEquip, EMOTES } from './shared.js';
+import { roomEditorMethods, ROOM_SPAWN } from './editor.js';
 
 // Cada sala del juego es una instancia de Room (un Durable Object).
 // - Reenvía posiciones, chat, AFK y estado del micrófono.
@@ -214,6 +215,7 @@ export class Room extends DurableObject {
         t: 'welcome', id: meta.id, players: this.players(ws), chat, screen: this.screen, dj: this.dj, parts: this.parts, lights: this.lights, groups: this.groups,
         room: { name: await this.roomName(), owner: await this.ownerId(), settings: this.settings, mod: meta.mod, silenced: !!this.silenced[user.id] },
         ground: this.ground.map((g) => ({ ...g, age: Date.now() - g.at })),
+        layout: await this.layout(),
       });
       this.broadcast({ t: 'join', ...this.publicInfo(meta) }, ws);
       await this.accounts().presence(await this.roomName(), [user.id]);
@@ -371,6 +373,9 @@ export class Room extends DurableObject {
         this.broadcast({ t: 'luces', s }, ws);
         break;
       }
+      case 'edit':
+        await this.editMessage(ws, meta, msg);
+        break;
       case 'drop':
         await this.drop(ws, meta, msg);
         break;
@@ -471,9 +476,11 @@ export class Room extends DurableObject {
         this.send(target, { t: 'teleport', x: s[0] + 1, y: s[1], z: s[2] + 0.5, by: meta.name });
         break;
       }
-      case 'spawn':
-        this.send(target, { t: 'teleport', x: SPAWN.x, y: 0, z: SPAWN.z, by: meta.name });
+      case 'spawn': {
+        const sp = (await this.ownerId()) ? ROOM_SPAWN : SPAWN; // las salas personales tienen su propia entrada
+        this.send(target, { t: 'teleport', x: sp.x, y: 0, z: sp.z, by: meta.name });
         break;
+      }
       case 'setting': {
         if (!(msg.key in DEFAULT_SETTINGS)) return;
         this.settings[msg.key] = !!msg.value;
@@ -900,3 +907,6 @@ function cleanLights(s) {
   };
   return out;
 }
+
+// Editor de salas: plantilla y muebles de las salas personales (server/editor.js)
+Object.assign(Room.prototype, roomEditorMethods);
