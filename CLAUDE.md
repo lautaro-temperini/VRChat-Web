@@ -80,7 +80,7 @@ npm run deploy   # build + wrangler deploy
 - **Pruebas:** en desarrollo existe `window.__game` (ctrl, world, remotes, rtc, social, net,
   ground, roomPanel, `setHour(h)` para probar día/noche…). Si el panel del navegador está oculto,
   el juego corre a muy pocos cuadros: para probar física llamar a `ctrl.update(1/60)` en un bucle.
-- **Protocolo de la sala** (mensajes `t`): `join`, `s` (estado `[x,y,z,yaw,vel,pose]`), `afk`,
+- **Protocolo de la sala** (mensajes `t`): `join`, `s` (estado `[x,y,z,yaw,vel,pose]`, pose 0–5: parado, agachado, sentado, trepando, aire, saltando baranda), `afk`,
   `mic`, `look`, `chat`, `sfu` (pedidos al servidor de audio: push/unpush/pull/unpull/answer), `sfu-cut`,
   `pub` (alguien publicó su voz), `group` (invite/respond/leave/kick), `groups` (estado de los grupos), `screen`, `drop`, `pickup`, `mod`, `trade`, `emote` (gestos), `dj` (cabina: on/off, track), `part` (consola de artistas: luces / escenario), `luces` (estado de las luces por OSC).
 - **Puente OSC:** `npm run puente` (sin dependencias) recibe OSC en el puerto 9000 y lo pasa a la pestaña

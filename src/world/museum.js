@@ -416,7 +416,7 @@ export function buildMuseum(scene, renderer, quality) {
     scene.add(g);
     collider(x - 0.3, x + 0.3, z - 0.3, z + 0.3, 1.2, false);
   }
-  for (const [x, z] of [[-29.3, -10.3], [-29.3, 10.3], [-29.2, -2.1], [-29.2, 2.1], [-6.9, -5.3], [-6.9, 5.3], [-12.9, -10.3]]) plant(x, z);
+  for (const [x, z] of [[-29.3, -10.3], [-29.3, 10.3], [-29.2, -2.1], [-29.2, 2.1], [-12.9, -10.3]]) plant(x, z);
 
   // ---------- Esculturas (del lado del hall de la pared del medio) ----------
   const sculptures = [];
@@ -633,6 +633,8 @@ export function buildMuseum(scene, renderer, quality) {
       const glass = box(len, 0.9, 0.02, x0 + (steps * run) / 2, BY / 2 + 0.5, rz, glassMat, { cast: false });
       glass.rotation.z = rail.rotation.z;
       glass.userData.mergeTransparent = true;
+      // El vidrio es barrera: un tramo por escalón, más alto que un salto (no se sube por el costado)
+      for (let i = 0; i < steps; i++) collider(x0 + run * i, x0 + run * (i + 1), rz - 0.04, rz + 0.04, (i + 1) * rise + 2.2, false);
     }
   }
 
@@ -646,12 +648,14 @@ export function buildMuseum(scene, renderer, quality) {
   slab(XP, BX, Z0, -BZ);
   slab(XP, BX, BZ, Z1);
   slab(XP, BW, -BZ, BZ);
-  // Barandas de vidrio (chocan solo a la altura del balcón)
+  // Barandas de vidrio (chocan solo a la altura del balcón). Más altas que un salto: se pasan
+  // saltándolas con Espacio pegado al vidrio (vault = altura del pasamanos)
   const railing = (x0, x1, z0, z1) => {
     const w = Math.max(x1 - x0, 0.06), d = Math.max(z1 - z0, 0.06), cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
     box(w, 1, d, cx, BY + 0.5, cz, glassMat, { cast: false }).userData.mergeTransparent = true;
     box(w + 0.02, 0.05, d + 0.02, cx, BY + 1.03, cz, steelMat, { cast: false, round: 0.02 });
-    collider(cx - w / 2 - 0.03, cx + w / 2 + 0.03, cz - d / 2 - 0.03, cz + d / 2 + 0.03, BY + 1.1, false, BY);
+    collider(cx - w / 2 - 0.03, cx + w / 2 + 0.03, cz - d / 2 - 0.03, cz + d / 2 + 0.03, BY + 1.9, false, BY);
+    colliders[colliders.length - 1].vault = BY + 1.05;
   };
   railing(BW, BX, -BZ, -BZ);
   railing(BW, BX, BZ, BZ);
