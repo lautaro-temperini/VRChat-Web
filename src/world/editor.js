@@ -83,8 +83,13 @@ export function createRoomEditor({ world, scene, camera, renderer, net, ctrl, me
         <button class="act" data-mode="espejo">Lo mismo que la otra</button>
       </div>
     </div>
-    <div id="re-modal" class="re-modal"><div class="re-card" id="re-modal-card"></div></div>`;
-  document.body.append(root);
+`;
+  // El selector de plantilla y de fotos va aparte: se abre también fuera del modo edición
+  const modal = document.createElement('div');
+  modal.id = 're-modal';
+  modal.className = 're-modal';
+  modal.innerHTML = '<div class="re-card" id="re-modal-card"></div>';
+  document.body.append(root, modal);
 
   let cat = 'living';
   function renderCats() {
@@ -341,7 +346,7 @@ export function createRoomEditor({ world, scene, camera, renderer, net, ctrl, me
       const b = document.createElement('button');
       b.className = `swatch ${c === p.c ? 'sel' : ''}`;
       b.style.background = c;
-      b.onclick = () => { sendUpdate(p.id, { c }); select(p.id); };
+      b.onclick = () => { if (selected) { sendUpdate(selected, { c }); select(selected); } };
       sw.append(b);
     }
   }
@@ -586,7 +591,7 @@ export function createRoomEditor({ world, scene, camera, renderer, net, ctrl, me
       if (drag?.id === piece.id) return; // lo estoy moviendo yo: manda lo mío al soltar
       const wasSelected = selected === tmp;
       world.setPiece(piece, tmp);
-      if (wasSelected) selected = piece.id;
+      if (wasSelected) select(piece.id);
       if (tmp && drag?.id === tmp) drag.id = piece.id;
       // Cambios que hice antes de que la sala confirmara el mueble nuevo
       if (tmp && pendingUpdates.has(tmp)) { net.send({ t: 'edit', op: 'update', id: piece.id, piece: pendingUpdates.get(tmp) }); pendingUpdates.delete(tmp); }

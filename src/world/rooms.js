@@ -41,7 +41,7 @@ export function buildPersonalRoom(scene, renderer, quality) {
     editable: true,
     colliders: [], blockers: [], interactables: [],
     bounds: { minY: 0.2, maxY: 4 },
-    spawn: { x: 0, z: 4, yaw: Math.PI },
+    spawn: { x: 0, z: 4, yaw: 0 },
     works: { paintings: [], sculptures: [] },
     get layout() { return layout; },
     get shell() { return shell; },

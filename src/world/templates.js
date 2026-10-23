@@ -83,7 +83,8 @@ export function buildShell(id, { high }) {
   function door(frameMat, leafMat) {
     const g = new THREE.Group();
     g.position.set(0, 0, D);
-    const add = (w, h, d, m, x, y, z) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); b.position.set(x, y, z); b.castShadow = high; g.add(b); };
+    // Todas las piezas frenan la cámara (si no, en 3ª persona se escapa por el hueco de la puerta)
+    const add = (w, h, d, m, x, y, z) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); b.position.set(x, y, z); b.castShadow = high; g.add(b); blockers.push(b); };
     add(0.08, 2.4, T + 0.06, frameMat, -0.9, 1.2, T / 2);
     add(0.08, 2.4, T + 0.06, frameMat, 0.9, 1.2, T / 2);
     add(1.88, 0.08, T + 0.06, frameMat, 0, 2.4, T / 2);
@@ -142,6 +143,7 @@ export function buildShell(id, { high }) {
     }
     // Lámparas colgantes
     for (const [x, z] of [[-2, -1], [2, -1], [-2, 2.5], [2, 2.5]]) pendant(x, z);
+    cutaway.push({ object: city, normal: null });
     door(frame, new THREE.MeshStandardMaterial({ color: 0x2b2b2e, roughness: 0.5 }));
     baseboard(new THREE.MeshStandardMaterial({ color: 0x2a1b12, roughness: 0.6 }));
     const sun = new THREE.DirectionalLight(0xffe2b8, 1.8);
@@ -208,6 +210,7 @@ export function buildShell(id, { high }) {
     const spots = [];
     for (const [x, z] of [[-3, -2], [3, -2], [-3, 2], [3, 2]]) {
       const can = box(0.22, 0.3, 0.22, new THREE.MeshStandardMaterial({ color: 0x1b1b20, metalness: 0.6, roughness: 0.4 }), x, H - 0.2, z);
+      cutaway.push({ object: can, normal: null });
       const lens = new THREE.Mesh(new THREE.CircleGeometry(0.09, 20), neonMat(0xffffff));
       lens.rotation.x = Math.PI / 2;
       lens.position.y = -0.151;
@@ -278,17 +281,21 @@ export function buildShell(id, { high }) {
     }
     // Guirnalda de lamparitas
     const bulbs = neonMat(0xffd27a);
+    const garland = new THREE.Group();
+    group.add(garland);
+    cutaway.push({ object: garland, normal: null });
     for (let i = 0; i < 4; i++) {
       const x0 = -W + 0.2, x1 = W - 0.2, z = -D + 1.5 + i * 2.2;
       const pts = [];
       for (let k = 0; k <= 20; k++) { const u = k / 20; pts.push(new THREE.Vector3(x0 + (x1 - x0) * u, 3 - Math.sin(u * Math.PI) * 0.5, z)); }
       const wire = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 40, 0.006, 4), rail);
-      group.add(wire);
-      for (let k = 1; k < 20; k += 2) { const b = new THREE.Mesh(new THREE.SphereGeometry(0.04, 8, 6), bulbs); b.position.copy(pts[k]).setY(pts[k].y - 0.06); group.add(b); }
+      garland.add(wire);
+      for (let k = 1; k < 20; k += 2) { const b = new THREE.Mesh(new THREE.SphereGeometry(0.04, 8, 6), bulbs); b.position.copy(pts[k]).setY(pts[k].y - 0.06); garland.add(b); }
     }
     const city = cityBackdrop(70, 14);
     city.position.set(0, 2, -32);
     group.add(city);
+    cutaway.push({ object: city, normal: null });
     const dome = new THREE.Mesh(new THREE.SphereGeometry(60, 24, 12), new THREE.MeshBasicMaterial({ color: 0x87b3e8, side: THREE.BackSide, fog: false }));
     group.add(dome);
     const sun = new THREE.DirectionalLight(0xffe2b8, 2.4);
@@ -312,19 +319,21 @@ export function buildShell(id, { high }) {
   }
 
   // Luz de lámparas colgantes (loft)
+  // (se ocultan junto con el techo en el editor)
   function pendant(x, z) {
-    const cord = box(0.01, 0.9, 0.01, new THREE.MeshStandardMaterial({ color: 0x111111 }), x, H - 0.45, z);
-    cord.castShadow = false;
-    const shade = mesh(new THREE.ConeGeometry(0.22, 0.25, 24, 1, true), new THREE.MeshStandardMaterial({ color: 0x1b1b20, metalness: 0.6, roughness: 0.4, side: THREE.DoubleSide }), x, H - 1, z);
-    shade.castShadow = false;
-    const bulb = mesh(new THREE.SphereGeometry(0.06, 12, 8), neonMat(0xffe3b0), x, H - 1.08, z);
-    bulb.castShadow = false;
+    const g = new THREE.Group();
+    const add = (geo, mat, y) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); g.add(m); };
+    add(new THREE.BoxGeometry(0.01, 0.9, 0.01), new THREE.MeshStandardMaterial({ color: 0x111111 }), H - 0.45);
+    add(new THREE.ConeGeometry(0.22, 0.25, 24, 1, true), new THREE.MeshStandardMaterial({ color: 0x1b1b20, metalness: 0.6, roughness: 0.4, side: THREE.DoubleSide }), H - 1);
+    add(new THREE.SphereGeometry(0.06, 12, 8), neonMat(0xffe3b0), H - 1.08);
+    group.add(g);
+    cutaway.push({ object: g, normal: null });
   }
 
   return {
     id, def, group, colliders, blockers, walls, cutaway,
     bounds: { minY: 0.2, maxY: def.h ? def.h - 0.2 : 30 },
-    spawn: { x: 0, z: D - 1, yaw: Math.PI },
+    spawn: { x: 0, z: D - 1, yaw: 0 }, // en la puerta, mirando hacia adentro
     setTime(hours) {
       const elev = Math.sin(((hours - 6.5) / 13) * Math.PI);
       const day = THREE.MathUtils.smoothstep(elev, -0.05, 0.35);
