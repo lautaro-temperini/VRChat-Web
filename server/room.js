@@ -27,6 +27,10 @@ const PARTS = ['luces', 'escenario'];
 const SPAWN = { x: -27.5, z: 0 }; // junto a la puerta de entrada (ver museum.js)
 // Servidor de audio (Cloudflare Realtime SFU)
 const SFU_API = 'https://rtc.live.cloudflare.com/v1/apps/';
+// TURN de Cloudflare (para redes cerradas). Opcional: sin TURN_KEY_ID / TURN_KEY_API_TOKEN se usa solo STUN
+const TURN_API = 'https://rtc.live.cloudflare.com/v1/turn/keys/';
+const TURN_TTL = 6 * 3600;           // s que duran las credenciales que se reparten
+const TURN_REUSE = 60 * 60_000;      // ms que la sala reutiliza las mismas (bien por debajo del TTL)
 const KINDS = ['voice', 'dj', 'stage']; // pistas que se pueden publicar
 // Voz: se escucha hasta 10 m (el cliente elige a los 4 más cercanos que hablan). Acá se
 // deja un margen, porque las posiciones llegan con un poco de atraso.
@@ -513,6 +517,30 @@ export class Room extends DurableObject {
     }
   }
 
+  // Credenciales TURN temporales para los navegadores. La clave de la API nunca sale del servidor.
+  // Se filtran las direcciones del puerto 53: los navegadores lo bloquean y solo hacen perder tiempo.
+  async turnServers() {
+    const { TURN_KEY_ID: id, TURN_KEY_API_TOKEN: token } = this.env;
+    if (!id || !token) return null;
+    if (this.turn && this.turn.until > Date.now()) return this.turn.servers;
+    try {
+      const r = await fetch(`${TURN_API}${id}/credentials/generate-ice-servers`, {
+        method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ttl: TURN_TTL }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) return null;
+      const servers = [].concat(j.iceServers ?? [])
+        .map((s) => ({ ...s, urls: [].concat(s.urls ?? []).filter((u) => !/:53(\?|$)/.test(u)) }))
+        .filter((s) => s.urls.length);
+      if (!servers.length) return null;
+      this.turn = { servers, until: Date.now() + TURN_REUSE };
+      return servers;
+    } catch {
+      return null;
+    }
+  }
+
   async sfuSession(ws, meta) {
     if (meta.sfu) return meta.sfu;
     const r = await this.sfuApi('sessions/new', 'POST');
@@ -545,6 +573,11 @@ export class Room extends DurableObject {
 
   async sfuMessage(ws, meta, msg) {
     const reply = (data) => this.send(ws, { t: 'sfu', rid: msg.rid, ...data });
+    // Servidores STUN/TURN para conectarse (sin TURN configurado, el cliente usa solo STUN)
+    if (msg.op === 'ice') {
+      const iceServers = await this.turnServers();
+      return reply(iceServers ? { ok: true, iceServers } : { ok: false });
+    }
     const sid = await this.sfuSession(ws, meta);
     if (!sid) return reply({ ok: false, error: 'No se pudo conectar con el servidor de audio.' });
     const base = `sessions/${sid}`;

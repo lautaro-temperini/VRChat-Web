@@ -9,6 +9,7 @@
 //   el canal izquierdo por uno y el derecho por el otro. Se escucha también estando en grupo.
 // - Pantalla del escenario (VJ): solo video.
 
+// Sin TURN configurado en el servidor (o si no responde) se usa solo el STUN de Cloudflare
 const ICE = [{ urls: 'stun:stun.cloudflare.com:3478' }];
 const HEAR_RANGE = 10;      // m: hasta dónde se escucha una voz
 const PRELOAD_RANGE = 12;   // m: me suscribo un poco antes, así no se pierde la primera palabra
@@ -44,6 +45,7 @@ export class RTC {
   reset() {
     try { this.pc?.close(); } catch { /* ya cerrada */ }
     this.pc = null;
+    this.ice = null;            // servidores STUN/TURN (se piden a la sala la primera vez)
     this.chain = Promise.resolve();
     this.rid = 0;
     this.waiting = new Map();   // rid -> resolve
@@ -118,9 +120,19 @@ export class RTC {
     return run;
   }
 
-  peer() {
+  // Servidores para atravesar redes cerradas (wifi de empresas, facultades, datos móviles con NAT
+  // estricto): la sala pide credenciales TURN temporales a Cloudflare (la clave queda en el servidor).
+  // Con TURN, el audio puede ir por TCP/TLS al 443, que casi ninguna red bloquea.
+  iceServers() {
+    this.ice ??= this.request('ice').then((r) => (r.ok && Array.isArray(r.iceServers) && r.iceServers.length ? r.iceServers : ICE));
+    return this.ice;
+  }
+
+  async peer() {
     if (this.pc) return this.pc;
-    const pc = new RTCPeerConnection({ iceServers: ICE, bundlePolicy: 'max-bundle' });
+    const iceServers = await this.iceServers();
+    if (this.pc) return this.pc;
+    const pc = new RTCPeerConnection({ iceServers, bundlePolicy: 'max-bundle' });
     pc.ontrack = (e) => this.onTrack(e);
     this.pc = pc;
     return pc;
@@ -130,7 +142,7 @@ export class RTC {
   publish(kind, track, stream) {
     if (!track) return Promise.resolve();
     return this.queue(async () => {
-      const pc = this.peer();
+      const pc = await this.peer();
       const tr = pc.addTransceiver(track, { direction: 'sendonly', streams: [stream] });
       if (kind === 'dj') setBitrate(tr.sender);
       const offer = await pc.createOffer();
@@ -189,7 +201,7 @@ export class RTC {
   }
 
   async answer(sdp) {
-    const pc = this.peer();
+    const pc = await this.peer();
     await pc.setRemoteDescription({ type: 'offer', sdp });
     const ans = await pc.createAnswer();
     await pc.setLocalDescription(ans);
