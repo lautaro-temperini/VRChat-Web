@@ -1,5 +1,5 @@
 import { api } from '../net/api.js';
-import { ITEMS } from '../../server/shared.js';
+import { ITEMS, rarityOf } from '../../server/shared.js';
 import { itemIcon } from './icons.js';
 import { toast } from './toast.js';
 import { guestGate } from './guest.js';
@@ -28,7 +28,7 @@ export function createSocial({ net, ui, me, room, onEquip, onDrop }) {
   function card(it, { onClick, extraClass = '' } = {}) {
     const def = ITEMS[it.type];
     const b = document.createElement('button');
-    b.className = `item ${it.equipped ? 'equipped' : ''} ${def?.rare ? 'rare' : ''} ${extraClass}`;
+    b.className = `item ${it.equipped ? 'equipped' : ''} ${def?.rare ? 'rare' : ''} r-${rarityOf(it.type)} ${extraClass}`;
     b.innerHTML = `${itemIcon(it.type, it.color)}<span></span>`;
     b.querySelector('span:last-child').textContent = def?.name ?? it.type;
     if (onClick) b.onclick = onClick; else b.disabled = true;

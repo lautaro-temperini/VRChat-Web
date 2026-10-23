@@ -227,12 +227,11 @@ export const progressMethods = {
   },
 
   // Punto de entrada de todos los enganches. room: nombre de la sala (para 'sala').
-  // Devuelve { news } con lo nuevo (la sala se lo manda al jugador).
+  // Lo nuevo (subiste de nivel…) queda en progress_news: el cliente lo lee con GET progress.
   progressTrack(userId, action, ref = null, room = null) {
     try {
       const row = this.row(userId);
-      if (!row || this.isGuest(row)) return { news: [] };
-      const before = this.sql.exec('SELECT COUNT(*) AS n FROM progress_news WHERE user_id = ?', userId).one().n;
+      if (!row || this.isGuest(row)) return;
       switch (action) {
         case 'obra': // obra del público expuesta (validado en progressView)
           if (this.progressOnce(userId, 'obra', ref)) this.progressPoints(userId, POINTS.obra);
@@ -242,7 +241,7 @@ export const progressMethods = {
           this.progressPath(userId, 'obra');
           break;
         case 'sala': // salas personales de otros (ni la propia ni el Museo)
-          if (!room?.startsWith('u-') || room === `u-${userId}`) return { news: [] };
+          if (!room?.startsWith('u-') || room === `u-${userId}`) return;
           ref = room;
           if (this.progressOnce(userId, 'sala', room)) this.progressPoints(userId, POINTS.sala);
           this.progressPath(userId, 'sala');
@@ -265,17 +264,20 @@ export const progressMethods = {
         case 'like': case 'corazon':
           break;
         default:
-          return { news: [] };
+          return;
       }
       if (DAILY_OF[action]) this.progressDaily(userId, DAILY_OF[action], ref == null ? null : `${action === 'obra_fija' ? 'f:' : ''}${ref}`);
       this.progressBadges(userId);
       this.progressCurator(userId);
-      const after = this.sql.exec('SELECT COUNT(*) AS n FROM progress_news WHERE user_id = ?', userId).one().n;
-      return { news: after > before ? this.takeNews(userId) : [] };
     } catch (e) {
       console.error('progressTrack', action, e);
-      return { news: [] };
     }
+  },
+
+  // Lo mismo, devolviendo lo nuevo para mostrarlo ya (la sala se lo manda al jugador)
+  progressTrackNews(userId, action, ref = null, room = null) {
+    this.progressTrack(userId, action, ref, room);
+    return { news: this.takeNews(userId) };
   },
 
   takeNews(userId) {
@@ -296,11 +298,11 @@ export const progressMethods = {
     if (id) {
       const w = this.sql.exec("SELECT id FROM works WHERE id = ? AND status = 'expuesta'", String(id)).toArray()[0];
       if (!w) return { ok: true, news: [] };
-      return { ok: true, ...this.progressTrack(me.id, 'obra', w.id) };
+      return { ok: true, ...this.progressTrackNews(me.id, 'obra', w.id) };
     }
     const key = String(fixed ?? '').slice(0, 60);
     if (!key) return { ok: true, news: [] };
-    return { ok: true, ...this.progressTrack(me.id, 'obra_fija', key) };
+    return { ok: true, ...this.progressTrackNews(me.id, 'obra_fija', key) };
   },
 
   // Todo lo mío (privado): nivel, puntos, camino, diarias, insignias y avisos nuevos
@@ -346,7 +348,7 @@ export const progressMethods = {
 
 export async function roomTrack(room, ws, userId, action, ref = null) {
   try {
-    const r = await room.accounts().progressTrack(userId, action, ref, await room.roomName());
+    const r = await room.accounts().progressTrackNews(userId, action, ref, await room.roomName());
     if (r?.news?.length) room.send(ws, { t: 'progress', news: r.news });
   } catch { /* la progresión nunca frena a la sala */ }
 }

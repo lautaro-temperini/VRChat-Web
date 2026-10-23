@@ -25,6 +25,7 @@ import { createRoomPanel } from './ui/roompanel.js';
 import { Ground } from './world/ground.js';
 import { buildLectern } from './world/lectern.js';
 import { createPhone } from './ui/phone.js';
+import { createProgress } from './ui/progress.js';
 import { createNotes } from './ui/notes.js';
 import { renderGallery } from './ui/gallery.js';
 import { detectQuality, FpsWatch } from './quality.js';
@@ -641,6 +642,8 @@ async function openPhone() {
   phone.open();
 }
 const togglePhone = () => (body.classList.contains('friends') ? closeOverlays() : openPhone());
+// Progresión: barrita de nivel en el HUD y app "Progreso" en el celular (ui/progress.js)
+const progress = createProgress({ net, me: () => account, openPhone });
 $('btn-friends').onclick = togglePhone;
 for (const b of document.querySelectorAll('[data-close-panel]')) b.onclick = closeOverlays;
 
@@ -722,6 +725,7 @@ function join() {
   net.connect(() => ({ token: session.token, s: ctrl.state(), afk }));
   social.refreshFriends();
   phone.refreshBadge();
+  progress.start();
   roomPanel.syncBlocks();
   setInterval(() => { social.refreshFriends(); phone.refreshBadge(); }, 25_000);
 }
@@ -1253,6 +1257,7 @@ function openInspect(item) {
     const dir = camera.position.clone().sub(center).setY(0).normalize();
     $('inspect-img').src = photo(center.clone().addScaledVector(dir, Math.max(1.6, r * 1.6)).add(new THREE.Vector3(0, r * 0.25, 0)), center);
   }
+  if (item.kind === 'art') progress.viewed(item); // progresión: descubrir obras
   $('inspect-kicker').textContent = item.kind === 'info' ? 'Info' : isPainting ? 'Obra' : 'Escultura';
   $('inspect-title').textContent = info.title;
   $('inspect-meta').textContent = [info.author, info.year, info.technique].filter(Boolean).join(' · ');
@@ -1295,6 +1300,7 @@ async function openProfile(player) {
   const g = $('profile-gallery');
   g.innerHTML = '';
   openOverlay('profiling');
+  progress.profileBadges(player.userId); // insignias públicas
   if (!player.userId) return;
   const r = await api(`profile?id=${encodeURIComponent(player.userId)}`);
   if (!r.ok) return;
