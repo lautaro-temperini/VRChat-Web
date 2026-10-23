@@ -77,3 +77,4 @@ body.touch #re-selected { bottom: auto; top: 96px; width: calc(100vw - 16px); }
 body.touch #re-selected .act { padding: 12px 14px; font-size: 14px; }
 body.touch .re-templates { grid-template-columns: 1fr; }
 @media (max-width: 700px) { .re-templates { grid-template-columns: 1fr; } }
+body.touch.roomedit #chat, body.touch.roomedit #voicebar { display: none; }

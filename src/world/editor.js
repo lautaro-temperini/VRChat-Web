@@ -196,7 +196,8 @@ export function createRoomEditor({ world, scene, camera, renderer, net, rtc, ctr
     prevMode = ctrl.mode;
     if (ctrl.mode === 'first') ctrl.setMode('third');
     const def = ROOM_TEMPLATES[world.layout.template];
-    Object.assign(cam, { tx: 0, tz: 0.5, yaw: 0, pitch: 0.95, dist: Math.max(def.w, def.d) * 1.15 });
+    // Con la pantalla vertical (celular) hay que alejarse más para ver la sala entera
+    Object.assign(cam, { tx: 0, tz: 0.5, yaw: 0, pitch: 1.05, dist: Math.max(def.w, def.d) * 1.15 * Math.min(1.9, Math.max(1, 1.2 / camera.aspect)) });
     grid.visible = true;
     renderCats();
     renderGrid();
@@ -517,7 +518,7 @@ export function createRoomEditor({ world, scene, camera, renderer, net, rtc, ctr
     if (prev) pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
     if (pinch && pointers.size === 2) {
       const [a, b] = [...pointers.values()];
-      cam.dist = THREE.MathUtils.clamp(pinch.dist * pinch.d / Math.max(20, Math.hypot(a.x - b.x, a.y - b.y)), 4, 24);
+      cam.dist = THREE.MathUtils.clamp(pinch.dist * pinch.d / Math.max(20, Math.hypot(a.x - b.x, a.y - b.y)), 4, 30);
       return;
     }
     if (drag && drag.pointerId === ev.pointerId) {
@@ -564,7 +565,7 @@ export function createRoomEditor({ world, scene, camera, renderer, net, rtc, ctr
   };
   surface.addEventListener('pointerup', end);
   surface.addEventListener('pointercancel', (ev) => { if (drag?.pointerId === ev.pointerId) cancelDrag(); end(ev); });
-  surface.addEventListener('wheel', (ev) => { cam.dist = THREE.MathUtils.clamp(cam.dist * (1 + Math.sign(ev.deltaY) * 0.1), 4, 24); }, { passive: true });
+  surface.addEventListener('wheel', (ev) => { cam.dist = THREE.MathUtils.clamp(cam.dist * (1 + Math.sign(ev.deltaY) * 0.1), 4, 30); }, { passive: true });
 
   // Esc mientras arrastrás: el mueble vuelve a su lugar (no se manda nada)
   function cancelDrag() {
