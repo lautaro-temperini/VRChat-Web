@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { loadGLTF, parseGLTF } from '../loaders.js';
 import { api, submitWork, workFileUrl } from '../net/api.js';
 import { toast } from './toast.js';
 
@@ -48,7 +48,7 @@ async function checkModel(file) {
   if (!/\.glb$/i.test(file.name)) throw new Error('El modelo tiene que ser un archivo .glb.');
   if (file.size > MODEL_BYTES) throw new Error('El modelo pesa más de 2 MB.');
   let gltf;
-  try { gltf = await new GLTFLoader().parseAsync(await file.arrayBuffer(), ''); } catch { throw new Error('No se pudo abrir el modelo. ¿Es un .glb válido?'); }
+  try { gltf = await parseGLTF(await file.arrayBuffer()); } catch { throw new Error('No se pudo abrir el modelo. ¿Es un .glb válido?'); }
   let tris = 0, tex = 0;
   gltf.scene.traverse((o) => {
     if (!o.isMesh) return;
@@ -100,7 +100,7 @@ async function preview(container, work, f) {
     img.src = url;
     container.replaceChildren(img);
   } else {
-    try { modelViewer(container, (await new GLTFLoader().loadAsync(url)).scene); } catch { container.replaceChildren(el('p', 'meta', 'No se pudo abrir el modelo.')); }
+    try { modelViewer(container, (await loadGLTF(url)).scene); } catch { container.replaceChildren(el('p', 'meta', 'No se pudo abrir el modelo.')); }
   }
 }
 
