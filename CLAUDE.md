@@ -46,7 +46,7 @@ npm run deploy   # build + wrangler deploy
 
 - **Ramas:** se trabaja sobre `main` (todas las ramas anteriores ya se juntaron ahí).
 - **Cuentas:** registro con mail + nickname único; se entra con cualquiera de los dos. Invitado =
-  cuenta sin `username` (`isGuest` en `accounts.js`): sin objetos, intercambios, muro, galería
+  cuenta sin `username` (`isGuest` en `accounts.js`): chatean por texto; sin voz, grupos, me gusta, objetos, intercambios, muro, galería
   ni sala propia (cada método lo frena con `guestError()`). Registrarse conserva el id.
 - **Cuidarse** (`src/ui/roompanel.js`): mutear (voz) e ignorar (voz + texto) se guardan en el navegador;
   restringir (oculta sus publicaciones del muro) vive en la cuenta (rutas `blocks`/`block`). Reportar está

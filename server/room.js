@@ -33,6 +33,7 @@ const KINDS = ['voice', 'dj', 'stage']; // pistas que se pueden publicar
 const VOICE_RANGE = 20;
 // Grupos de voz
 const GROUP_MAX = 4, GROUP_INVITE_LIFE = 60_000;
+const GUEST_VOICE = 'Creá una cuenta (es gratis) para usar la voz y los grupos. Los invitados chatean solo por texto.';
 
 // Estado de un jugador: [x, y, z, rotación, velocidad, pose]
 // pose: 0 parado, 1 agachado, 2 sentado, 3 trepando, 4 en el aire
@@ -252,6 +253,11 @@ export class Room extends DurableObject {
       }
       case 'mic': {
         if (!MIC_STATES.includes(msg.v)) return;
+        // Los invitados (sin cuenta) chatean por texto, pero no hablan por voz
+        if (msg.v === 'on' && meta.guest) {
+          this.send(ws, { t: 'mic-denied' });
+          return this.notice(ws, GUEST_VOICE);
+        }
         if (msg.v === 'on' && (silenced || (!this.settings.voice && !meta.mod))) {
           this.send(ws, { t: 'mic-denied' });
           this.notice(ws, silenced ? 'Estás silenciado en esta sala.' : 'El chat de voz está deshabilitado en esta sala.');
@@ -547,7 +553,7 @@ export class Room extends DurableObject {
     if (msg.op === 'push') {
       // Publicar mis pistas: voz siempre; música y video solo si la cabina / la pantalla son mías
       const tracks = (Array.isArray(msg.tracks) ? msg.tracks : []).slice(0, 3).filter((t) => KINDS.includes(t?.kind) && typeof t.mid === 'string');
-      const allowed = (k) => k === 'voice' || (k === 'dj' && this.dj?.id === meta.id) || (k === 'stage' && this.parts.escenario?.id === meta.id);
+      const allowed = (k) => (k === 'voice' && !meta.guest) || (k === 'dj' && this.dj?.id === meta.id) || (k === 'stage' && this.parts.escenario?.id === meta.id);
       if (!sdp || !tracks.length || !tracks.every((t) => allowed(t.kind))) return reply({ ok: false, error: 'denied' });
       const r = await this.sfuApi(`${base}/tracks/new`, 'POST', {
         sessionDescription: { type: 'offer', sdp },
@@ -668,6 +674,9 @@ export class Room extends DurableObject {
       const target = this.byId(String(msg.to ?? ''));
       const tm = target?.deserializeAttachment();
       if (!tm?.joined || tm.id === meta.id) return;
+      // Los invitados (sin cuenta) no arman ni entran a grupos de voz
+      if (meta.guest) return this.notice(ws, GUEST_VOICE);
+      if (tm.guest) return this.notice(ws, `${tm.name} entró como invitado: los invitados no usan la voz.`);
       const sent = () => this.send(ws, { t: 'group', op: 'sent', name: tm.name });
       const gid = this.groupOf(meta.userId);
       if (gid && this.groups[gid].leader !== meta.userId) return this.notice(ws, 'Solo quien armó el grupo puede invitar.');

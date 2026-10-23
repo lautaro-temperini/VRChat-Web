@@ -570,6 +570,7 @@ export class Accounts extends DurableObject {
   async like(token, type, id, on) {
     const me = await this.userFromToken(token);
     if (!me) return { ok: false, error: 'Sesión vencida.' };
+    if (this.isGuest(me)) return this.guestError();
     if (!['note', 'photo'].includes(type)) return { ok: false, error: 'Publicación no válida.' };
     const table = type === 'note' ? 'notes' : 'photos';
     const post = this.sql.exec(`SELECT owner FROM ${table} WHERE id = ?`, String(id ?? '')).toArray()[0];

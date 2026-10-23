@@ -369,6 +369,7 @@ rtc.setVolumes({ master: audioPrefs.master, voices: audioPrefs.voices, media: au
 // Hablar: mantener apretada la V (o el botón "Hablar")
 async function talk(on) {
   if (on && roomPanel.info.silenced) return toast('Estás silenciado en esta sala.');
+  if (on && account?.guest) return toast('Creá una cuenta (es gratis) para usar la voz. Los invitados chatean solo por texto.');
   const r = await rtc.talk(on);
   if (!r.ok) toast(r.error);
   me.talking = on && r.ok; // animación de hablar mientras está quieto
@@ -1207,6 +1208,7 @@ async function openProfile(player) {
   $('profile-since').textContent = `Miembro desde ${new Date(p.created).toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })}${p.hearts ? ` · ♥ ${p.hearts} en su sala` : ''}`;
   renderGallery(g, p.id);
   social.profileActions(player, p);
+  $('act-group').hidden = !!account?.guest || player.guest; // los invitados no usan la voz
 }
 function showProfileTab(tab) {
   for (const b of document.querySelectorAll('#profile-tabs .tab')) b.classList.toggle('active', b.dataset.ptab === tab);
