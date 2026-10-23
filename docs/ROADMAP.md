@@ -119,7 +119,7 @@ La música del DJ y el puente OSC ya están hechos. Falta:
 | Hosting | Gratis (Cloudflare); local primero |
 | AFK | No se expulsa por AFK; solo una etiqueta "AFK" debajo del nombre. Se sale al cerrar la pestaña |
 | Cuentas | Invitado persistente o cuenta registrada; no pedir datos al recargar. El registro es con mail (ver "Registro") |
-| Invitados (sin cuenta) | Solo para probar: miran, chatean **por texto** y se mueven. No hablan por voz ni arman o entran a grupos, no dan me gusta; sin objetos, intercambios, muro, galería ni sala propia. Sin verificar el mail por ahora |
+| Invitados (sin cuenta) | Solo para probar: miran, chatean **por texto**, se mueven y escuchan las voces públicas. No hablan por voz ni arman o entran a grupos, no dan me gusta ni corazones; sin objetos, intercambios, muro, galería ni sala propia. Sin verificar el mail por ahora |
 | Cámara | Cambio 1ª/3ª persona con la rueda (sin botón en PC; en celular sí) |
 | Teclas | E usar · P personaje · V (mantener) hablar · M silenciar música de la sala · Tab (mantener) jugadores/info · Esc menú con pestañas · I inventario · F amigos · Y Mapa · R gestos · C agacharse (Ctrl no: con Ctrl+W se cerraba la pestaña) |
 | Stamina | Correr gasta stamina (barra visible) |
@@ -150,7 +150,7 @@ La música del DJ y el puente OSC ya están hechos. Falta:
 | Celular | Inicio = Amigos (conectados primero) + buscador de gente. Apps: Notas (mías), Galería (mía), Avisos. Al abrirlo el personaje lo saca y los demás lo ven (también caminando) |
 | Notas del dueño | Tipo Twitter: solo escribe el dueño; los visitantes solo leen (en el atril de su sala) |
 | Atril | Libro abierto en la sala personal; E para leer las notas. Contador de corazones arriba |
-| Corazones | Uno por visitante por sala (los invitados pueden dar corazones, pero no me gusta); cuentan para la sala y para el dueño. El dueño no se puede dar a sí mismo |
+| Corazones | Uno por visitante por sala (los invitados no dan corazones ni me gusta); cuentan para la sala y para el dueño. El dueño no se puede dar a sí mismo |
 | Contador de corazones | Hoy en el atril. Con el editor, el dueño decide dónde va; también podría mostrarse en la red social o en un dashboard (idea, sin definir) |
 | Galería del perfil | Subir y borrar fotos, hasta 30. Visibilidad la elige el dueño (todos / amigos / solo yo). No se cuelgan en la sala por defecto: el dueño decide qué objeto con imagen la muestra (llega con el editor) |
 | Salas favoritas | Dentro del Mapa, con lista propia arriba; se puede marcar la sala actual |
@@ -216,3 +216,5 @@ La música del DJ y el puente OSC ya están hechos. Falta:
 | Voz: quién maneja el grupo | El que lo creó: solo él invita y puede sacar a alguien; si se va, pasa al siguiente |
 | Voz: se ve | Los del grupo ven una marca sobre sus compañeros, y todos ven "En grupo" debajo del nombre |
 | Voz: invitaciones (anti-acoso) | Bloqueo creciente al rechazar: 1º rechazo, no te puede reinvitar por 1 min; 2º, 10 min; 3º, hasta mañana. No se le avisa que lo rechazaste. Alguien ignorado o restringido no te puede invitar (y no se entera) |
+| Invitados: cómo se ve lo bloqueado | Las opciones se ven igual, con un candado 🔒; al tocarlas aparece "Para … tenés que crear una cuenta (es gratis)" con un botón "Crear cuenta" |
+| Voz: grupo | Suena como una llamada (sin distancia ni dirección). La invitación sin respuesta vence al minuto y no cuenta como rechazo. Quien está en un grupo figura "En grupo" y no se lo puede invitar a otro hasta que salga |

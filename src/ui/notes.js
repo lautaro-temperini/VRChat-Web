@@ -1,5 +1,6 @@
 import { api } from '../net/api.js';
 import { toast } from './toast.js';
+import { guestGate, lock } from './guest.js';
 
 // El atril de cada sala personal: un libro abierto con las notas del dueño (tipo Twitter).
 // - Solo el dueño escribe y borra; los visitantes solo leen.
@@ -15,7 +16,7 @@ function ago(ts) {
   return new Date(ts).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' });
 }
 
-export function createNotes({ ui, onHearts }) {
+export function createNotes({ ui, onHearts, me }) {
   let ownerId = null;
 
   async function renderHearts() {
@@ -27,7 +28,9 @@ export function createNotes({ ui, onHearts }) {
     b.hidden = h.self;
     b.disabled = h.given;
     b.textContent = h.given ? 'Ya dejaste tu corazón' : 'Dejar un corazón ♥';
+    lock(b, me?.()?.guest);
     b.onclick = async () => {
+      if (me?.()?.guest) return guestGate('dejar corazones');
       const r = await api('heart', { method: 'POST', body: { id: ownerId } });
       if (!r.ok) return toast(r.error);
       renderHearts();

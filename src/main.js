@@ -16,6 +16,7 @@ import { api, session } from './net/api.js';
 import { RTC } from './net/rtc.js';
 import { createSocial } from './ui/social.js';
 import { toast } from './ui/toast.js';
+import { guestGate, setRegister, lock } from './ui/guest.js';
 import { EMOTES, DANCES } from '../server/shared.js';
 import { UI_ICONS } from './ui/icons.js';
 import { createRoomPanel } from './ui/roompanel.js';
@@ -222,6 +223,9 @@ function useAccount(user) {
   setEquip(user.equip);
 }
 
+// El botón "Crear cuenta" de los avisos para invitados
+setRegister(async () => { closeOverlays(); await saveProfile(); showAuth('register', true); });
+
 function renderAccount() {
   const el = $('account');
   el.innerHTML = '';
@@ -369,7 +373,7 @@ rtc.setVolumes({ master: audioPrefs.master, voices: audioPrefs.voices, media: au
 // Hablar: mantener apretada la V (o el botón "Hablar")
 async function talk(on) {
   if (on && roomPanel.info.silenced) return toast('Estás silenciado en esta sala.');
-  if (on && account?.guest) return toast('Creá una cuenta (es gratis) para usar la voz. Los invitados chatean solo por texto.');
+  if (on && account?.guest) return guestGate('hablar por voz');
   const r = await rtc.talk(on);
   if (!r.ok) toast(r.error);
   me.talking = on && r.ok; // animación de hablar mientras está quieto
@@ -618,6 +622,7 @@ if (roomOwner) {
 // Atril de la sala personal: E para leer las notas del dueño y dejar un corazón
 let lectern = null;
 const notes = createNotes({
+  me: () => account,
   ui: { openOverlay, closeOverlays, isOpen: (cls) => body.classList.contains(cls) },
   onHearts: (n) => lectern?.setHearts(n),
 });
@@ -1208,7 +1213,9 @@ async function openProfile(player) {
   $('profile-since').textContent = `Miembro desde ${new Date(p.created).toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })}${p.hearts ? ` · ♥ ${p.hearts} en su sala` : ''}`;
   renderGallery(g, p.id);
   social.profileActions(player, p);
-  $('act-group').hidden = !!account?.guest || player.guest; // los invitados no usan la voz
+  // Los invitados ven estas opciones con candado; al tocarlas, el aviso para crear cuenta
+  lock($('act-group'), account?.guest);
+  lock($('act-trade'), account?.guest);
 }
 function showProfileTab(tab) {
   for (const b of document.querySelectorAll('#profile-tabs .tab')) b.classList.toggle('active', b.dataset.ptab === tab);

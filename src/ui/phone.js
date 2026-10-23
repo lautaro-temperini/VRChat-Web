@@ -1,6 +1,7 @@
 import { api, photoUrl } from '../net/api.js';
 import { renderGallery, openPhoto } from './gallery.js';
 import { toast } from './toast.js';
+import { guestGate, lock } from './guest.js';
 
 // El celular del jugador: la red social. Inicio = Amigos (conectados + buscador).
 // Apps: Muro (tipo Facebook: lo tuyo y de amigos, después "Destacados"; tus notas también
@@ -136,7 +137,9 @@ export function createPhone({ social, me, go }) {
     like.className = `like ${it.liked ? 'on' : ''}`;
     const paint = () => { like.textContent = `${it.liked ? '♥' : '♡'} ${it.likes || ''}`.trim(); like.classList.toggle('on', it.liked); };
     paint();
+    lock(like, me()?.guest);
     like.onclick = async () => {
+      if (me()?.guest) return guestGate('dar me gusta');
       const r = await api('like', { method: 'POST', body: { type: it.type, id: it.id, on: !it.liked } });
       if (!r.ok) return toast(r.error);
       it.liked = r.liked;

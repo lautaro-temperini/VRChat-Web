@@ -597,6 +597,7 @@ export class Accounts extends DurableObject {
   async heartGive(token, ownerId) {
     const me = await this.userFromToken(token);
     if (!me) return { ok: false, error: 'Sesión vencida.' };
+    if (this.isGuest(me)) return this.guestError();
     if (!this.row(ownerId)) return { ok: false, error: 'No existe esa sala.' };
     if (me.id === ownerId) return { ok: false, error: 'No podés dejarte un corazón a vos mismo.' };
     this.sql.exec('INSERT OR IGNORE INTO hearts (owner, from_user, created) VALUES (?, ?, ?)', ownerId, me.id, Date.now());

@@ -526,3 +526,6 @@ body.notes #notes { display: flex; }
 .nametag.in-my-group .group-tag { background: #a078ff; color: #12062b; }
 .nametag.in-my-group .name { color: #d8c8ff; }
 .tag.group { background: #a078ff; color: #12062b; }
+
+/* Opciones que los invitados ven pero no pueden usar: candado + aviso al tocar */
+.locked::after { content: ' 🔒'; font-size: .85em; }

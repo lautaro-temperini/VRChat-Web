@@ -2,6 +2,7 @@ import { api } from '../net/api.js';
 import { ITEMS } from '../../server/shared.js';
 import { itemIcon } from './icons.js';
 import { toast } from './toast.js';
+import { guestGate } from './guest.js';
 
 // Lo social: inventario, amigos, salas e intercambios.
 // ui: { openOverlay(clase), closeOverlays(), isOpen(clase) }
@@ -224,6 +225,7 @@ export function createSocial({ net, ui, me, room, onEquip, onDrop }) {
       refreshFriends();
     };
     $('act-trade').onclick = () => {
+      if (me()?.guest) return guestGate('intercambiar objetos');
       net.send({ t: 'trade', op: 'invite', to: player.id });
       toast(`Invitaste a ${player.name} a intercambiar. Esperando respuesta…`);
       ui.closeOverlays();
@@ -231,6 +233,8 @@ export function createSocial({ net, ui, me, room, onEquip, onDrop }) {
     $('act-visit').onclick = () => go(roomOf(profile.id));
     // Grupo de voz privado: la sala responde si se mandó (o por qué no)
     $('act-group').onclick = () => {
+      if (me()?.guest) return guestGate('invitar a grupos de voz');
+      if (player.guest) return toast(`${player.name} entró como invitado: los invitados no usan la voz.`);
       net.send({ t: 'group', op: 'invite', to: player.id });
       ui.closeOverlays();
     };
