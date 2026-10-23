@@ -704,7 +704,7 @@ if (roomOwner) {
   notes.hearts(roomOwner);
 }
 // Editor de la sala propia (solo lo usa el dueño; los demás ven los cambios)
-const roomEditor = world.editable ? createRoomEditor({ world, scene, camera, renderer, net, ctrl, me: () => account, ui: { openOverlay, closeOverlays }, toast, isTouch }) : null;
+const roomEditor = world.editable ? createRoomEditor({ world, scene, camera, renderer, net, rtc, ctrl, me: () => account, ui: { openOverlay, closeOverlays }, toast, isTouch }) : null;
 
 // Controles: al entrar (una vez por visita), con /controls o desde el menú
 let controlsShown = false;
@@ -1053,6 +1053,7 @@ function interact() {
     ctrl.sit(seat);
   } else if (t.kind === 'player') openProfile(t.player);
   else if (t.kind === 'screen') useScreen();
+  else if (t.kind === 'screen2') roomEditor?.useScreen2(); // segunda pantalla de una sala personal
   else if (t.kind === 'atril') notes.open(roomOwner, account?.id === roomOwner);
   else if (t.kind === 'museo') { if (account?.guest) guestGate('postular obras al Museo'); else works.open(); }
   else if (t.kind === 'dj') openDJPanel();
@@ -1198,6 +1199,7 @@ function promptFor(t) {
   if (t.kind === 'player') return `Ver perfil de ${t.player.name}`;
   if (t.kind === 'artists') return 'Consola de artistas';
   if (t.kind === 'dj') return !rtc.dj ? 'Pasar música' : rtc.dj.id === net.id ? 'Terminar tu set' : `Cabina ocupada (DJ ${rtc.dj.name})`;
+  if (t.kind === 'screen2') return roomEditor?.screen2Prompt();
   if (t.kind === 'screen') return !parts.escenario ? 'Pasar visuales' : parts.escenario.id === net.id ? 'Dejar de pasar visuales' : 'Ver en grande';
   if (t.kind === 'pickup') {
     const g = t.ground;

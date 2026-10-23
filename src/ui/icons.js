@@ -1,5 +1,7 @@
 // Íconos SVG simples (sin imágenes externas).
 
+// Muebles (editor de salas): un sillón
+const FURNITURE_PATH = '<path d="M5 10V7a3 3 0 013-3h8a3 3 0 013 3v3a2 2 0 00-2 2v1H7v-1a2 2 0 00-2-2z"/><path d="M3 12a2 2 0 014 0v3h10v-3a2 2 0 014 0v6h-2v2h-2v-2H7v2H5v-2H3z"/>';
 const ITEM_PATHS = {
   cap: '<path d="M4 15c0-5 3.6-9 8-9s8 4 8 9z"/><path d="M12 15h9.5c.8 0 .8 2-1 2H12z"/>',
   beanie: '<path d="M5 15c0-5 3-9 7-9s7 4 7 9z"/><rect x="4" y="14" width="16" height="4" rx="2"/><circle cx="12" cy="4.5" r="2"/>',
@@ -14,7 +16,7 @@ const ITEM_PATHS = {
 // Ícono de un objeto con su color
 export function itemIcon(type, color) {
   const dark = isLight(color) ? '#1d1500' : '#ffffff';
-  return `<span class="ico" style="background:${color};color:${dark}"><svg viewBox="0 0 24 24" fill="${dark}">${ITEM_PATHS[type] ?? ''}</svg></span>`;
+  return `<span class="ico" style="background:${color};color:${dark}"><svg viewBox="0 0 24 24" fill="${dark}">${ITEM_PATHS[type] ?? FURNITURE_PATH}</svg></span>`;
 }
 
 function isLight(hex) {

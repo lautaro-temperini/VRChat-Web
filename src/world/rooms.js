@@ -32,7 +32,7 @@ export function buildPersonalRoom(scene, renderer, quality) {
   let layout = null;      // { template, pieces, chosen }
   let hours = 12;
   const pieces = new Map(); // id -> { piece, holder, built, colliders, blockers, item, seats }
-  const state = { music: -1, lights: null, dj: null, parts: {}, hearts: 0, video: null };
+  const state = { music: -1, lights: null, dj: null, parts: {}, hearts: 0, video: null, video2: null };
   const speakers = [new THREE.Vector3(-1, 1.6, -4), new THREE.Vector3(1, 1.6, -4)];
   const screenPos = new THREE.Vector3(0, 2.5, -5);
   let idleTex = null;
@@ -47,7 +47,10 @@ export function buildPersonalRoom(scene, renderer, quality) {
     get shell() { return shell; },
     pieces,
     screen: { get position() { return screenPos; } },
-    stage: { setVideo(video) { state.video = video; applyVideo(); } },
+    stage: {
+      setVideo(video) { state.video = video; applyVideo(); },
+      setVideo2(video) { state.video2 = video; applyVideo(); }, // segunda pantalla con su propio VJ (stage2.js)
+    },
     dj: {
       get spot() { return spotOf('cabina', (p) => p.spot); },
       get exit() { return world.dj.spot?.exit; },
@@ -285,19 +288,23 @@ export function buildPersonalRoom(scene, renderer, quality) {
     sign.material.map = artistsSign(state.parts);
     sign.material.needsUpdate = true;
   }
-  // Hasta 2 pantallas: muestran el video del VJ (la segunda, si es "espejo", lo mismo que la primera)
+  // Hasta 2 pantallas. La primera muestra al VJ de la consola; la segunda, lo mismo ("espejo")
+  // o su propio VJ ("propia", se toma con E sobre ella: stage2.js)
   function applyVideo() {
     const screens = ofType('pantalla');
     screens.forEach((e, i) => {
       const mesh = e.built.parts.screen;
-      const live = state.video && (i === 0 || e.piece.m === 'espejo');
+      const own = i > 0 && e.piece.m === 'propia';
+      if (e.item) e.item.kind = own ? 'screen2' : 'screen';
+      const video = own ? state.video2 : state.video;
+      const live = !!video;
       if (mesh.material.map && !mesh.material.map.userData.shared) mesh.material.map.dispose();
       if (live) {
-        const tex = new THREE.VideoTexture(state.video);
+        const tex = new THREE.VideoTexture(video);
         tex.colorSpace = THREE.SRGBColorSpace;
         // "Cubrir" la pantalla con el video
         const { w, h } = e.built.parts.size;
-        const va = (state.video.videoWidth || 16) / (state.video.videoHeight || 9), sa = w / h;
+        const va = (video.videoWidth || 16) / (video.videoHeight || 9), sa = w / h;
         if (va > sa) { tex.repeat.set(sa / va, 1); tex.offset.set((1 - tex.repeat.x) / 2, 0); }
         else { tex.repeat.set(1, va / sa); tex.offset.set(0, (1 - tex.repeat.y) / 2); }
         mesh.material.map = tex;

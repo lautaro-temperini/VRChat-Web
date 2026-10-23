@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { FURNITURE, FURNITURE_CATS, ROOM_TEMPLATES, ROOM_MAX_PIECES, SCREEN_WIDTH } from '../../server/shared.js';
 import { buildFurniture } from './furniture.js';
 import { api, photoUrl } from '../net/api.js';
+import { createStage2 } from './stage2.js';
 import './editor.css';
 
 // Editor de la sala propia (u-<id>). Solo el dueño lo abre.
@@ -12,6 +13,7 @@ import './editor.css';
 // - Celular: tocar y arrastrar; botones grandes para girar, color, sacar y listo.
 
 const GRID = 0.25, TURN = Math.PI / 12;
+const angleDiff = (a, b) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
 const TEMPLATE_TEXT = {
   loft: 'Piso de madera, ladrillo y un ventanal a la ciudad.',
   galeria: 'Paredes blancas y luz cenital, para colgar y exponer.',
@@ -20,7 +22,7 @@ const TEMPLATE_TEXT = {
 };
 const QUICK_COLORS = ['#f4f1ea', '#1d1d22', '#4a2c1b', '#8a3b3b', '#2f3a48', '#3f7a3a', '#c9a14a', '#ff4fd8', '#19d3ff'];
 
-export function createRoomEditor({ world, scene, camera, renderer, net, ctrl, me, ui, toast, isTouch }) {
+export function createRoomEditor({ world, scene, camera, renderer, net, rtc, ctrl, me, ui, toast, isTouch }) {
   const $ = (id) => document.getElementById(id);
   const body = document.body;
   let isOwner = false;
@@ -267,8 +269,8 @@ export function createRoomEditor({ world, scene, camera, renderer, net, ctrl, me
       const fwd = camera.getWorldDirection(new THREE.Vector3());
       const wall = hangWalls().sort((a, b) => a.normal.dot(fwd) - b.normal.dot(fwd))[0];
       if (!wall) return toast('Esta sala no tiene paredes libres para colgar.');
-      Object.assign(piece, onWall(wall, wall.along === 'x' ? cam.tx : cam.tz, type === 'pantalla' ? 2.6 : 1.6, type));
       if (type === 'pantalla') { piece.w = 3.6; piece.m = 'espejo'; }
+      Object.assign(piece, freeWallSpot(wall, type === 'pantalla' ? 2.6 : 1.6, piece));
     } else {
       // Un poco más allá del centro de la vista, mirando a la cámara
       piece.r = Math.round((cam.yaw + Math.PI) / TURN) * TURN;
@@ -439,14 +441,28 @@ export function createRoomEditor({ world, scene, camera, renderer, net, ctrl, me
     if (!shell) return [];
     return shell.walls.filter((w) => w.top >= 1.5 && (shell.cutaway.find((c) => c.normal?.equals(w.normal))?.object.visible ?? true));
   }
-  function onWall(wall, along, y, type, free) {
+  function onWall(wall, along, y, type, free, screenW) {
     const half = (FURNITURE[type].size[0] ?? 1) / 2;
-    const hw = type === 'pantalla' ? (pieceData(selected)?.w ?? 3.6) / 2 : half;
+    const hw = type === 'pantalla' ? (screenW ?? pieceData(selected)?.w ?? 3.6) / 2 : half;
     let a = THREE.MathUtils.clamp(snap(along, free), wall.min + hw, wall.max - hw);
     const p = wall.point.clone();
     if (wall.along === 'x') p.x = a; else p.z = a;
     const top = Math.min(wall.top, world.shell.def.h || 4);
     return { x: p.x, z: p.z, y: THREE.MathUtils.clamp(snap(y, free), 0.5, Math.max(0.6, top - 0.4)), r: Math.atan2(wall.normal.x, wall.normal.z) };
+  }
+  // Un lugar libre en la pared (que no quede encima de otro cuadro o pantalla), empezando por el centro de la vista
+  function freeWallSpot(wall, y, piece) {
+    const width = (p) => (p.type === 'pantalla' ? p.w ?? 3.6 : FURNITURE[p.type].size[0]);
+    const on = [...world.pieces.values()].map((e) => e.piece)
+      .filter((p) => FURNITURE[p.type].mount === 'wall' && angleDiff(p.r, Math.atan2(wall.normal.x, wall.normal.z)) < 0.01 && Math.abs((p.y ?? 0) - y) < 1.2);
+    const start = wall.along === 'x' ? cam.tx : cam.tz;
+    for (let k = 0; k < 24; k++) {
+      const a = start + (k % 2 ? 1 : -1) * Math.ceil(k / 2) * 0.5;
+      const spot = onWall(wall, a, y, piece.type, false, piece.w);
+      const at = wall.along === 'x' ? spot.x : spot.z;
+      if (on.every((p) => Math.abs((wall.along === 'x' ? p.x : p.z) - at) >= (width(p) + width(piece)) / 2 + 0.1)) return spot;
+    }
+    return onWall(wall, start, y, piece.type, false, piece.w);
   }
   function wallHit(ev, type, free) {
     setRay(ev);
@@ -611,15 +627,17 @@ export function createRoomEditor({ world, scene, camera, renderer, net, ctrl, me
     });
 
   // Al entrar a la sala: el diseño, y si sos el dueño, el botón (y elegir plantilla la primera vez)
+  const stage2 = createStage2({ net, rtc, world, toast, ui });
   function onWelcome(m) {
     if (m.layout) world.setLayout(m.layout);
+    stage2.onWelcome(m);
     const account = me();
     isOwner = !!account && !account.guest && m.room?.owner === account.id;
     btn.hidden = !isOwner;
     if (isOwner && !m.layout?.chosen) setTimeout(() => chooseTemplate(true), 1200);
   }
 
-  const api_ = { onWelcome, update, open, close, get active() { return active; }, get selected() { return selected; } };
+  const api_ = { onWelcome, update, open, close, useScreen2: () => stage2.use(), screen2Prompt: () => stage2.prompt(), get active() { return active; }, get selected() { return selected; } };
   if (import.meta.env.DEV) window.__roomEditor = api_;
   return api_;
 }

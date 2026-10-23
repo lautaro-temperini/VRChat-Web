@@ -1,5 +1,5 @@
 import { api } from '../net/api.js';
-import { ITEMS } from '../../server/shared.js';
+import { ITEMS, FURNITURE } from '../../server/shared.js';
 import { itemIcon } from './icons.js';
 import { toast } from './toast.js';
 import { guestGate } from './guest.js';
@@ -26,9 +26,9 @@ export function createSocial({ net, ui, me, room, onEquip, onDrop }) {
   }
 
   function card(it, { onClick, extraClass = '' } = {}) {
-    const def = ITEMS[it.type];
+    const def = ITEMS[it.type] ?? FURNITURE[it.type]; // prendas o muebles especiales
     const b = document.createElement('button');
-    b.className = `item ${it.equipped ? 'equipped' : ''} ${def?.rare ? 'rare' : ''} ${extraClass}`;
+    b.className = `item ${it.equipped ? 'equipped' : ''} ${def?.rare || def?.special ? 'rare' : ''} ${extraClass}`;
     b.innerHTML = `${itemIcon(it.type, it.color)}<span></span>`;
     b.querySelector('span:last-child').textContent = def?.name ?? it.type;
     if (onClick) b.onclick = onClick; else b.disabled = true;
@@ -43,6 +43,7 @@ export function createSocial({ net, ui, me, room, onEquip, onDrop }) {
     for (const it of items) {
       const c = card(it, {
         onClick: async () => {
+          if (!ITEMS[it.type]) return toast('Los muebles se ponen en tu sala, con "Editar sala".');
           const r = await api('equip', { method: 'POST', body: { iid: it.iid, on: !it.equipped } });
           if (!r.ok) return toast(r.error);
           items = r.items;

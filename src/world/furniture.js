@@ -28,6 +28,18 @@ const shared = {
 for (const m of Object.values(shared)) m.userData.shared = true; // no se liberan al sacar un mueble
 export const neonMat = (hex) => { const m = new THREE.MeshBasicMaterial({ toneMapped: false }); m.color.set(hex).multiplyScalar(GLOW); return m; };
 
+// Versión chiquita (para cuando un mueble especial queda en el suelo)
+export function miniFurniture(type, color, size = 0.55) {
+  const { group } = buildFurniture({ type, c: color, w: 2 }, { h: 2.2 });
+  const labels = [];
+  group.traverse((o) => { if (o.isCSS2DObject) labels.push(o); });
+  for (const l of labels) l.removeFromParent();
+  const box = new THREE.Box3().setFromObject(group);
+  const dim = box.getSize(new THREE.Vector3());
+  group.scale.setScalar(size / Math.max(dim.x, dim.y, dim.z, 0.01));
+  return group;
+}
+
 export function buildFurniture(piece, env = {}) {
   const high = !!env.high;
   const g = new THREE.Group();

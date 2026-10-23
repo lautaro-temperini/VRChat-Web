@@ -24,11 +24,11 @@ const PICKUP_LOCK = 5_000, GROUND_LIFE = 60_000;
 const FLOOD_MAX = 5, FLOOD_WINDOW = 10_000, REPEAT_WINDOW = 30_000;
 const DEFAULT_SETTINGS = { chat: true, voice: true, screen: true, items: true, dj: true, artists: true };
 // Partes que toman los artistas en la consola (además de la pantalla del hall, que es this.screen)
-const PARTS = ['luces', 'escenario'];
+const PARTS = ['luces', 'escenario', 'escenario2']; // escenario2: la segunda pantalla de una sala personal (editor)
 const SPAWN = { x: -27.5, z: 0 }; // junto a la puerta de entrada (ver museum.js)
 // Servidor de audio (Cloudflare Realtime SFU)
 const SFU_API = 'https://rtc.live.cloudflare.com/v1/apps/';
-const KINDS = ['voice', 'dj', 'stage']; // pistas que se pueden publicar
+const KINDS = ['voice', 'dj', 'stage', 'stage2']; // pistas que se pueden publicar
 // Voz: se escucha hasta 10 m (el cliente elige a los 4 más cercanos que hablan). Acá se
 // deja un margen, porque las posiciones llegan con un poco de atraso.
 const VOICE_RANGE = 20;
@@ -359,7 +359,7 @@ export class Room extends DurableObject {
             return this.notice(ws, silenced ? 'Estás silenciado en esta sala.' : 'La consola de artistas está deshabilitada en esta sala.');
           }
           if (cur && cur.id !== meta.id && this.byId(cur.id)) return this.send(ws, { t: 'part', part, busy: true, name: cur.name });
-          this.parts[part] = { id: meta.id, name: meta.name, ...(part === 'escenario' ? { streamId: String(msg.streamId ?? '').slice(0, 100) } : {}) };
+          this.parts[part] = { id: meta.id, name: meta.name, ...(part !== 'luces' ? { streamId: String(msg.streamId ?? '').slice(0, 100) } : {}) };
           this.broadcast({ t: 'part', part, on: true, ...this.parts[part] });
         } else if (cur?.id === meta.id) this.releasePart(part);
         break;
@@ -539,6 +539,7 @@ export class Room extends DurableObject {
     if (!tm?.joined || !tm.sfu) return 'not-yet';
     if (kind === 'dj') return this.dj?.id === tm.id ? (tm.pubs?.dj ? null : 'not-yet') : 'denied';
     if (kind === 'stage') return this.parts.escenario?.id === tm.id ? (tm.pubs?.stage ? null : 'not-yet') : 'denied';
+    if (kind === 'stage2') return this.parts.escenario2?.id === tm.id ? (tm.pubs?.stage2 ? null : 'not-yet') : 'denied';
     if (kind !== 'voice') return 'denied';
     if (!tm.pubs?.voice) return 'not-yet';
     if (this.silenced[tm.userId] || (!this.settings.voice && !tm.mod)) return 'denied';
@@ -560,7 +561,7 @@ export class Room extends DurableObject {
     if (msg.op === 'push') {
       // Publicar mis pistas: voz siempre; música y video solo si la cabina / la pantalla son mías
       const tracks = (Array.isArray(msg.tracks) ? msg.tracks : []).slice(0, 3).filter((t) => KINDS.includes(t?.kind) && typeof t.mid === 'string');
-      const allowed = (k) => (k === 'voice' && !meta.guest) || (k === 'dj' && this.dj?.id === meta.id) || (k === 'stage' && this.parts.escenario?.id === meta.id);
+      const allowed = (k) => (k === 'voice' && !meta.guest) || (k === 'dj' && this.dj?.id === meta.id) || (k === 'stage' && this.parts.escenario?.id === meta.id) || (k === 'stage2' && this.parts.escenario2?.id === meta.id);
       if (!sdp || !tracks.length || !tracks.every((t) => allowed(t.kind))) return reply({ ok: false, error: 'denied' });
       const r = await this.sfuApi(`${base}/tracks/new`, 'POST', {
         sessionDescription: { type: 'offer', sdp },
