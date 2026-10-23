@@ -194,7 +194,7 @@ La música del DJ y el puente OSC ya están hechos. Falta:
 | Editor: qué ven los visitantes | Los cambios aparecen al soltar el click (no se ve el trayecto mientras arrastrás). Con Esc se cancela y el objeto vuelve a su lugar |
 | Editor: máximo | 100 objetos por sala |
 | Editor: muebles | Catálogo libre de muebles básicos para todos; los especiales salen del inventario (y vuelven si los levantás) |
-| Editor: cambiar de plantilla | Se puede; lo puesto vuelve al inventario |
+| Editor: cambiar de plantilla | Se puede; los muebles especiales puestos vuelven al inventario |
 | Editor: visitantes | Pueden usar los muebles (sentarse, ver cuadros con E), no moverlos |
 | Orden del plan | El editor de salas va **antes** que la progresión (las recompensas necesitan muebles) |
 | Eventos | Cualquier set de DJ o show de la consola, en cualquier sala, con **más de 5 personas** presentes. Cuenta haber estado **5 minutos** (aunque estés AFK) |
