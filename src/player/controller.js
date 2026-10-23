@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { POSE } from './avatar.js';
+import { POSE, VAULT_TIME } from './avatar.js';
 
 // Movimiento (m/s, m/s²)
 const WALK = 1.6, JOG = 3.2, CROUCH = 1.2; // sin Shift camina; con Shift trota (gasta stamina)
@@ -43,6 +43,7 @@ export class PlayerController {
     this.sitting = null;
     this.booth = null;      // en la cabina del DJ: fijo hasta salir con la E
     this.mantle = null;
+    this.vault = null;
     this.landing = 0;
     this.speed = 0;
     this.turn = 0;
@@ -122,6 +123,7 @@ export class PlayerController {
   sit(seat) {
     this.sitting = seat;
     this.mantle = null;
+    this.vault = null;
     this.vel.set(0, 0);
     this.velY = 0;
     this.pos.set(seat.x, seat.y, seat.z);
@@ -134,6 +136,7 @@ export class PlayerController {
     this.stand();
     this.booth = spot;
     this.mantle = null;
+    this.vault = null;
     this.vel.set(0, 0);
     this.velY = 0;
     this.grounded = true;
@@ -247,6 +250,29 @@ export class PlayerController {
     return { ground, hit };
   }
 
+  // Busca una baranda saltable (vault) al alcance, a la altura de los pies y de frente
+  tryVault(dirX, dirZ, len) {
+    const p = this.pos;
+    const fx = len > 0.3 ? dirX / len : Math.sin(this.bodyYaw), fz = len > 0.3 ? dirZ / len : Math.cos(this.bodyYaw);
+    for (const b of this.world.colliders) {
+      if (b.vault === undefined || Math.abs(p.y - b.bottom) > 0.3) continue;
+      const cx = THREE.MathUtils.clamp(p.x, b.minX, b.maxX), cz = THREE.MathUtils.clamp(p.z, b.minZ, b.maxZ);
+      const dx = cx - p.x, dz = cz - p.z, d = Math.hypot(dx, dz);
+      if (d > RADIUS + 0.3 || d < 1e-4 || (fx * dx + fz * dz) / d < 0.5) continue;
+      const nx = dx / d, nz = dz / d; // hacia la baranda
+      this.vault = {
+        t: 0, from: p.clone(), top: b.vault + 0.12,
+        to: new THREE.Vector3(cx + nx * (RADIUS + 0.35), 0, cz + nz * (RADIUS + 0.35)),
+        dir: new THREE.Vector2(nx, nz),
+      };
+      this.bodyYaw = Math.atan2(nx, nz);
+      this.vel.set(0, 0);
+      this.velY = 0;
+      this.jumpBuffer = 0;
+      return;
+    }
+  }
+
   update(dt) {
     const p = this.pos;
     let ix = 0, iy = 0;
@@ -280,6 +306,20 @@ export class PlayerController {
       p.set(m.from.x + (m.to.x - m.from.x) * fwd, m.from.y + (m.to.y - m.from.y) * up, m.from.z + (m.to.z - m.from.z) * fwd);
       this.speed = 0;
       if (m.t >= 1) { this.mantle = null; this.grounded = true; this.velY = 0; this.vel.set(0, 0); }
+    } else if (this.vault) {
+      // Saltando la baranda: sube hasta el pasamanos, la cruza y se suelta del otro lado
+      const v = this.vault;
+      v.t = Math.min(1, v.t + dt / VAULT_TIME);
+      const f = THREE.MathUtils.smoothstep(v.t, 0.1, 1);
+      const arc = Math.sin(Math.min(1, v.t / 0.75) * Math.PI / 2) - THREE.MathUtils.smoothstep(v.t, 0.75, 1) * 0.35;
+      p.set(v.from.x + (v.to.x - v.from.x) * f, v.from.y + (v.top - v.from.y) * arc, v.from.z + (v.to.z - v.from.z) * f);
+      this.speed = 0;
+      if (v.t >= 1) {
+        this.vault = null;
+        this.vel.set(v.dir.x * 2.2, v.dir.y * 2.2); // sigue de largo y cae
+        this.velY = -1;
+        this.grounded = false;
+      }
     } else {
       const wantsRun = this.keys.has('ShiftLeft') || this.keys.has('ShiftRight') || this.stick.length() > 0.92;
       const running = wantsRun && len > 0.3 && !this.exhausted && !this.crouched && this.stamina > 0;
@@ -304,8 +344,10 @@ export class PlayerController {
       p.x += this.vel.x * dt;
       p.z += this.vel.y * dt;
 
+      // Pegado a una baranda del balcón y mirándola, Espacio la salta en vez de saltar en el lugar
+      if (this.jumpBuffer > 0 && this.grounded && this.enabled && !this.crouched) this.tryVault(dirX, dirZ, len);
       // Salto (con margen antes y después del borde)
-      if (this.jumpBuffer > 0 && (this.grounded || this.coyote > 0) && this.enabled) {
+      if (!this.vault && this.jumpBuffer > 0 && (this.grounded || this.coyote > 0) && this.enabled) {
         this.velY = JUMP;
         this.grounded = false;
         this.coyote = 0;
@@ -356,12 +398,12 @@ export class PlayerController {
     if (this.showcase && (this.speed > 0.3 || !this.grounded)) this.showcase = false;
     const vitrina = !this.enabled || this.showcase;
     if (vitrina) this.bodyYaw += dt * 0.5; // vitrina: el personaje gira
-    else if (this.sitting || this.booth || this.mantle) { /* fijo */ }
+    else if (this.sitting || this.booth || this.mantle || this.vault) { /* fijo */ }
     else if (this.mode === 'first') this.bodyYaw = this.yaw + Math.PI;
     else if (this.speed > 0.3) this.bodyYaw += angleDiff(this.bodyYaw, Math.atan2(this.vel.x, this.vel.y)) * Math.min(1, dt * 14);
     this.turn = damp(this.turn, angleDiff(prevYaw, this.bodyYaw) / Math.max(dt, 1e-3), 8, dt);
 
-    this.pose = this.sitting ? POSE.sit : this.mantle ? POSE.climb : !this.grounded ? POSE.air : this.crouched ? POSE.crouch : POSE.stand;
+    this.pose = this.sitting ? POSE.sit : this.mantle ? POSE.climb : this.vault ? POSE.vault : !this.grounded ? POSE.air : this.crouched ? POSE.crouch : POSE.stand;
     const av = this.avatar;
     av.root.position.copy(p);
     av.root.rotation.y = this.bodyYaw;

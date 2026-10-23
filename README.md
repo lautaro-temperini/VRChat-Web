@@ -101,10 +101,12 @@ Los IDs públicos (App ID de Realtime, Client ID de Google y Discord) están en 
 
 ## Subirlo online (gratis)
 
-Desde la carpeta del proyecto, cargá las tres claves (una vez) y subilo:
+Antes, una sola vez: activá **R2** en el panel de Cloudflare (pide tarjeta, tiene capa gratis) para las
+obras del Museo. Después, desde la carpeta del proyecto, creá el bucket, cargá las tres claves y subilo:
 
 ```bash
 npx wrangler login
+npx wrangler r2 bucket create galeria-obras
 npx wrangler secret put REALTIME_APP_TOKEN
 npx wrangler secret put GOOGLE_CLIENT_SECRET
 npx wrangler secret put DISCORD_CLIENT_SECRET
@@ -115,7 +117,8 @@ En Google Cloud y en Discord hay que agregar también la dirección de vuelta on
 `https://<tu-sitio>/api/oauth/google/callback` y `https://<tu-sitio>/api/oauth/discord/callback`.
 
 Queda en `https://galeria-online.<tu-usuario>.workers.dev`. Los admins se configuran en
-`wrangler.jsonc` → `vars.ADMIN_IDS` (IDs de cuenta separados por coma).
+`wrangler.jsonc` → `vars.ADMIN_IDS` (IDs de cuenta separados por coma). Online la base de datos
+arranca vacía: creá tu cuenta ahí, poné su ID en `ADMIN_IDS` y volvé a correr `npm run deploy`.
 
 ## Créditos
 

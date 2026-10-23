@@ -488,7 +488,7 @@ export class Accounts extends DurableObject {
   async pickupItem(userId, iid) {
     if (this.isGuest(this.row(userId))) return this.guestError();
     const item = this.sql.exec("SELECT * FROM items WHERE iid = ? AND owner_id LIKE 'ground:%'", String(iid ?? '')).toArray()[0];
-    if (!item) return { ok: false, error: 'Ese objeto ya no está.' };
+    if (!item) return { ok: false, gone: true, error: 'Ese objeto ya no está.' };
     this.sql.exec('UPDATE items SET owner_id = ?, equipped = 0 WHERE iid = ?', userId, item.iid);
     return { ok: true };
   }

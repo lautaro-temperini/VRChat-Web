@@ -68,6 +68,8 @@ export function cleanLook(look) {
   return out;
 }
 
+// Alcance para soltar y juntar objetos del piso (m). El servidor deja un margen por el retraso.
+export const ITEM_REACH = 3;
 // ---------- Editor de salas ----------
 // Plantillas de las salas personales (u-<id>). Medidas en metros, centradas en 0,0:
 // x de -w/2 a w/2, z de -d/2 a d/2. La entrada está al sur (z = d/2), mirando al norte.
