@@ -13,7 +13,7 @@ import { FPArms } from './player/fpArms.js';
 import { Net } from './net/net.js';
 import { RemotePlayer } from './net/remote.js';
 import { api, session, workFileUrl } from './net/api.js';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { loadGLTF, setLoaderRenderer } from './loaders.js';
 import { createWorks } from './ui/works.js';
 import { RTC } from './net/rtc.js';
 import { createSocial } from './ui/social.js';
@@ -58,6 +58,7 @@ renderer.toneMappingExposure = 1.1;
 renderer.shadowMap.enabled = high;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 $('app').append(renderer.domElement);
+setLoaderRenderer(renderer);
 
 const labels = new CSS2DRenderer();
 labels.setSize(innerWidth, innerHeight);
@@ -66,7 +67,7 @@ body.append(labels.domElement);
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.05, 120);
-const world = buildMuseum(scene, renderer, high ? 'high' : 'low');
+const world = buildMuseum(scene, renderer, quality);
 
 // Post-procesado (solo calidad alta): sombras de contacto (GTAO) + brillo solo en neones (bloom con umbral alto)
 let composer = null;
@@ -692,7 +693,7 @@ async function loadMuseum() {
         await img.decode();
         if (shown[s.kind][s.idx] === id) slot.setWork(s.work, img);
       } else {
-        const gltf = await new GLTFLoader().loadAsync(await workFileUrl(id, 'model'));
+        const gltf = await loadGLTF(await workFileUrl(id, 'model'));
         if (shown[s.kind][s.idx] === id) slot.setWork(s.work, gltf.scene);
       }
     } catch { shown[s.kind][s.idx] = null; } // se reintenta en la próxima vuelta

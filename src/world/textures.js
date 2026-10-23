@@ -320,8 +320,10 @@ export function concrete() {
 }
 
 // Collage para las paredes del baño: recortes de colores, "fotos", palabras y cinta
-export function collage(seed = 3) {
-  const [c, g] = canvas(1024, 1024);
+// size: 1024 px, o 512 en calidad baja (misma composición, menos memoria de video)
+export function collage(seed = 3, size = 1024) {
+  const [c, g] = canvas(size, size);
+  g.scale(size / 1024, size / 1024);
   const rand = rng(seed);
   g.fillStyle = '#efe6d6';
   g.fillRect(0, 0, 1024, 1024);

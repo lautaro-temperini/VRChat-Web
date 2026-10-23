@@ -3,6 +3,7 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { lightPool, painting, plaque, artistsSign, boothSign, concrete, collage, rng } from './textures.js';
 import { artworkInfo, SCULPTURES } from './artworks.js';
+import { mergeStatic } from './merge.js';
 
 // Sala principal (48 × 22 m), de oeste a este:
 //   x -30..-6  hall: puerta doble de entrada, barra (sur), baño que sobresale (norte),
@@ -27,6 +28,10 @@ export function buildMuseum(scene, renderer, quality) {
   const interactables = []; // cosas con las que se interactúa con E
   const animated = [];      // funciones (dt, t) que se llaman cada frame
   const high = quality === 'high';
+  // Calidad baja (celulares): bordes redondeados más simples (casi no se nota y es ~40% menos
+  // triángulos) y el collage del baño a 512 px. Decisión del usuario, ver ROADMAP.md
+  const low = quality === 'low';
+  const SEG = low ? 2 : 4;
   const rand = rng(42);
 
   // ---------- Luz y ambiente ----------
@@ -80,7 +85,7 @@ export function buildMuseum(scene, renderer, quality) {
   // opts: collide (choca), float (choca solo a su altura: se puede pasar por debajo), block (frena la cámara),
   //       climb (se puede trepar), round (bordes redondeados), cast (sombra)
   function box(w, h, d, x, y, z, mat, opts = {}) {
-    const geo = opts.round ? new RoundedBoxGeometry(w, h, d, 4, opts.round) : new THREE.BoxGeometry(w, h, d);
+    const geo = opts.round ? new RoundedBoxGeometry(w, h, d, SEG, opts.round) : new THREE.BoxGeometry(w, h, d);
     const m = new THREE.Mesh(geo, mat);
     m.position.set(x, y, z);
     m.castShadow = high && (opts.cast ?? true);
@@ -519,7 +524,7 @@ export function buildMuseum(scene, renderer, quality) {
     g.position.set(x, y, z);
     g.rotation.y = yaw;
     const add = (w, h, d, px, py, pz, mat, round = 0.06) => {
-      const m = new THREE.Mesh(new RoundedBoxGeometry(w, h, d, 3, round), mat);
+      const m = new THREE.Mesh(new RoundedBoxGeometry(w, h, d, low ? 2 : 3, round), mat);
       m.position.set(px, py, pz);
       m.castShadow = high;
       g.add(m);
@@ -528,6 +533,7 @@ export function buildMuseum(scene, renderer, quality) {
     add(2.1, 0.16, 0.8, 0, 0.4, 0.06, fabricMat);
     add(2.4, 0.55, 0.22, 0, 0.6, -0.38, fabricMat);
     for (const s of [-1, 1]) add(0.2, 0.42, 0.95, s * 1.12, 0.45, 0, fabricMat);
+    g.userData.mergeable = true; // no se mueve: se dibuja junto con el resto (ver merge.js)
     scene.add(g);
     const cos = Math.cos(yaw), sin = Math.sin(yaw);
     const hw = Math.abs(cos) * 1.2 + Math.abs(sin) * 0.48, hd = Math.abs(sin) * 1.2 + Math.abs(cos) * 0.48;
@@ -535,6 +541,7 @@ export function buildMuseum(scene, renderer, quality) {
     const seats = [-0.7, 0, 0.7].map((d) => ({ x: x + cos * d + sin * 0.1, y, z: z - sin * d + cos * 0.1, yaw }));
     interactive(g, { kind: 'sit', prompt: 'Sentarse', seats });
   }
+  const stoolSeatMat = new THREE.MeshStandardMaterial({ color: 0x8a1c1c, roughness: 0.5 });
   function stool(x, z, yaw) {
     const g = new THREE.Group();
     g.position.set(x, 0, z);
@@ -544,9 +551,10 @@ export function buildMuseum(scene, renderer, quality) {
     foot.position.y = 0.015;
     const ring = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.012, 8, 32).rotateX(Math.PI / 2), steelMat);
     ring.position.y = 0.3;
-    const seat = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.18, 0.07, 32), new THREE.MeshStandardMaterial({ color: 0x8a1c1c, roughness: 0.5 }));
+    const seat = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.18, 0.07, 32), stoolSeatMat);
     seat.position.y = 0.74;
     for (const m of [leg, foot, ring, seat]) { m.castShadow = high; g.add(m); }
+    g.userData.mergeable = true;
     scene.add(g);
     collider(x - 0.2, x + 0.2, z - 0.2, z + 0.2, 0.78);
     interactive(g, { kind: 'sit', prompt: 'Sentarse', seats: [{ x, y: 0.3, z, yaw }] });
@@ -566,6 +574,7 @@ export function buildMuseum(scene, renderer, quality) {
       for (let x = x0 + 0.3; x < x1 - 0.2; x += 0.22 + rand() * 0.2) {
         const b = new THREE.Mesh(bottleGeo, bottleMats[Math.floor(rand() * bottleMats.length)]);
         b.position.set(x, y, Z1 - 0.22);
+        b.userData.mergeTransparent = true;
         scene.add(b);
       }
     }
@@ -581,7 +590,7 @@ export function buildMuseum(scene, renderer, quality) {
     box(T, h, d, x1 + T / 2, h / 2, cz, wallMat, wall);
     box(w + 2 * T, h, T, cx, h / 2, z0 - T / 2, wallMat, wall);
     box(w + 2 * T, T, d + T, cx, h + T / 2, cz, wallMat, { cast: false });
-    const coll = (seed, rep) => { const t = collage(seed); t.repeat.set(rep, 1); return new THREE.MeshStandardMaterial({ map: t, roughness: 0.8 }); };
+    const coll = (seed, rep) => { const t = collage(seed, low ? 512 : 1024); t.repeat.set(rep, 1); return new THREE.MeshStandardMaterial({ map: t, roughness: 0.8 }); };
     plane(d, h, coll(3, d / h), x0 + 0.01, h / 2, cz, Math.PI / 2);
     plane(d, h, coll(5, d / h), x1 - 0.01, h / 2, cz, -Math.PI / 2);
     plane(w, h, coll(8, w / h), cx, h / 2, z0 + 0.01, 0);
@@ -623,6 +632,7 @@ export function buildMuseum(scene, renderer, quality) {
       rail.rotation.z = Math.atan2(BY, steps * run);
       const glass = box(len, 0.9, 0.02, x0 + (steps * run) / 2, BY / 2 + 0.5, rz, glassMat, { cast: false });
       glass.rotation.z = rail.rotation.z;
+      glass.userData.mergeTransparent = true;
       // El vidrio es barrera: un tramo por escalón, más alto que un salto (no se sube por el costado)
       for (let i = 0; i < steps; i++) collider(x0 + run * i, x0 + run * (i + 1), rz - 0.04, rz + 0.04, (i + 1) * rise + 2.2, false);
     }
@@ -642,7 +652,7 @@ export function buildMuseum(scene, renderer, quality) {
   // saltándolas con Espacio pegado al vidrio (vault = altura del pasamanos)
   const railing = (x0, x1, z0, z1) => {
     const w = Math.max(x1 - x0, 0.06), d = Math.max(z1 - z0, 0.06), cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
-    box(w, 1, d, cx, BY + 0.5, cz, glassMat, { cast: false });
+    box(w, 1, d, cx, BY + 0.5, cz, glassMat, { cast: false }).userData.mergeTransparent = true;
     box(w + 0.02, 0.05, d + 0.02, cx, BY + 1.03, cz, steelMat, { cast: false, round: 0.02 });
     collider(cx - w / 2 - 0.03, cx + w / 2 + 0.03, cz - d / 2 - 0.03, cz + d / 2 + 0.03, BY + 1.9, false, BY);
     colliders[colliders.length - 1].vault = BY + 1.05;
@@ -704,6 +714,7 @@ export function buildMuseum(scene, renderer, quality) {
   for (const z of [-0.85, 0.85]) {
     const deck = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.04, 48), deckMat);
     deck.position.set(16.15, 1.42, z);
+    deck.userData.dynamic = true; // gira
     scene.add(deck);
     animated.push((dt) => { deck.rotation.y += dt * 3.5; });
   }
@@ -724,6 +735,7 @@ export function buildMuseum(scene, renderer, quality) {
   // Cartelito en el frente de la cabina con el DJ y el track (solo cuando hay DJ)
   const boothSignMesh = plane(2.6, 0.65, new THREE.MeshBasicMaterial({ toneMapped: false }), 15.78, 0.85, 0, -Math.PI / 2);
   boothSignMesh.visible = false;
+  boothSignMesh.userData.dynamic = true;
   function setBooth(dj) {
     boothSignMesh.material.map?.dispose();
     boothSignMesh.visible = !!dj;
@@ -806,7 +818,8 @@ export function buildMuseum(scene, renderer, quality) {
     for (const x of [1.2, 5, 8.8]) {
       const head = new THREE.Group();
       head.position.set(x, H - 0.6, z);
-      const body = new THREE.Mesh(new RoundedBoxGeometry(0.22, 0.26, 0.22, 3, 0.04), darkMat);
+      head.userData.dynamic = true; // apunta a la pista
+      const body = new THREE.Mesh(new RoundedBoxGeometry(0.22, 0.26, 0.22, low ? 2 : 3, 0.04), darkMat);
       head.add(body);
       const mat = new THREE.ShaderMaterial({
         uniforms: { color: { value: new THREE.Color() }, opacity: { value: 0 } },
@@ -888,6 +901,9 @@ export function buildMuseum(scene, renderer, quality) {
       stageLight.intensity = (30 + p * 70) * party;
     }
   });
+
+  // Las piezas quietas que comparten material se dibujan juntas (ver merge.js): mismo aspecto, menos trabajo
+  mergeStatic(scene);
 
   return {
     colliders,
