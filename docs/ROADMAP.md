@@ -189,6 +189,14 @@ La música del DJ y el puente OSC ya están hechos. Falta:
 | Me gusta y progresión | Los me gusta son solo sociales: **no dan puntos** (para que no se farmee). Puede haber una insignia por recibir cierta cantidad |
 | Misiones | Un camino fijo para empezar + misiones diarias |
 | Recompensas | Niveles y misiones dan **objetos** (sin moneda). La progresión se hace **después del editor de salas**, cuando ya haya muebles para dar |
+| Editor: plantillas | Para arrancar: loft, galería, club y terraza (después se suman más) |
+| Editor: quién | Solo el dueño de la sala |
+| Editor: qué ven los visitantes | Los cambios aparecen al soltar el click (no se ve el trayecto mientras arrastrás). Con Esc se cancela y el objeto vuelve a su lugar |
+| Editor: máximo | 100 objetos por sala |
+| Editor: muebles | Catálogo libre de muebles básicos para todos; los especiales salen del inventario (y vuelven si los levantás) |
+| Editor: cambiar de plantilla | Se puede; lo puesto vuelve al inventario |
+| Editor: visitantes | Pueden usar los muebles (sentarse, ver cuadros con E), no moverlos |
+| Orden del plan | El editor de salas va **antes** que la progresión (las recompensas necesitan muebles) |
 | Eventos | Cualquier set de DJ o show de la consola, en cualquier sala, con **más de 5 personas** presentes. Cuenta haber estado **5 minutos** (aunque estés AFK) |
 | Voz: servidor | Servidor de audio (Cloudflare Realtime SFU) para que nadie vea la IP de otro |
 | Voz: a quién escuchás | Los 4 más cercanos **que estén hablando**, dentro de 10 m. Si uno se calla, entra el siguiente |
