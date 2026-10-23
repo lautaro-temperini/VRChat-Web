@@ -281,6 +281,11 @@ export function buildMuseum(scene, renderer, quality) {
     return new THREE.ExtrudeGeometry(s, { depth: 0.03, bevelEnabled: true, bevelThickness: 0.022, bevelSize: 0.022, bevelSegments: 4, curveSegments: 1 });
   }
 
+  // Lugares del Museo rotativo: cada cuadro y cada pedestal puede mostrar una obra del público
+  // (setWork) y vuelve a la obra de siempre cuando no hay ninguna (setWork(null))
+  const paintingSlots = [], sculptureSlots = [];
+  const FIT_W = 2.6, FIT_H = 1.9; // tamaño máximo de un cuadro del público en la pared
+
   let artId = 1;
   function hangArt(x, z, rotY, railOffset, y = 2.15) {
     const w = 1.5 + rand() * 1.1, h = 1.1 + rand() * 0.8;
@@ -305,7 +310,41 @@ export function buildMuseum(scene, renderer, quality) {
     label.position.set(w / 2 + 0.32, -0.35, 0.01);
     g.add(label);
     scene.add(g);
-    interactive(g, { kind: 'art', prompt: 'Ver obra', info, image: tex.image });
+    const item = interactive(g, { kind: 'art', prompt: 'Ver obra', info, image: tex.image });
+    // Lugar rotativo: cambia imagen, tamaño del marco y ficha
+    const base = { w, h, tex, info, label: label.material[4].map };
+    const slot = {
+      group: g,
+      setWork(work, image) {
+        let ww = base.w, hh = base.h;
+        if (work) {
+          const a = (work.w && work.h) ? work.w / work.h : (image.width / image.height);
+          ww = Math.min(FIT_W, FIT_H * a); hh = ww / a;
+        }
+        for (const [m, geo] of [[frame, frameGeo(ww, hh)], [art, new THREE.PlaneGeometry(ww, hh)], [glow, new THREE.PlaneGeometry(ww * 2, hh * 2)]]) { m.geometry.dispose(); m.geometry = geo; }
+        label.position.x = ww / 2 + 0.32;
+        if (art.material.map !== base.tex) art.material.map.dispose();
+        if (label.material[4].map !== base.label) label.material[4].map.dispose();
+        if (work) {
+          const t = new THREE.Texture(image);
+          t.colorSpace = THREE.SRGBColorSpace;
+          t.anisotropy = 8;
+          t.needsUpdate = true;
+          art.material.map = t;
+          label.material[4].map = plaque(work.title.slice(0, 18), `${work.author?.name ?? ''}${work.year ? ` · ${work.year}` : ''}`);
+          item.info = { title: work.title, author: work.author?.name ?? '', year: work.year, technique: work.technique, description: work.description, link: work.link };
+          item.image = null;
+          item.work = work;
+        } else {
+          art.material.map = base.tex;
+          label.material[4].map = base.label;
+          Object.assign(item, { info: base.info, image: base.tex.image, work: null });
+        }
+        art.material.needsUpdate = true;
+        label.material[4].needsUpdate = true;
+      },
+    };
+    paintingSlots.push(slot);
     if (railOffset) {
       // Foco colgado del riel, apuntando al cuadro
       const head = new THREE.Mesh(spotGeo, steelMat);
@@ -376,7 +415,7 @@ export function buildMuseum(scene, renderer, quality) {
 
   // ---------- Esculturas (del lado del hall de la pared del medio) ----------
   const sculptures = [];
-  function pedestal(x, z, w, h, mesh, lift, key) {
+  function pedestal(x, z, w, h, mesh, lift, key, maxH = 1.3) {
     const body = box(w, h - 0.05, w, x, (h - 0.05) / 2, z, pedestalMat, { collide: true, block: true, round: 0.025, noStand: true });
     const cap = box(w + 0.06, 0.05, w + 0.06, x, h - 0.025, z, pedestalMat, { round: 0.02 });
     mesh.position.set(x, h + lift, z);
@@ -386,6 +425,36 @@ export function buildMuseum(scene, renderer, quality) {
     const item = interactive(mesh, { kind: 'art', prompt: 'Ver escultura', info: SCULPTURES[key] });
     body.userData.interact = item;
     cap.userData.interact = item;
+    // Lugar rotativo: el modelo del público se achica para entrar en el pedestal (sin agrandarlo)
+    let current = mesh;
+    sculptureSlots.push({
+      setWork(work, object) {
+        current.removeFromParent();
+        sculptures.splice(sculptures.indexOf(current), 1);
+        if (current !== mesh) current.traverse((o) => { o.geometry?.dispose(); });
+        if (work) {
+          const holder = new THREE.Group();
+          const size = new THREE.Box3().setFromObject(object).getSize(new THREE.Vector3());
+          const k = Math.min(1, (w * 0.95) / Math.max(size.x, size.z, 1e-3), maxH / Math.max(size.y, 1e-3));
+          object.scale.multiplyScalar(k);
+          const box3 = new THREE.Box3().setFromObject(object);
+          object.position.sub(box3.getCenter(new THREE.Vector3())).setY(object.position.y - box3.min.y);
+          holder.add(object);
+          holder.position.set(x, h, z);
+          holder.traverse((o) => { if (o.isMesh) o.castShadow = high; o.userData.interact = item; });
+          current = holder;
+          item.info = { title: work.title, author: work.author?.name ?? '', year: work.year, technique: work.technique, description: work.description, link: work.link };
+          item.work = work;
+        } else {
+          current = mesh;
+          item.info = SCULPTURES[key];
+          item.work = null;
+        }
+        item.object = current;
+        scene.add(current);
+        sculptures.push(current);
+      },
+    });
   }
   pedestal(-11.6, -3.2, 0.8, 1, new THREE.Mesh(
     new THREE.TorusKnotGeometry(0.24, 0.075, 260, 32),
@@ -419,7 +488,7 @@ export function buildMuseum(scene, renderer, quality) {
     colGeo.computeVertexNormals();
   }
   const CX = -9.6;
-  pedestal(CX, 0, 1.2, 0.5, new THREE.Mesh(colGeo, new THREE.MeshPhysicalMaterial({ color: 0x101012, roughness: 0.15, clearcoat: 1, clearcoatRoughness: 0.1 })), 1.2, 'column');
+  pedestal(CX, 0, 1.2, 0.5, new THREE.Mesh(colGeo, new THREE.MeshPhysicalMaterial({ color: 0x101012, roughness: 0.15, clearcoat: 1, clearcoatRoughness: 0.1 })), 1.2, 'column', 2.4);
   animated.push((dt) => { for (const s of sculptures) s.rotation.y += dt * 0.25; });
   // Sogas de terciopelo alrededor de la columna
   const velvet = new THREE.MeshStandardMaterial({ color: 0x8a1020, roughness: 0.7 });
@@ -823,6 +892,8 @@ export function buildMuseum(scene, renderer, quality) {
     // Una sola pantalla (la pared este): la usan el VJ (consola) y "ver en grande"
     screen: screenApi,
     stage: screenApi,
+    // Museo rotativo: 9 lugares de cuadros y 5 de esculturas (en el orden del servidor)
+    works: { paintings: paintingSlots, sculptures: sculptureSlots },
     // Cabina del DJ: dónde se para (mirando a la pista), dónde se baja y los dos parlantes [izq., der.]
     dj: {
       spot: { x: 17.05, y: 0.4, z: 0, yaw: -Math.PI / 2, exit: { x: 15.2, z: 0 } },

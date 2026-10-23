@@ -26,6 +26,9 @@ Guía para trabajar en este proyecto con Claude Code. Leé también [docs/ESTADO
   - `Accounts` (una instancia global): usuarios, sesiones, inventario, amigos, presencia y toda la
     red social (fotos, notas, muro, me gusta, corazones, favoritas, avisos, restringidos).
   - `Room` (una por sala): tiempo real por WebSocket con hibernación.
+  - **R2** (binding `ART`, bucket `galeria-obras`): archivos del Museo rotativo. La lógica está en
+    `server/works.js` (se mezcla en `Accounts`); los archivos se sirven por `/api/workfile` (públicos solo
+    si están o estuvieron expuestos). En desarrollo wrangler lo simula.
 - **Voz, música del DJ y pantalla del escenario:** por Cloudflare Realtime SFU (`src/net/rtc.js`):
   nadie se conecta directo con nadie, así nadie ve la IP de otro. La sala (`server/room.js` →
   `sfuMessage`) es la intermediaria con la API (tiene la clave) y decide quién puede escuchar a quién.

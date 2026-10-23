@@ -546,3 +546,26 @@ body.notes #notes { display: flex; }
 #auth .or::before, #auth .or::after { content: ''; flex: 1; height: 1px; background: var(--line); }
 #auth[data-tab=nick] .no-nick, #auth[data-tab=nick] .tabs, #auth[data-tab=nick] .note:not(.only-nick),
 #auth[data-tab=nick]:not([data-terms]) #auth-terms-row, #auth:not([data-tab=nick]) .only-nick { display: none; }
+
+/* ---------- Atril del Museo: Museo rotativo ---------- */
+body.works #works { display: flex; }
+.works-sheet { width: min(560px, 100%); max-height: calc(100vh - 32px); overflow-y: auto; padding: 24px 22px; display: flex; flex-direction: column; gap: 12px; }
+.works-sheet h1 { margin: 0; font-size: 28px; }
+.work-form { display: flex; flex-direction: column; gap: 10px; }
+.work-row { display: grid; grid-template-columns: 1fr 120px; gap: 10px; }
+#work-kind button.sel { background: var(--primary); color: var(--primary-ink); }
+.work-img { max-width: 100%; max-height: 300px; border-radius: 10px; display: block; margin: 0 auto; }
+.work-viewer, .work-review-view { width: 100%; min-height: 120px; border-radius: 10px; background: rgba(0, 0, 0, 0.25); display: grid; place-items: center; overflow: hidden; }
+.work-error { color: var(--danger); font-size: 13px; margin: 4px 0; }
+.work-titles { margin: 0; color: var(--primary); font-weight: 800; font-size: 13px; }
+.work-card { display: flex; gap: 10px; padding: 10px; border-radius: 12px; background: rgba(255, 255, 255, 0.05); align-items: flex-start; flex-wrap: wrap; }
+.work-card.expuesta { outline: 1px solid var(--primary); }
+.work-card.en_disputa { outline: 1px solid var(--danger); }
+.work-thumb { width: 64px; height: 64px; border-radius: 8px; background: rgba(0, 0, 0, 0.3) center / cover no-repeat; display: grid; place-items: center; font-size: 28px; flex: none; }
+.work-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.work-text p { margin: 4px 0; font-size: 14px; }
+.work-text a { color: var(--accent); font-size: 13px; word-break: break-all; }
+.work-vote, .work-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.work-deny { display: flex; gap: 8px; flex-wrap: wrap; width: 100%; }
+.work-deny select, .work-deny input { flex: 1; min-width: 160px; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--line); background: rgba(10, 6, 30, 0.55); color: var(--text); font: 600 14px var(--font); }
+.work-card.admin .work-review-view { width: 100%; }

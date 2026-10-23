@@ -1,5 +1,6 @@
 import { DurableObject } from 'cloudflare:workers';
 import { cleanName, cleanLook, ITEMS, STARTER_ITEMS } from './shared.js';
+import { setupWorks, worksMethods } from './works.js';
 
 // Cuentas de usuario (una sola instancia global con base SQLite).
 // - Invitado: se crea sin usuario ni contraseña; el navegador guarda su token.
@@ -148,6 +149,7 @@ export class Accounts extends DurableObject {
         detail TEXT NOT NULL, room TEXT NOT NULL, created INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'abierto'
       );
     `);
+    setupWorks(this.sql); // Museo rotativo (works.js)
   }
 
   // Invitado = cuenta sin registrar (sin nickname): solo para probar
@@ -815,7 +817,9 @@ export class Accounts extends DurableObject {
       ok: true, unseen,
       items: rows.map((r) => {
         const from = this.row(r.from_user);
-        return { id: r.id, type: r.type, created: r.created, seen: !!r.seen, from: from ? { id: from.id, name: from.name, username: from.username ?? null } : null };
+        let data = null;
+        try { data = r.data ? JSON.parse(r.data) : null; } catch { /* aviso viejo */ }
+        return { id: r.id, type: r.type, created: r.created, seen: !!r.seen, data, from: from ? { id: from.id, name: from.name, username: from.username ?? null } : null };
       }),
     };
   }
@@ -931,3 +935,6 @@ export class Accounts extends DurableObject {
     this.sql.exec('DELETE FROM presence WHERE user_id = ? AND room = ?', userId, room);
   }
 }
+
+// Museo rotativo: postular, revisar, rotar (server/works.js)
+Object.assign(Accounts.prototype, worksMethods);

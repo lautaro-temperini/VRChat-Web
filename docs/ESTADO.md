@@ -31,17 +31,19 @@ Workers + Durable Objects. Todo se trabaja sobre `main` (no hay otras ramas).
   publicaciones). Reportar quedó postergado (el servidor tiene el código, sin botón).
 - **Antiflood** del chat, **condiciones de uso y aviso +18**, obras y cabinas **no pisables**.
 
+### Museo rotativo (paso 2): ✅ terminado (23/10)
+Obras del público (cuadros y modelos 3D) que rotan cada 24 h en los 9 cuadros y 5 esculturas del Museo.
+Se postula en el atril de la entrada; curadores verifican (1) o deniegan (2, con motivo), un admin decide
+los desacuerdos y baja obras; Creadores (3 aceptadas seguidas) entran sin verificar. Archivos en R2.
+Código: `server/works.js`, `src/ui/works.js`, lugares en `src/world/museum.js` (`works`).
+
 ### Antes de eso (ya estaba)
 Museo con DJ (música desde la PC), consola de artistas (luces por OSC y visuales), red social en el
 celular del personaje (amigos, muro, galería, avisos), atril con notas y corazones, salas personales con
 privacidad, favoritas, personaje Quaternius con animaciones de Mixamo, inventario e intercambios.
 
 ### Diseño definido (sin programar todavía)
-Los pasos 2 a 5 del plan ya tienen sus decisiones en ROADMAP.md:
-- **Museo rotativo:** obras del público, 24 h cada una, cola por orden de llegada, hasta 5 postulaciones
-  por día. Curadores (por méritos, revisan al azar y nunca a amigos; verificar con 1, denegar con 2 y con
-  motivo), Creadores (3 obras aceptadas seguidas → entran sin verificar). Solo admins bajan obras y quitan
-  títulos. Lugares: los 9 cuadros y 2 esculturas actuales. Si no hay cola, la obra se queda otras 24 h.
+Los pasos 3 a 5 del plan ya tienen sus decisiones en ROADMAP.md:
 - **Editor de salas:** plantillas loft, galería, club y terraza; solo edita el dueño; máximo 100 objetos;
   catálogo libre de muebles básicos; los cambios se ven al soltar el click (Esc cancela).
   La sala de xvvave usa la plantilla club.
@@ -58,15 +60,15 @@ Los pasos 2 a 5 del plan ya tienen sus decisiones en ROADMAP.md:
 - **Probar la voz con personas reales** (se probó con un tono generado) y la pantalla del escenario (VJ).
 - **Registrar la cuenta xvvave** si todavía es de invitado (Personaje → Crear cuenta): conserva id y admin.
 - **Para subirlo online:** cargar las 3 claves con `wrangler secret put` (ver README → "Subirlo online")
-  y agregar la dirección de vuelta online en Google Cloud y en Discord.
+  y agregar la dirección de vuelta online en Google Cloud y en Discord. Para el Museo rotativo: activar
+  R2 en Cloudflare (pide tarjeta, tiene capa gratis) y `npx wrangler r2 bucket create galeria-obras`.
+- **Nombrar curadores fundadores** con `/curador nick` en el chat (mientras tanto verifican los admins).
 
 ### Para programar, en este orden
-1. **Museo rotativo con postulaciones** (paso 2). Ojo: con obras en HD (hasta 2048 px) y modelos 3D, el
-   SQLite de cuentas puede quedar chico; consultar si se pasa a R2 (pide tarjeta, tiene capa gratis).
-2. **Editor de salas** con plantillas (paso 3) y catálogo de muebles.
-3. **Progresión, misiones e insignias** (paso 4).
-4. **Diseños de artistas como objetos** y más mapas públicos (paso 5).
-5. **Primera prueba con gente real:** inauguración con 5–10 artistas exponiendo.
+1. **Editor de salas** con plantillas (paso 3) y catálogo de muebles.
+2. **Progresión, misiones e insignias** (paso 4). Ahí se define cómo se gana el título de Curador.
+3. **Diseños de artistas como objetos** y más mapas públicos (paso 5).
+4. **Primera prueba con gente real:** inauguración con 5–10 artistas exponiendo.
 
 ### Pendientes sueltos (consultar antes)
 Tipos de cuerpo y más ropa/peinados/cejas, selector RGB, stamina con consumibles (falta cómo se consigue

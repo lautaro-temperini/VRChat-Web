@@ -50,3 +50,26 @@ export async function api(path, { method = 'GET', body } = {}) {
   if (data.ok && data.token) session.token = data.token;
   return data;
 }
+
+// Archivo de una obra del Museo (imagen o modelo) → URL local. Las que todavía no se expusieron
+// solo las ven el autor y los curadores, así que también van con la sesión.
+const workCache = new Map();
+export async function workFileUrl(id, f) {
+  const key = `${id}/${f}`;
+  if (!workCache.has(key)) {
+    workCache.set(key, fetch(`/api/workfile?id=${encodeURIComponent(id)}&f=${f}`, { headers: authHeader() })
+      .then(async (res) => (res.ok ? URL.createObjectURL(await res.blob()) : null))
+      .catch(() => null));
+  }
+  return workCache.get(key);
+}
+
+// Postular una obra (formulario con los archivos)
+export async function submitWork(form) {
+  try {
+    const res = await fetch('/api/work', { method: 'POST', headers: authHeader(), body: form });
+    return await res.json();
+  } catch {
+    return { ok: false, error: 'No hay conexión con el servidor.' };
+  }
+}

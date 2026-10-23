@@ -16,8 +16,8 @@ y las salas giran alrededor de exponer, descubrir y coleccionar arte.
 2. **Museo rotativo con postulaciones**: cada obra dura 24 h, cola con prioridad para usuarios.
    Cuadros (arte digital, shaders, diseños) y esculturas (modelos 3D, instalaciones interactivas).
    Empezar por imágenes y modelos 3D; shaders e instalaciones después (corren código: aislar y limitar).
-   ✅ Diseño definido (curadores, creadores, verificación, 5 postulaciones por día…: ver "Decisiones").
-   Falta programarlo.
+   ✅ Hecho (23/10): imágenes y modelos 3D, guardados en R2. Shaders e instalaciones, más adelante.
+   Para subirlo online: activar R2 y crear el bucket (`npx wrangler r2 bucket create galeria-obras`).
 3. **Editor de salas** y salas distintas entre sí (solo el Museo es igual para todos), con plantillas
    (loft, galería, club, terraza). ✅ Diseño definido. Va **antes** que la progresión (las recompensas son muebles).
 4. **Progresión y misiones ligadas al arte** (descubrir, exponer, curar, asistir a eventos; no tiempo
@@ -175,7 +175,7 @@ La música del DJ y el puente OSC ya están hechos. Falta:
 | Moderación del Museo | Ignorar/restringir + antiflood; no depende de que el admin esté conectado |
 | Personajes | Mejorar con Blender + Tripo/Meshy (IA para objetos y decoración; cuerpos y ropa en Blender) |
 | Exploradores | Más mapas públicos |
-| Museo rotativo: lugares | Por ahora los que ya hay (9 cuadros y 2 esculturas) |
+| Museo rotativo: lugares | Rotan los 9 cuadros y las 5 esculturas que ya hay; cada lugar rota por su cuenta cada 24 h. Mientras no haya obras del público, se ven las de ahora |
 | Museo rotativo: cola vacía | Si no hay nadie esperando, la obra actual se queda otras 24 h |
 | Museo rotativo: postular | Abierto: cualquiera postula. La cola tiene orden fijo (fecha de postulación, con prioridad para usuarios); verificar NO adelanta una obra, solo la deja lista para presentarse en su turno |
 | Museo rotativo: verificación | Las obras sin verificar quedan en la cola hasta que alguien las verifique o deniegue (no vencen). Si le llega el turno a una sin verificar, se presenta la siguiente verificada y la otra conserva el primer lugar |
@@ -185,7 +185,15 @@ La música del DJ y el puente OSC ya están hechos. Falta:
 | Títulos: perderlos | Solo un admin quita el título de Creador o Curador, a mano |
 | Bajar obras | Solo los admins pueden sacar una obra que ya entró (de la cola o del Museo) |
 | Registro de curadores | Los admins ven quién verificó y quién denegó cada obra |
-| Museo rotativo: por persona | Hasta 5 postulaciones por día |
+| Museo rotativo: por persona | Hasta 5 postulaciones en las últimas 24 h |
+| Museo rotativo: dónde | Se postula (y los curadores revisan) en el **atril de la entrada del Museo** |
+| Museo rotativo: ficha | Ficha completa: título (obligatorio), descripción, técnica, año y un link |
+| Museo rotativo: invitados | No pueden postular (tienen que crear cuenta) |
+| Museo rotativo: avisos | Al autor le llegan avisos al celular: verificada, denegada (con motivo), expuesta, título de Creador |
+| Museo rotativo: motivos | No es obra propia / plagio · No cumple las condiciones de uso · Archivo con problemas · Spam o repetida · Otro (con texto) |
+| Museo rotativo: saltear | El curador puede pedir "Otra" si no quiere revisar la que le tocó |
+| Curadores: nombrar | Un admin escribe en el chat `/curador nick` (y `/creador nick`); el mismo comando lo quita |
+| Museo rotativo: archivos | Se guardan en Cloudflare R2. Cuadros: hasta 2048 px (se ven a 1024 en la pared). Modelos: GLB hasta 2 MB, 10.000 triángulos, texturas de 1K y 3 m de alto |
 | Curadores: arranque | Mientras no haya curadores, verifican los admins; además el admin puede nombrar curadores fundadores a mano |
 | Curadores: requisitos | Nivel + participación (propuesta a ajustar: nivel 10+ y haber visto 50 obras distintas del Museo) |
 | Progresión | Niveles por puntos (**privados**, solo los ve uno) + insignias por logros (**públicas**, se ven en el perfil) |

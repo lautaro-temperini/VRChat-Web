@@ -12,7 +12,9 @@ import { PlayerController } from './player/controller.js';
 import { FPArms } from './player/fpArms.js';
 import { Net } from './net/net.js';
 import { RemotePlayer } from './net/remote.js';
-import { api, session } from './net/api.js';
+import { api, session, workFileUrl } from './net/api.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { createWorks } from './ui/works.js';
 import { RTC } from './net/rtc.js';
 import { createSocial } from './ui/social.js';
 import { toast } from './ui/toast.js';
@@ -139,7 +141,7 @@ for (const b of document.querySelectorAll('button.pill:not(.icon)')) {
 
 // ---------- Estado de la interfaz ----------
 // Un solo panel/superposición abierto a la vez. Mientras hay uno, el jugador no se mueve.
-const OVERLAYS = ['editing', 'settings', 'inspecting', 'profiling', 'auth', 'inventory', 'friends', 'trading', 'viewing', 'roompanel', 'mundi', 'gestures', 'djing', 'artists', 'controls', 'kicked', 'notes'];
+const OVERLAYS = ['editing', 'settings', 'inspecting', 'profiling', 'auth', 'inventory', 'friends', 'trading', 'viewing', 'roompanel', 'mundi', 'gestures', 'djing', 'artists', 'controls', 'kicked', 'notes', 'works'];
 // Paneles que no frenan al personaje (se puede seguir caminando con WASD)
 const NON_BLOCKING = ['inventory', 'friends', 'roompanel', 'editing', 'gestures', 'artists'];
 function openOverlay(cls) {
@@ -656,6 +658,44 @@ const notes = createNotes({
   ui: { openOverlay, closeOverlays, isOpen: (cls) => body.classList.contains(cls) },
   onHearts: (n) => lectern?.setHearts(n),
 });
+const shown = { cuadro: [], escultura: [] }; // id de la obra del público en cada lugar
+// Museo: en la entrada, un atril para postular obras al Museo rotativo (y revisar, para curadores)
+const works = createWorks({ ui: { openOverlay, closeOverlays }, me: () => account });
+if (room === 'museo') {
+  const altar = buildLectern(scene, { x: -24.5, z: -4.2, yaw: Math.atan2(-3, 4.2) });
+  world.colliders.push(altar.collider);
+  const item = { object: altar.group, kind: 'museo', prompt: 'Exponé tu obra' };
+  altar.group.traverse((o) => { o.userData.interact = item; });
+  world.interactables.push(item);
+  loadMuseum();
+  setInterval(loadMuseum, 5 * 60_000);
+}
+
+// Obras del público que están expuestas ahora (cada lugar rota por su cuenta cada 24 h)
+async function loadMuseum() {
+  const r = await api('museum');
+  if (!r.ok) return;
+  for (const s of r.slots) {
+    const slot = (s.kind === 'cuadro' ? world.works.paintings : world.works.sculptures)[s.idx];
+    const id = s.work?.id ?? null;
+    if (!slot || shown[s.kind][s.idx] === id) continue;
+    shown[s.kind][s.idx] = id;
+    if (!s.work) { slot.setWork(null); continue; }
+    try {
+      if (s.kind === 'cuadro') {
+        const url = await workFileUrl(id, 'wall');
+        const img = new Image();
+        img.src = url;
+        await img.decode();
+        if (shown[s.kind][s.idx] === id) slot.setWork(s.work, img);
+      } else {
+        const gltf = await new GLTFLoader().loadAsync(await workFileUrl(id, 'model'));
+        if (shown[s.kind][s.idx] === id) slot.setWork(s.work, gltf.scene);
+      }
+    } catch { shown[s.kind][s.idx] = null; } // se reintenta en la próxima vuelta
+  }
+}
+
 if (roomOwner) {
   lectern = buildLectern(scene, { x: -24.5, z: -4.2, yaw: Math.atan2(-3, 4.2) });
   world.colliders.push(lectern.collider);
@@ -951,6 +991,15 @@ function command(text) {
       gesture(`baile${n >= 1 && n <= DANCES.length ? n : 1 + Math.floor(Math.random() * DANCES.length)}`);
       break;
     }
+    case 'curador':
+    case 'creador': {
+      // Solo admins: da o quita el título (curadores fundadores, o quitar Creador)
+      if (!arg) return system(`Usá: /${cmd.toLowerCase()} nick`);
+      api('title', { method: 'POST', body: { nick: arg, title: cmd.toLowerCase() } }).then((r) => {
+        system(r.ok ? `${r.name} ${r.on ? 'ahora es' : 'ya no es'} ${cmd.toLowerCase()}.` : r.error);
+      });
+      break;
+    }
     case 'salas':
       system(`Salas: Museo · Tu sala${friends.length ? ' · ' + friends.map((f) => `Sala de ${f.name}${f.room ? `  (${social.roomLabel(f.room).toLowerCase()})` : ''}`).join(' · ') : ''}`);
       break;
@@ -1003,6 +1052,7 @@ function interact() {
   } else if (t.kind === 'player') openProfile(t.player);
   else if (t.kind === 'screen') useScreen();
   else if (t.kind === 'atril') notes.open(roomOwner, account?.id === roomOwner);
+  else if (t.kind === 'museo') { if (account?.guest) guestGate('postular obras al Museo'); else works.open(); }
   else if (t.kind === 'dj') openDJPanel();
   else if (t.kind === 'artists') openArtists();
   else if (t.kind === 'pickup') net.send({ t: 'pickup', iid: t.ground.iid });
@@ -1188,9 +1238,14 @@ function photo(from, lookAt) {
 let previewToken = 0;
 function openInspect(item) {
   const info = item.info;
-  const isPainting = !!item.image;
+  const publicPainting = item.work?.kind === 'cuadro';
+  const isPainting = !!item.image || publicPainting;
   $('inspect').classList.toggle('no-frame', !isPainting);
-  if (isPainting) $('inspect-img').src = item.image.toDataURL('image/png');
+  if (publicPainting) {
+    // Obra del público: la imagen en HD (hasta 2048 px)
+    $('inspect-img').removeAttribute('src');
+    workFileUrl(item.work.id, 'hd').then((url) => { if (url) $('inspect-img').src = url; });
+  } else if (isPainting) $('inspect-img').src = item.image.toDataURL('image/png');
   else {
     const box = new THREE.Box3().setFromObject(item.object);
     const center = box.getCenter(new THREE.Vector3());
@@ -1414,7 +1469,7 @@ world.setTime(hoursGMT3());
 setInterval(() => world.setTime(fixedHour ?? hoursGMT3()), 30_000);
 
 // Acceso para pruebas, solo en desarrollo (npm run dev)
-if (import.meta.env.DEV) window.__game = { ctrl, me, gesture, openDJPanel, openArtists, parts, world, remotes, interact, camera, fpArms, renderer, rtc, social, net, ground, roomPanel, setHour: (h) => { fixedHour = h; world.setTime(h); }, get target() { return target; } };
+if (import.meta.env.DEV) window.__game = { ctrl, me, gesture, openDJPanel, openArtists, parts, world, remotes, interact, camera, fpArms, renderer, rtc, social, net, ground, roomPanel, works, setHour: (h) => { fixedHour = h; world.setTime(h); }, get target() { return target; } };
 
 // ---------- Inicio: si ya hay sesión guardada, entra directo ----------
 // La pantalla de carga se va cuando el personaje y sus animaciones están listos (o a los 20 s, por las dudas)

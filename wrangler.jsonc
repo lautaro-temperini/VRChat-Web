@@ -16,6 +16,9 @@
     // Ingreso con Google y Discord (los secretos van en .dev.vars / wrangler secret)
     "GOOGLE_CLIENT_ID": "1015529034698-cte3651nesdv632alf58nn1h9r4nljmp.apps.googleusercontent.com",
     "DISCORD_CLIENT_ID": "1563272193373380608" },
+  // Obras del Museo rotativo (imágenes y modelos 3D). En local wrangler lo simula; online hay que
+  // activar R2 en Cloudflare y crear el bucket (npx wrangler r2 bucket create galeria-obras)
+  "r2_buckets": [{ "binding": "ART", "bucket_name": "galeria-obras" }],
   "durable_objects": {
     "bindings": [
       { "name": "ROOMS", "class_name": "Room" },

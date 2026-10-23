@@ -71,6 +71,26 @@ async function api(request, env, path) {
     return json(result, result.ok ? 200 : 400);
   }
 
+  // Museo rotativo: postular (formulario con archivos) y bajar los archivos de una obra (de R2)
+  if (path === 'work' && request.method === 'POST') {
+    let fd;
+    try { fd = await request.formData(); } catch { return json({ ok: false, error: 'Formulario inválido.' }, 400); }
+    const file = async (name) => {
+      const f = fd.get(name);
+      return f && typeof f === 'object' ? { mime: f.type, data: await f.arrayBuffer() } : null;
+    };
+    const f = Object.fromEntries(['kind', 'title', 'description', 'technique', 'year', 'link', 'w', 'h'].map((k) => [k, fd.get(k) ?? '']));
+    Object.assign(f, { hd: await file('hd'), wall: await file('wall'), model: await file('model') });
+    const result = await accounts.workSubmit(token, f);
+    return json(result, result.ok ? 200 : 400);
+  }
+  if (path === 'workfile' && request.method === 'GET') {
+    const key = await accounts.workFile(token, q.get('id'), q.get('f'));
+    const obj = key && env.ART ? await env.ART.get(key) : null;
+    if (!obj) return new Response('No encontrada', { status: 404 });
+    return new Response(obj.body, { headers: { 'content-type': obj.httpMetadata?.contentType ?? 'application/octet-stream', 'cache-control': 'private, max-age=3600' } });
+  }
+
   // Vuelta de Google / Discord: se canjea el código y se vuelve al juego con un código de un solo uso
   // (el token de sesión nunca viaja en la dirección)
   const cb = path.match(/^oauth\/(google|discord)\/callback$/);
@@ -132,6 +152,13 @@ async function api(request, env, path) {
     case 'GET search': result = await accounts.search(token, q.get('q')); break;
     case 'GET notifications': result = await accounts.notifications(token); break;
     case 'POST notificationsseen': result = await accounts.notificationsSeen(token); break;
+    case 'GET museum': result = await accounts.museumNow(); break;
+    case 'GET myworks': result = await accounts.myWorks(token); break;
+    case 'GET review': result = await accounts.reviewNext(token, q.get('skip')); break;
+    case 'POST reviewvote': result = await accounts.reviewVote(token, body.id, body.vote, body.reason, body.text); break;
+    case 'GET worksadmin': result = await accounts.worksAdmin(token); break;
+    case 'POST workremove': result = await accounts.workRemove(token, body.id); break;
+    case 'POST title': result = await accounts.setTitle(token, body.nick, body.title); break;
     default: return json({ ok: false, error: 'No encontrado' }, 404);
   }
   return json(result, result.ok ? 200 : 400);

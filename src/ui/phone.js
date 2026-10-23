@@ -13,6 +13,11 @@ const $ = (id) => document.getElementById(id);
 const NOTIF_TEXT = {
   friend_request: (n) => `${n} te mandó una solicitud de amistad`,
   friend_accepted: (n) => `${n} aceptó tu solicitud de amistad`,
+  // Museo rotativo
+  work_verified: (n, d) => `Tu obra "${d?.title}" fue verificada: entra al Museo en su turno`,
+  work_denied: (n, d) => `Tu obra "${d?.title}" fue denegada. Motivo: ${d?.reason}${d?.text ? ` — ${d.text}` : ''}`,
+  work_showing: (n, d) => `¡Tu obra "${d?.title}" está expuesta en el Museo! (24 h)`,
+  title_creator: () => '¡Ahora sos Creador! Tus próximas obras entran a la cola ya verificadas',
 };
 
 function ago(ts) {
@@ -215,7 +220,7 @@ export function createPhone({ social, me, go }) {
       const el = document.createElement('div');
       el.className = `notif ${n.seen ? '' : 'new'}`;
       const text = document.createElement('p');
-      text.textContent = (NOTIF_TEXT[n.type] ?? (() => 'Aviso'))(n.from?.name ?? 'Alguien');
+      text.textContent = (NOTIF_TEXT[n.type] ?? (() => 'Aviso'))(n.from?.name ?? 'Alguien', n.data);
       const meta = document.createElement('span');
       meta.className = 'meta';
       meta.textContent = ago(n.created);

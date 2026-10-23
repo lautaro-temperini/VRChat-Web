@@ -406,6 +406,41 @@
   </aside>
 
   <!-- Atril: notas del dueño de la sala y corazones -->
+  <!-- Atril de la entrada del Museo: Museo rotativo (postular, mis obras, revisar, admin) -->
+  <div id="works" class="overlay">
+    <div class="sheet works-sheet">
+      <button class="close" data-close aria-label="Cerrar">✕</button>
+      <p class="kicker">Museo rotativo</p>
+      <h1 class="display">Exponé tu obra</h1>
+      <p class="meta">Cada obra se expone 24 horas en un lugar del Museo. Las revisa un curador y entran por orden de llegada.</p>
+      <div class="tabs" id="works-tabs">
+        <button type="button" class="tab" data-wtab="postular">Postular</button>
+        <button type="button" class="tab" data-wtab="mias">Mis obras</button>
+        <button type="button" class="tab" data-wtab="revisar" hidden>Revisar</button>
+        <button type="button" class="tab" data-wtab="admin" hidden>Admin</button>
+      </div>
+      <form id="work-form" data-wpane="postular" class="work-form" autocomplete="off">
+        <div class="field">Tipo de obra
+          <div class="seg" id="work-kind"><button type="button" data-kind="cuadro">Cuadro</button><button type="button" data-kind="escultura">Escultura (3D)</button></div>
+        </div>
+        <label class="field">Archivo <input type="file" id="work-file" /></label>
+        <p class="meta" id="work-file-hint"></p>
+        <div id="work-preview"></div>
+        <label class="field">Título <input id="work-title" maxlength="80" placeholder="Nombre de la obra" /></label>
+        <label class="field">Descripción (opcional) <textarea id="work-description" maxlength="600" rows="3" placeholder="Contá algo de la obra"></textarea></label>
+        <div class="work-row">
+          <label class="field">Técnica (opcional) <input id="work-technique" maxlength="80" placeholder="Óleo digital, render…" /></label>
+          <label class="field">Año (opcional) <input id="work-year" maxlength="12" placeholder="2026" /></label>
+        </div>
+        <label class="field">Link (opcional) <input id="work-link" maxlength="300" placeholder="https://…" /></label>
+        <button class="cta" id="work-send">Postular</button>
+      </form>
+      <div data-wpane="mias" id="works-mine" hidden></div>
+      <div data-wpane="revisar" id="works-review" hidden></div>
+      <div data-wpane="admin" id="works-admin" hidden></div>
+    </div>
+  </div>
+
   <div id="notes" class="overlay">
     <div class="sheet book">
       <button class="close" data-close aria-label="Cerrar">✕</button>
