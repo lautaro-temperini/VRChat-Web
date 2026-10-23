@@ -16,14 +16,15 @@ y las salas giran alrededor de exponer, descubrir y coleccionar arte.
 2. **Museo rotativo con postulaciones**: cada obra dura 24 h, cola con prioridad para usuarios.
    Cuadros (arte digital, shaders, diseños) y esculturas (modelos 3D, instalaciones interactivas).
    Empezar por imágenes y modelos 3D; shaders e instalaciones después (corren código: aislar y limitar).
-   **Consultar**: aprobación o entrada directa, cantidad de lugares, postulaciones por persona, qué pasa
-   si no hay postulaciones, cómo se ve la cola.
-3. **Progresión y misiones ligadas al arte** (descubrir, exponer, curar, asistir a eventos; no tiempo
-   conectado), con objetos de recompensa. Niveles que dan objetos nuevos.
-4. **Editor de salas** y salas distintas entre sí (solo el Museo es igual para todos), con plantillas.
+   ✅ Diseño definido (curadores, creadores, verificación, 5 postulaciones por día…: ver "Decisiones").
+   Falta programarlo.
+3. **Editor de salas** y salas distintas entre sí (solo el Museo es igual para todos), con plantillas
+   (loft, galería, club, terraza). ✅ Diseño definido. Va **antes** que la progresión (las recompensas son muebles).
+4. **Progresión y misiones ligadas al arte** (descubrir, exponer, curar, asistir a eventos; no tiempo
+   conectado), con objetos de recompensa. Niveles privados e insignias públicas. ✅ Diseño definido.
 5. **Proceso de arte**: IA (Tripo/Meshy) para muebles, decoración y esculturas; Blender para cuerpos
    y ropa; **diseños de artistas como objetos del juego** (entran a la base y se pueden intercambiar).
-   Más mapas públicos para exploradores. **Consultar** cómo se reparten las copias de un diseño.
+   Más mapas públicos para exploradores. ✅ Diseño definido (copias ilimitadas para regalar, título Diseñador).
 
 Pendiente transversal: **primera prueba con personas reales** (inauguración con 5–10 artistas exponiendo).
 
@@ -72,7 +73,6 @@ La música del DJ y el puente OSC ya están hechos. Falta:
   corto y rodete, pero el dato guardado de cada cuenta no se toca.
 - **Fotos colgadas como cuadros** en la sala propia (la galería, el atril y el muro ya están; esto
   llega con el editor).
-- **Diseño de la sala de xvvave** (distinta del Museo).
 - **AR** en las dos direcciones (obras/avatar en tu habitación; fotos/escaneos del mundo real al juego).
 - **Editor avanzado (capa 2)** con sliders de cara y cuerpo.
 - **Nombre y marca definitivos** (hoy "Galería Online" es provisorio).

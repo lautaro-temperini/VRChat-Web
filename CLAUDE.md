@@ -1,7 +1,7 @@
 # CLAUDE.md
 
-Guía para trabajar en este proyecto con Claude Code. Leé también [docs/ROADMAP.md](docs/ROADMAP.md)
-(próximos pasos y decisiones de diseño ya tomadas).
+Guía para trabajar en este proyecto con Claude Code. Leé también [docs/ESTADO.md](docs/ESTADO.md)
+(qué se hizo y qué falta, para retomar) y [docs/ROADMAP.md](docs/ROADMAP.md) (plan y decisiones de diseño ya tomadas).
 
 ## Reglas de trabajo (pedidas por el dueño del proyecto)
 
@@ -51,8 +51,8 @@ npm run deploy   # build + wrangler deploy
   cuenta sin `username` (`isGuest` en `accounts.js`): chatean por texto y escuchan voces públicas; sin hablar, grupos, me gusta, corazones, objetos, intercambios, muro, galería
   ni sala propia (cada método lo frena con `guestError()`). En el cliente esas opciones se ven con candado
   y avisan (`src/ui/guest.js`: `guestGate`, `lock`). Registrarse conserva el id.
-- **Cuidarse** (`src/ui/roompanel.js`): mutear (voz) e ignorar (voz + texto) se guardan en el navegador;
-  restringir (oculta sus publicaciones del muro) vive en la cuenta (rutas `blocks`/`block`). Reportar está
+- **Cuidarse** (`src/ui/roompanel.js`): mutear (voz) se guarda en el navegador; ignorar (voz + texto,
+  rutas `ignores`/`ignore`) y restringir (oculta sus publicaciones del muro, rutas `blocks`/`block`) viven en la cuenta. Reportar está
   postergado: las rutas `report`/`reports` existen en el servidor pero no hay botón.
 - **Antiflood** del chat en `server/room.js` (`FLOOD_MAX`, `FLOOD_WINDOW`, `REPEAT_WINDOW`).
 - **Voz:** el cliente se suscribe a los más cercanos (`updateVoices`, cada 0,5 s) y suenan los 4 más

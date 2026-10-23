@@ -31,7 +31,7 @@ npm run dev
 | Día y noche | Según la hora de Argentina (GMT-3) |
 | Personaje | Modelo Quaternius con editor (piel, ojos, pelo, ropa, altura, contextura), animaciones de Mixamo y gestos/bailes |
 | Movimiento | Caminar, trotar (gasta stamina), saltar, trepar, agacharse, sentarse; 1ª/3ª persona con la rueda; manos en 1ª persona |
-| Cuentas | Registro con mail + nickname único (PBKDF2), o con Google o Discord. Invitados solo para probar: miran, chatean y se mueven |
+| Cuentas | Registro con mail + nickname único (PBKDF2), o con Google o Discord. Invitados (sin cuenta) solo para probar: miran, chatean por texto y escuchan voces públicas; lo demás aparece con candado 🔒 |
 | Red social | Celular del personaje: amigos y buscador, muro (notas y fotos de amigos + destacados, me gusta), galería y avisos. Atril con notas y corazones en cada sala personal |
 | Salas personales | Nombre, descripción y quién entra (abierta / amigos / cerrada); salas favoritas en el Mapa |
 | Voz | Por el servidor de audio de Cloudflare (nadie ve la IP de otro): escuchás a los 4 más cercanos que hablan (10 m), con audio 3D. Grupos de voz privados de hasta 4 (E sobre alguien → Invitar al grupo) |
@@ -86,12 +86,33 @@ Hasta que exista el editor de salas:
    20.000 triángulos y texturas de 1K–2K.
 3. **Dónde**: `public/models/props/` y pedir dónde ubicarlo en la sala.
 
+## Claves
+
+La voz (Cloudflare Realtime) y el ingreso con Google/Discord necesitan claves secretas. En local van en
+un archivo `.dev.vars` en la raíz (ignorado por git), una por línea:
+
+```
+REALTIME_APP_TOKEN=...
+GOOGLE_CLIENT_SECRET=...
+DISCORD_CLIENT_SECRET=...
+```
+
+Los IDs públicos (App ID de Realtime, Client ID de Google y Discord) están en `wrangler.jsonc`.
+
 ## Subirlo online (gratis)
+
+Desde la carpeta del proyecto, cargá las tres claves (una vez) y subilo:
 
 ```bash
 npx wrangler login
+npx wrangler secret put REALTIME_APP_TOKEN
+npx wrangler secret put GOOGLE_CLIENT_SECRET
+npx wrangler secret put DISCORD_CLIENT_SECRET
 npm run deploy
 ```
+
+En Google Cloud y en Discord hay que agregar también la dirección de vuelta online:
+`https://<tu-sitio>/api/oauth/google/callback` y `https://<tu-sitio>/api/oauth/discord/callback`.
 
 Queda en `https://galeria-online.<tu-usuario>.workers.dev`. Los admins se configuran en
 `wrangler.jsonc` → `vars.ADMIN_IDS` (IDs de cuenta separados por coma).
@@ -102,4 +123,4 @@ Queda en `https://galeria-online.<tu-usuario>.workers.dev`. Los admins se config
 - Animaciones de movimiento, gestos y bailes: [Mixamo](https://www.mixamo.com/) (Adobe).
 - Three.js, Vite, Cloudflare Workers.
 
-Próximos pasos y decisiones de diseño: ver [docs/ROADMAP.md](docs/ROADMAP.md).
+Próximos pasos y decisiones de diseño: ver [docs/ROADMAP.md](docs/ROADMAP.md). Resumen para retomar el trabajo: [docs/ESTADO.md](docs/ESTADO.md).
