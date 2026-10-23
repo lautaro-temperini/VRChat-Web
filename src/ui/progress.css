@@ -1,0 +1,45 @@
+/* ---------- Progresión (src/ui/progress.js) ---------- */
+.track { display: inline-block; position: relative; width: 64px; height: 6px; border-radius: 4px; background: rgba(255, 255, 255, 0.14); overflow: hidden; vertical-align: middle; }
+.track .fill { position: absolute; inset: 0 auto 0 0; width: 0; background: linear-gradient(90deg, var(--accent), var(--primary)); border-radius: 4px; transition: width .4s; }
+.track.big { display: block; width: 100%; height: 9px; margin: 6px 0 4px; }
+
+/* Barrita del HUD */
+.lvlbar { display: inline-flex; align-items: center; gap: 6px; margin-left: 4px; padding: 2px 6px; border: 0; border-left: 1px solid var(--line); background: none; color: var(--text); font: inherit; cursor: pointer; pointer-events: auto; }
+.lvlbar .lv { font-weight: 800; color: var(--primary); }
+.lvlbar[hidden] { display: none; }
+
+/* App del celular */
+.progress-app { display: flex; flex-direction: column; gap: 6px; }
+.pg-level { display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 14px; background: rgba(255, 255, 255, 0.06); }
+.pg-num { flex: none; width: 52px; height: 52px; display: grid; place-items: center; border-radius: 14px; background: var(--primary); color: var(--primary-ink); font: 400 26px var(--display); transform: skewX(var(--skew)); }
+.pg-lvtext { flex: 1; min-width: 0; display: flex; flex-direction: column; font-weight: 700; font-size: 14px; }
+.pg-lvtext .meta { font-weight: 400; font-size: 12px; }
+.pg-h { font: 400 15px var(--display); text-transform: uppercase; letter-spacing: .5px; margin: 12px 0 2px; color: var(--muted); }
+.pg-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; counter-reset: paso; }
+.pg-list li { position: relative; padding: 8px 10px 8px 34px; border-radius: 10px; background: rgba(255, 255, 255, 0.05); font-size: 13px; }
+.pg-list li::before { content: '○'; position: absolute; left: 12px; color: var(--muted); }
+.pg-list li.current { border: 1px solid var(--accent); }
+.pg-list li.current::before { content: '▸'; color: var(--accent); }
+.pg-list li.done { color: var(--muted); text-decoration: line-through; }
+.pg-list li.done::before { content: '✓'; color: #3dff9a; }
+.pg-list li.later { color: var(--muted); opacity: .6; }
+
+/* Insignias */
+.pg-badges { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 6px; }
+.pg-badges.small { grid-template-columns: repeat(auto-fill, minmax(74px, 1fr)); margin-top: 8px; }
+.pg-badges.small:empty { display: none; }
+.pg-badge { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 4px; border-radius: 12px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.05); font-size: 12px; text-align: center; }
+.pg-badge .ico { font-size: 22px; line-height: 1.2; }
+.pg-badge .tier { font: 400 10px var(--display); text-transform: uppercase; letter-spacing: .6px; }
+.pg-badge .meta { font-size: 10px; }
+.pg-badge.none { opacity: .45; }
+.pg-badge.bronce { border-color: #c98a4b; } .pg-badge.bronce .tier { color: #e0a36a; }
+.pg-badge.plata { border-color: #c9d1dc; } .pg-badge.plata .tier { color: #dfe6ef; }
+.pg-badge.oro { border-color: #ffc93c; background: rgba(255, 201, 60, 0.1); } .pg-badge.oro .tier { color: #ffc93c; }
+.pg-badge.title { border-color: var(--accent-2); background: rgba(255, 79, 216, 0.1); }
+
+/* Rareza en el inventario: básico (sin marca), raro (azul), exótico (dorado) */
+.item.r-raro { border-color: #4f8cff; }
+.item.r-raro .ico { box-shadow: inset 0 -6px 0 rgba(0, 0, 0, 0.25), 0 0 12px rgba(79, 140, 255, 0.7); }
+.item.r-exotico { border-color: #ffc93c; }
+.item.r-exotico .ico { box-shadow: inset 0 -6px 0 rgba(0, 0, 0, 0.25), 0 0 14px rgba(255, 201, 60, 0.8); }

@@ -233,3 +233,18 @@ La música del DJ y el puente OSC ya están hechos. Falta:
 | Invitados: cómo se ve lo bloqueado | Las opciones se ven igual, con un candado 🔒; al tocarlas aparece "Para … tenés que crear una cuenta (es gratis)" con un botón "Crear cuenta" |
 | Voz: grupo | Suena como una llamada (sin distancia ni dirección). La invitación sin respuesta vence al minuto y no cuenta como rechazo. Quien está en un grupo figura "En grupo" y no se lo puede invitar a otro hasta que salga |
 | Ingreso | Mail + contraseña, **Google** y **Discord** (Facebook no). Después de entrar con Google/Discord se elige el nickname único. Mismo mail confirmado por Google/Discord = la misma cuenta |
+| Progresión: orden con el editor | Se hace la base ahora (puntos, niveles, insignias, misiones, interfaz) y las recompensas quedan como datos que apuntan a ids de objetos; los muebles se conectan al juntar el editor |
+| Objetos: rareza | Tres rarezas: **básico / raro / exótico** (gris / azul / dorado en el inventario). Las recompensas salen al azar dentro de una rareza |
+| Progresión: puntos | Ver una obra del público 10 · visitar una sala nueva 5 · que te expongan una obra 100 · curar (verificar o denegar) 15 · asistir a un evento 50 · cada paso del camino inicial 20. Cada cosa una sola vez |
+| Progresión: niveles | Nivel N desde 25·N·(N−1) puntos (nivel 2 = 50, 5 = 500, 10 = 2.250, 20 = 9.500). Sin tope |
+| Progresión: ver obras (anti-farmeo) | Suma solo si la obra está **expuesta ahora** y estás conectado **en el Museo** (lo controla el servidor) |
+| Progresión: qué obras cuentan | Solo las del **público** (las de base del Museo no dan puntos) |
+| Progresión: exponer | Suma el día que la obra **entra a una pared** del Museo |
+| Curadores: requisitos (definido) | **Nivel 8 + 30 obras del público vistas**. Se da solo, con aviso al celular |
+| Insignias | Con escalones bronce / plata / oro: Explorador (obras vistas 10/50/200) · Trotamundos (salas 5/20/50) · Artista (obras expuestas 1/5/20) · Ojo crítico (obras curadas 10/50/200) · Fiestero (eventos 3/15/50) · Querido (me gusta recibidos 25/100/500). Aparte, Curador y Creador. En el perfil se ve el escalón más alto de cada una |
+| Camino inicial | En orden: ver una obra con E · visitar otra sala · hacer un gesto · agregar un amigo · publicar en el muro · postular una obra · asistir a un evento. Cada paso da un objeto básico y 20 puntos; terminarlo da uno raro |
+| Misiones diarias | 3 al azar por día (00:00 GMT-3): ver 3 obras · visitar 2 salas · dar 3 me gusta · dejar un corazón · escribir en el muro · hacer 2 gestos · estar en un evento · curar 1 obra (solo curadores). Cada una da un objeto básico; las 3 juntas, 25% de chance de uno raro. Las diarias no dan puntos de nivel |
+| Recompensas por nivel | Objeto básico en cada nivel; raro cada 5 (5, 15, 25…); exótico cada 10 (10, 20…) |
+| Eventos: cómo cuenta | Estar al menos 5 minutos en la sala mientras el DJ pasa música (o hay show en la consola), aunque estés AFK. Cada set es un evento |
+| Progresión: salas que cuentan | Las salas de otros (ni la propia ni el Museo) |
+| Progresión: dónde se ve | App **Progreso** en el celular + **barrita de nivel** chica en pantalla (junto al nombre de la sala) |

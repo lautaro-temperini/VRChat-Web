@@ -70,3 +70,19 @@ export function cleanLook(look) {
 
 // Alcance para soltar y juntar objetos del piso (m). El servidor deja un margen por el retraso.
 export const ITEM_REACH = 3;
+
+// ---------- Progresión (server/progress.js) ----------
+// Rareza de los objetos: separa lo básico de lo especial. Las recompensas de niveles y misiones
+// se eligen al azar dentro de una rareza, de esta lista. PROVISORIO: hoy hay solo indumentaria;
+// cuando se junte el editor de salas se suman acá los muebles (su id + rareza).
+export const RARITIES = {
+  basico: { name: 'Básico', color: '#a7adb5' },
+  raro: { name: 'Raro', color: '#4f8cff' },
+  exotico: { name: 'Exótico', color: '#ffc93c' },
+};
+export const ITEM_RARITY = {
+  cap: 'basico', beanie: 'basico', headphones: 'basico', sunglasses: 'basico', glasses: 'basico', backpack: 'basico',
+  chain: 'raro',
+  crown: 'exotico',
+};
+export const rarityOf = (type) => ITEM_RARITY[type] ?? 'basico';

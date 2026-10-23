@@ -1,6 +1,7 @@
 import { DurableObject } from 'cloudflare:workers';
 import { cleanName, cleanLook, ITEMS, STARTER_ITEMS } from './shared.js';
 import { setupWorks, worksMethods } from './works.js';
+import { setupProgress, progressMethods } from './progress.js';
 
 // Cuentas de usuario (una sola instancia global con base SQLite).
 // - Invitado: se crea sin usuario ni contraseña; el navegador guarda su token.
@@ -150,6 +151,7 @@ export class Accounts extends DurableObject {
       );
     `);
     setupWorks(this.sql); // Museo rotativo (works.js)
+    setupProgress(this.sql); // Progresión (progress.js)
   }
 
   // Invitado = cuenta sin registrar (sin nickname): solo para probar
@@ -533,6 +535,7 @@ export class Accounts extends DurableObject {
     if (rel === 'none') {
       this.sql.exec("INSERT INTO friends (a, b, status, created) VALUES (?, ?, 'pending', ?)", me.id, otherId, Date.now());
       this.notify(otherId, 'friend_request', me.id);
+      this.progressTrack(me.id, 'amigo');
     }
     return { ok: true, relation: this.relation(me.id, otherId) };
   }
@@ -542,7 +545,7 @@ export class Accounts extends DurableObject {
     if (!me) return { ok: false, error: 'Sesión vencida.' };
     if (accept) {
       const changed = this.sql.exec("UPDATE friends SET status = 'accepted' WHERE a = ? AND b = ? AND status = 'pending'", otherId, me.id).rowsWritten;
-      if (changed) this.notify(otherId, 'friend_accepted', me.id);
+      if (changed) { this.notify(otherId, 'friend_accepted', me.id); this.progressTrack(me.id, 'amigo'); }
     } else this.sql.exec('DELETE FROM friends WHERE a = ? AND b = ?', otherId, me.id);
     return { ok: true, relation: this.relation(me.id, otherId) };
   }
@@ -641,6 +644,7 @@ export class Accounts extends DurableObject {
     if (!clean) return { ok: false, error: 'La nota está vacía.' };
     const id = randomHex(8);
     this.sql.exec('INSERT INTO notes (id, owner, text, created) VALUES (?, ?, ?, ?)', id, me.id, clean, Date.now());
+    this.progressTrack(me.id, 'muro');
     return { ok: true, note: { id, text: clean, created: Date.now() } };
   }
 
@@ -704,6 +708,7 @@ export class Accounts extends DurableObject {
     if (!post) return { ok: false, error: 'Esa publicación ya no existe.' };
     if (type === 'photo' && !this.allowed(me.id, post.owner, this.row(post.owner)?.gallery_privacy)) return { ok: false, error: 'No podés ver esa foto.' };
     if (on) this.sql.exec('INSERT OR IGNORE INTO likes (post_type, post_id, user_id, created) VALUES (?, ?, ?, ?)', type, String(id), me.id, Date.now());
+    if (on) { this.progressTrack(me.id, 'like', `${type}:${id}`); this.progressBadges(post.owner); }
     else this.sql.exec('DELETE FROM likes WHERE post_type = ? AND post_id = ? AND user_id = ?', type, String(id), me.id);
     const likes = this.sql.exec('SELECT COUNT(*) AS n FROM likes WHERE post_type = ? AND post_id = ?', type, String(id)).one().n;
     return { ok: true, likes, liked: !!on };
@@ -728,6 +733,7 @@ export class Accounts extends DurableObject {
     if (!this.row(ownerId)) return { ok: false, error: 'No existe esa sala.' };
     if (me.id === ownerId) return { ok: false, error: 'No podés dejarte un corazón a vos mismo.' };
     this.sql.exec('INSERT OR IGNORE INTO hearts (owner, from_user, created) VALUES (?, ?, ?)', ownerId, me.id, Date.now());
+    this.progressTrack(me.id, 'corazon', ownerId);
     return { ok: true, count: this.heartCount(ownerId), given: true };
   }
 
@@ -938,3 +944,5 @@ export class Accounts extends DurableObject {
 
 // Museo rotativo: postular, revisar, rotar (server/works.js)
 Object.assign(Accounts.prototype, worksMethods);
+// Progresión: puntos, niveles, insignias y misiones (server/progress.js)
+Object.assign(Accounts.prototype, progressMethods);

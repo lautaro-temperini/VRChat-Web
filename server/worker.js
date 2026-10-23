@@ -159,6 +159,10 @@ async function api(request, env, path) {
     case 'GET worksadmin': result = await accounts.worksAdmin(token); break;
     case 'POST workremove': result = await accounts.workRemove(token, body.id); break;
     case 'POST title': result = await accounts.setTitle(token, body.nick, body.title); break;
+    // Progresión
+    case 'GET progress': result = await accounts.progress(token); break;
+    case 'POST progressview': result = await accounts.progressView(token, body.id, body.fixed); break;
+    case 'GET badges': result = await accounts.badgesOf(q.get('id')); break;
     default: return json({ ok: false, error: 'No encontrado' }, 404);
   }
   return json(result, result.ok ? 200 : 400);

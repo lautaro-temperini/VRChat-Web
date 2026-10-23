@@ -18,6 +18,7 @@ const NOTIF_TEXT = {
   work_denied: (n, d) => `Tu obra "${d?.title}" fue denegada. Motivo: ${d?.reason}${d?.text ? ` — ${d.text}` : ''}`,
   work_showing: (n, d) => `¡Tu obra "${d?.title}" está expuesta en el Museo! (24 h)`,
   title_creator: () => '¡Ahora sos Creador! Tus próximas obras entran a la cola ya verificadas',
+  title_curator: () => '¡Ahora sos Curador! Revisás obras en el atril de la entrada del Museo',
 };
 
 function ago(ts) {
