@@ -196,6 +196,13 @@ La música del DJ y el puente OSC ya están hechos. Falta:
 | Editor: muebles | Catálogo libre de muebles básicos para todos; los especiales salen del inventario (y vuelven si los levantás) |
 | Editor: cambiar de plantilla | Se puede; los muebles especiales puestos vuelven al inventario |
 | Editor: visitantes | Pueden usar los muebles (sentarse, ver cuadros con E), no moverlos |
+| Diseños: qué | Estampas para ropa, cuadros y objetos 3D |
+| Diseños: copias | El artista puede regalar copias ilimitadas; los demás las intercambian |
+| Diseños: verificación | Nadie verifica el contenido; solo un control automático de que funcione en el juego |
+| Diseños: reglas 3D | GLB, hasta 2 MB, hasta 10.000 triángulos, texturas hasta 1K, máximo 3 m de alto (se pueden ajustar) |
+| Diseños: imágenes | Estampas a 1024 px. Cuadros y obras del Museo: 1024 px en la pared y hasta 2048 px (HD) al abrir la ficha con E |
+| Diseños: crédito | "Diseño de X" solo en el inventario |
+| Diseñadores | Título que se gana al subir 3 modelos que pasen el control automático. Solo reconocimiento (no da poderes). No se pierde |
 | Orden del plan | El editor de salas va **antes** que la progresión (las recompensas necesitan muebles) |
 | Eventos | Cualquier set de DJ o show de la consola, en cualquier sala, con **más de 5 personas** presentes. Cuenta haber estado **5 minutos** (aunque estés AFK) |
 | Voz: servidor | Servidor de audio (Cloudflare Realtime SFU) para que nadie vea la IP de otro |
