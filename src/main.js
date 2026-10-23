@@ -19,7 +19,7 @@ import { RTC } from './net/rtc.js';
 import { createSocial } from './ui/social.js';
 import { toast } from './ui/toast.js';
 import { guestGate, setRegister, lock } from './ui/guest.js';
-import { EMOTES, DANCES } from '../server/shared.js';
+import { EMOTES, DANCES, ITEM_REACH } from '../server/shared.js';
 import { UI_ICONS } from './ui/icons.js';
 import { createRoomPanel } from './ui/roompanel.js';
 import { Ground } from './world/ground.js';
@@ -450,6 +450,9 @@ const ground = new Ground(scene);
 function dropItem(it, at) {
   // Por defecto, adelante del personaje; si se arrastró a la escena, donde se soltó
   const p = at ?? ctrl.pos.clone().add(new THREE.Vector3(Math.sin(ctrl.bodyYaw), 0, Math.cos(ctrl.bodyYaw)).multiplyScalar(0.9));
+  // Alcance máximo: 3 m (si se arrastró más lejos, cae a 3 m en esa dirección)
+  const off = new THREE.Vector2(p.x - ctrl.pos.x, p.z - ctrl.pos.z);
+  if (off.length() > ITEM_REACH) { off.setLength(ITEM_REACH); p.set(ctrl.pos.x + off.x, ctrl.pos.y, ctrl.pos.z + off.y); }
   net.send({ t: 'drop', iid: it.iid, x: p.x, y: p.y, z: p.z });
 }
 

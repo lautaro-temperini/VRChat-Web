@@ -76,7 +76,6 @@ La música del DJ y el puente OSC ya están hechos. Falta:
 - **AR** en las dos direcciones (obras/avatar en tu habitación; fotos/escaneos del mundo real al juego).
 - **Editor avanzado (capa 2)** con sliders de cara y cuerpo.
 - **Nombre y marca definitivos** (hoy "Galería Online" es provisorio).
-- **Arrastrar objetos al suelo: ¿alcance máximo?** Hoy no tiene límite (cae donde se suelta).
 - **Selfie → avatar:** MetaPerson (Avatar SDK) requiere plan pago (~800 USD/mes para integrar);
   no se encontró alternativa gratuita vigente. Queda en espera.
 
@@ -200,6 +199,7 @@ La música del DJ y el puente OSC ya están hechos. Falta:
 | Curaduría: enfoque | Se mantiene como está (23/10). Primero se prueba que el título de Curador se gane solo, con un mínimo de actividad específica |
 | Museo rotativo: escasez | Sin cambios por ahora (todavía no hay tanta gente). Que una persona ocupe varios lugares el mismo día está bien: da coherencia temática |
 | Balcón: barandas | El vidrio del balcón se salta: pegado al vidrio y mirándolo, Espacio. Animación hecha por código (salto de costado apoyando una mano); al caer, aterrizaje normal. El salto común ya no lo pasa |
+| Objetos del piso: alcance | Se sueltan y se juntan hasta 3 m (como la E). Si se arrastra más lejos, cae a 3 m en esa dirección. El servidor lo controla |
 | Escaleras: costados | El vidrio de la escalera es barrera: no se atraviesa ni se salta |
 | Progresión | Niveles por puntos (**privados**, solo los ve uno) + insignias por logros (**públicas**, se ven en el perfil) |
 | Progresión: qué suma | Descubrir (ver obras, visitar salas), exponer (obras aceptadas), curar (verificar/denegar) y asistir a eventos (sets de DJ, inauguraciones, pasar música o luces). Cada cosa da puntos **una sola vez** (la misma obra o sala no suma dos veces) |

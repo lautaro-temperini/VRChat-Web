@@ -67,3 +67,6 @@ export function cleanLook(look) {
   if (build !== undefined) out.build = build;
   return out;
 }
+
+// Alcance para soltar y juntar objetos del piso (m). El servidor deja un margen por el retraso.
+export const ITEM_REACH = 3;
