@@ -28,6 +28,10 @@ export function buildMuseum(scene, renderer, quality) {
   const interactables = []; // cosas con las que se interactúa con E
   const animated = [];      // funciones (dt, t) que se llaman cada frame
   const high = quality === 'high';
+  // Calidad baja (celulares): bordes redondeados más simples (casi no se nota y es ~40% menos
+  // triángulos) y el collage del baño a 512 px. Decisión del usuario, ver ROADMAP.md
+  const low = quality === 'low';
+  const SEG = low ? 2 : 4;
   const rand = rng(42);
 
   // ---------- Luz y ambiente ----------
@@ -81,7 +85,7 @@ export function buildMuseum(scene, renderer, quality) {
   // opts: collide (choca), float (choca solo a su altura: se puede pasar por debajo), block (frena la cámara),
   //       climb (se puede trepar), round (bordes redondeados), cast (sombra)
   function box(w, h, d, x, y, z, mat, opts = {}) {
-    const geo = opts.round ? new RoundedBoxGeometry(w, h, d, 4, opts.round) : new THREE.BoxGeometry(w, h, d);
+    const geo = opts.round ? new RoundedBoxGeometry(w, h, d, SEG, opts.round) : new THREE.BoxGeometry(w, h, d);
     const m = new THREE.Mesh(geo, mat);
     m.position.set(x, y, z);
     m.castShadow = high && (opts.cast ?? true);
@@ -520,7 +524,7 @@ export function buildMuseum(scene, renderer, quality) {
     g.position.set(x, y, z);
     g.rotation.y = yaw;
     const add = (w, h, d, px, py, pz, mat, round = 0.06) => {
-      const m = new THREE.Mesh(new RoundedBoxGeometry(w, h, d, 3, round), mat);
+      const m = new THREE.Mesh(new RoundedBoxGeometry(w, h, d, low ? 2 : 3, round), mat);
       m.position.set(px, py, pz);
       m.castShadow = high;
       g.add(m);
@@ -586,7 +590,7 @@ export function buildMuseum(scene, renderer, quality) {
     box(T, h, d, x1 + T / 2, h / 2, cz, wallMat, wall);
     box(w + 2 * T, h, T, cx, h / 2, z0 - T / 2, wallMat, wall);
     box(w + 2 * T, T, d + T, cx, h + T / 2, cz, wallMat, { cast: false });
-    const coll = (seed, rep) => { const t = collage(seed); t.repeat.set(rep, 1); return new THREE.MeshStandardMaterial({ map: t, roughness: 0.8 }); };
+    const coll = (seed, rep) => { const t = collage(seed, low ? 512 : 1024); t.repeat.set(rep, 1); return new THREE.MeshStandardMaterial({ map: t, roughness: 0.8 }); };
     plane(d, h, coll(3, d / h), x0 + 0.01, h / 2, cz, Math.PI / 2);
     plane(d, h, coll(5, d / h), x1 - 0.01, h / 2, cz, -Math.PI / 2);
     plane(w, h, coll(8, w / h), cx, h / 2, z0 + 0.01, 0);
@@ -811,7 +815,7 @@ export function buildMuseum(scene, renderer, quality) {
       const head = new THREE.Group();
       head.position.set(x, H - 0.6, z);
       head.userData.dynamic = true; // apunta a la pista
-      const body = new THREE.Mesh(new RoundedBoxGeometry(0.22, 0.26, 0.22, 3, 0.04), darkMat);
+      const body = new THREE.Mesh(new RoundedBoxGeometry(0.22, 0.26, 0.22, low ? 2 : 3, 0.04), darkMat);
       head.add(body);
       const mat = new THREE.ShaderMaterial({
         uniforms: { color: { value: new THREE.Color() }, opacity: { value: 0 } },

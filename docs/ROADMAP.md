@@ -145,6 +145,7 @@ La música del DJ y el puente OSC ya están hechos. Falta:
 | Tipo de cuerpo | Masculino / femenino; todo libre (cualquier cuerpo puede usar cualquier peinado y barba) |
 | Peinados | corto, largo, rapado, rodete. Rulos → corto y coleta → rodete hasta que existan (sin preferencia del usuario; opción reversible) |
 | Calidad gráfica | Siempre automática (sin selector): baja/media/alta según GPU, memoria y celular; si anda lento baja sola. KTX2 para celular más adelante (todavía no se instalan las herramientas) |
+| Calidad baja: Museo (23/10) | Bordes redondeados más simples (2 segmentos en vez de 4: casi no se nota, ~40% menos triángulos) y el collage del baño a 512 px. Media y alta, sin cambios. El piso de cemento queda a 1024 px (a 512 se veía una trama) |
 | Botones | PC: Gestos, Sala, Personaje y Ajustes arriba a la derecha; Inventario, Amigos y Mapa abajo a la derecha; Hablar y Audio debajo del chat. Celular: todo arriba con íconos (mochila, celular, mundo); Hablar y Audio arriba del chat |
 | Red social: dónde | **Celular** (centro personal, desde cualquier sala) **y atril** (en cada sala personal). El Mapa queda aparte, fuera del celular |
 | Celular | Inicio = Amigos (conectados primero) + buscador de gente. Apps: Notas (mías), Galería (mía), Avisos. Al abrirlo el personaje lo saca y los demás lo ven (también caminando) |

@@ -67,7 +67,7 @@ body.append(labels.domElement);
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.05, 120);
-const world = buildMuseum(scene, renderer, high ? 'high' : 'low');
+const world = buildMuseum(scene, renderer, quality);
 
 // Post-procesado (solo calidad alta): sombras de contacto (GTAO) + brillo solo en neones (bloom con umbral alto)
 let composer = null;
