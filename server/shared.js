@@ -68,6 +68,9 @@ export function cleanLook(look) {
   return out;
 }
 
+// Alcance para soltar y juntar objetos del piso (m). El servidor deja un margen por el retraso.
+export const ITEM_REACH = 3;
+
 // ---------- Progresión (server/progress.js) ----------
 // Rareza de los objetos: separa lo básico de lo especial. Las recompensas de niveles y misiones
 // se eligen al azar dentro de una rareza, de esta lista. PROVISORIO: hoy hay solo indumentaria;

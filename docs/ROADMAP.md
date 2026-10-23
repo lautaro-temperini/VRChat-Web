@@ -76,7 +76,6 @@ La música del DJ y el puente OSC ya están hechos. Falta:
 - **AR** en las dos direcciones (obras/avatar en tu habitación; fotos/escaneos del mundo real al juego).
 - **Editor avanzado (capa 2)** con sliders de cara y cuerpo.
 - **Nombre y marca definitivos** (hoy "Galería Online" es provisorio).
-- **Arrastrar objetos al suelo: ¿alcance máximo?** Hoy no tiene límite (cae donde se suelta).
 - **Selfie → avatar:** MetaPerson (Avatar SDK) requiere plan pago (~800 USD/mes para integrar);
   no se encontró alternativa gratuita vigente. Queda en espera.
 
@@ -197,6 +196,11 @@ La música del DJ y el puente OSC ya están hechos. Falta:
 | Museo rotativo: archivos | Se guardan en Cloudflare R2. Cuadros: hasta 2048 px (se ven a 1024 en la pared). Modelos: GLB hasta 2 MB, 10.000 triángulos, texturas de 1K y 3 m de alto |
 | Curadores: arranque | Mientras no haya curadores, verifican los admins; además el admin puede nombrar curadores fundadores a mano |
 | Curadores: requisitos | Nivel + participación (propuesta a ajustar: nivel 10+ y haber visto 50 obras distintas del Museo) |
+| Curaduría: enfoque | Se mantiene como está (23/10). Primero se prueba que el título de Curador se gane solo, con un mínimo de actividad específica |
+| Museo rotativo: escasez | Sin cambios por ahora (todavía no hay tanta gente). Que una persona ocupe varios lugares el mismo día está bien: da coherencia temática |
+| Balcón: barandas | El vidrio del balcón se salta: pegado al vidrio y mirándolo, Espacio. Animación hecha por código (salto de costado apoyando una mano); al caer, aterrizaje normal. El salto común ya no lo pasa |
+| Objetos del piso: alcance | Se sueltan y se juntan hasta 3 m (como la E). Si se arrastra más lejos, cae a 3 m en esa dirección. El servidor lo controla |
+| Escaleras: costados | El vidrio de la escalera es barrera: no se atraviesa ni se salta |
 | Progresión | Niveles por puntos (**privados**, solo los ve uno) + insignias por logros (**públicas**, se ven en el perfil) |
 | Progresión: qué suma | Descubrir (ver obras, visitar salas), exponer (obras aceptadas), curar (verificar/denegar) y asistir a eventos (sets de DJ, inauguraciones, pasar música o luces). Cada cosa da puntos **una sola vez** (la misma obra o sala no suma dos veces) |
 | Me gusta y progresión | Los me gusta son solo sociales: **no dan puntos** (para que no se farmee). Puede haber una insignia por recibir cierta cantidad |
