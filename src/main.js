@@ -7,6 +7,8 @@ import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { buildMuseum } from './world/museum.js';
+import { buildPersonalRoom, isPersonalRoom } from './world/rooms.js';
+import { createRoomEditor } from './world/editor.js';
 import { Avatar, DEFAULT_LOOK, LOOK_OPTIONS, setTextureQuality } from './player/avatar.js';
 import { PlayerController } from './player/controller.js';
 import { FPArms } from './player/fpArms.js';
@@ -69,7 +71,8 @@ body.append(labels.domElement);
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.05, 120);
-const world = buildMuseum(scene, renderer, quality);
+// Las salas personales (u-<id>) usan una plantilla con los muebles del dueño (rooms.js); el Museo es el de siempre
+const world = isPersonalRoom() ? buildPersonalRoom(scene, renderer, quality) : buildMuseum(scene, renderer, quality);
 
 // Post-procesado (solo calidad alta): sombras de contacto (GTAO) + brillo solo en neones (bloom con umbral alto)
 let composer = null;
@@ -144,7 +147,7 @@ for (const b of document.querySelectorAll('button.pill:not(.icon)')) {
 
 // ---------- Estado de la interfaz ----------
 // Un solo panel/superposición abierto a la vez. Mientras hay uno, el jugador no se mueve.
-const OVERLAYS = ['editing', 'settings', 'inspecting', 'profiling', 'auth', 'inventory', 'friends', 'trading', 'viewing', 'roompanel', 'mundi', 'gestures', 'djing', 'artists', 'controls', 'kicked', 'notes', 'works'];
+const OVERLAYS = ['editing', 'settings', 'inspecting', 'profiling', 'auth', 'inventory', 'friends', 'trading', 'viewing', 'roompanel', 'mundi', 'gestures', 'djing', 'artists', 'controls', 'kicked', 'notes', 'works', 'roomedit'];
 // Paneles que no frenan al personaje (se puede seguir caminando con WASD)
 const NON_BLOCKING = ['inventory', 'friends', 'roompanel', 'editing', 'gestures', 'artists'];
 function openOverlay(cls) {
@@ -747,13 +750,11 @@ async function loadMuseum() {
 }
 
 if (roomOwner) {
-  lectern = buildLectern(scene, { x: -24.5, z: -4.2, yaw: Math.atan2(-3, 4.2) });
-  world.colliders.push(lectern.collider);
-  const item = { object: lectern.group, kind: 'atril', prompt: 'Leer las notas' };
-  lectern.group.traverse((o) => { o.userData.interact = item; });
-  world.interactables.push(item);
+  lectern = world.lectern; // el atril es un mueble más del editor de salas (rooms.js)
   notes.hearts(roomOwner);
 }
+// Editor de la sala propia (solo lo usa el dueño; los demás ven los cambios)
+const roomEditor = world.editable ? createRoomEditor({ world, scene, camera, renderer, net, rtc, ctrl, me: () => account, ui: { openOverlay, closeOverlays }, toast, isTouch }) : null;
 
 // Controles: al entrar (una vez por visita), con /controls o desde el menú
 let controlsShown = false;
@@ -814,6 +815,7 @@ net
     applyGroups();
     if (rtc.mic) net.send({ t: 'mic', v: rtc.micState });
     roomPanel.setRoom(m.room ?? {});
+    roomEditor?.onWelcome(m);
     if (me.phone) net.send({ t: 'phone', v: true });
     roomPanel.applyMutes();
     ground.clear();
@@ -1102,6 +1104,7 @@ function interact() {
     ctrl.sit(seat);
   } else if (t.kind === 'player') openProfile(t.player);
   else if (t.kind === 'screen') useScreen();
+  else if (t.kind === 'screen2') roomEditor?.useScreen2(); // segunda pantalla de una sala personal
   else if (t.kind === 'atril') notes.open(roomOwner, account?.id === roomOwner);
   else if (t.kind === 'museo') { if (account?.guest) guestGate('postular obras al Museo'); else works.open(); }
   else if (t.kind === 'dj') openDJPanel();
@@ -1247,6 +1250,7 @@ function promptFor(t) {
   if (t.kind === 'player') return `Ver perfil de ${t.player.name}`;
   if (t.kind === 'artists') return 'Consola de artistas';
   if (t.kind === 'dj') return !rtc.dj ? 'Pasar música' : rtc.dj.id === net.id ? 'Terminar tu set' : `Cabina ocupada (DJ ${rtc.dj.name})`;
+  if (t.kind === 'screen2') return roomEditor?.screen2Prompt();
   if (t.kind === 'screen') return !parts.escenario ? 'Pasar visuales' : parts.escenario.id === net.id ? 'Dejar de pasar visuales' : 'Ver en grande';
   if (t.kind === 'pickup') {
     const g = t.ground;
@@ -1455,6 +1459,7 @@ renderer.setAnimationLoop(() => {
   ctrl.update(dt);
   for (const r of remotes.values()) r.update(dt);
   world.update(dt, t);
+  roomEditor?.update(dt);
   ground.update(dt, t, account?.id);
   rtc.update(camera, (key) => (key.endsWith(':dj') ? world.dj.speakers : key.endsWith(':screen') ? world.screen.position : remotes.get(key)?.mouth()));
   world.dj.setMusic(rtc.dj ? rtc.musicLevel() : -1);

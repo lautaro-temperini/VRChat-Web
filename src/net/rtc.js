@@ -197,6 +197,7 @@ export class RTC {
   wanted(id, kind) {
     if (kind === 'dj') return this.dj?.id === id;
     if (kind === 'stage') return this.stage?.id === id;
+    if (kind === 'stage2') return this.stage2?.id === id;
     return !!this.voiceWanted?.has(id);
   }
 
@@ -216,6 +217,7 @@ export class RTC {
     this.subs.delete(key);
     this.dropSound(key.endsWith(':voice') ? key.split(':')[0] : key);
     if (key.endsWith(':stage') && this.stage) this.onStage(null);
+    if (key.endsWith(':stage2') && this.stage2) this.onStage2?.(null);
     if (!sub.mid) return;
     this.byMid.delete(sub.mid);
     this.queue(() => this.request('unpull', { mids: [sub.mid] }));
@@ -240,6 +242,7 @@ export class RTC {
     this.flat.delete(id);
     if (this.dj?.id === id) this.setDJ(null);
     if (this.stage?.id === id) this.setStage(null);
+    if (this.stage2?.id === id) this.setStage(null, 'stage2');
   }
 
   // ---------- Qué voces escucho ----------
@@ -295,6 +298,7 @@ export class RTC {
     if (kind === 'voice') this.addSound(id, stream);
     else if (kind === 'dj') this.addMusic(`${id}:dj`, stream);
     else if (kind === 'stage' && this.stage?.id === id) this.onStage(videoOf(stream));
+    else if (kind === 'stage2' && this.stage2?.id === id) this.onStage2?.(videoOf(stream));
   }
 
   addSound(key, stream) {
@@ -519,40 +523,45 @@ export class RTC {
 
   // ---------- Pantalla del escenario (VJ): solo video ----------
 
-  async captureStage() {
+  // slot: 'stage' (la pantalla de siempre) o 'stage2' (la segunda pantalla de una sala personal)
+  async captureStage(slot = 'stage') {
     try {
       const stream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 30 }, audio: false });
-      this.pendingStage = stream;
-      return { ok: true, streamId: 'stage' };
+      this[slot === 'stage' ? 'pendingStage' : 'pendingStage2'] = stream;
+      return { ok: true, streamId: slot };
     } catch {
       return { ok: false, error: 'Se canceló o el navegador no permite compartir pantalla.' };
     }
   }
 
   // La sala confirmó que la pantalla es mía
-  startStage() {
-    const stream = this.pendingStage;
+  startStage(slot = 'stage') {
+    const [pending, live, show] = slot === 'stage' ? ['pendingStage', 'stageStream', this.onStage] : ['pendingStage2', 'stage2Stream', this.onStage2];
+    const stream = this[pending];
     if (!stream) return;
-    this.pendingStage = null;
-    this.stageStream = stream;
-    stream.getVideoTracks()[0]?.addEventListener('ended', () => this.onStageEnded?.());
-    this.publish('stage', stream.getVideoTracks()[0], stream);
-    this.onStage(videoOf(stream));
+    this[pending] = null;
+    this[live] = stream;
+    stream.getVideoTracks()[0]?.addEventListener('ended', () => (slot === 'stage' ? this.onStageEnded : this.onStage2Ended)?.());
+    this.publish(slot, stream.getVideoTracks()[0], stream);
+    show?.(videoOf(stream));
   }
 
-  stopStage() {
-    for (const stream of [this.stageStream, this.pendingStage]) if (stream) for (const t of stream.getTracks()) t.stop();
-    if (this.stageStream) this.unpublish('stage');
-    this.stageStream = this.pendingStage = null;
+  stopStage(slot = 'stage') {
+    const [pending, live] = slot === 'stage' ? ['pendingStage', 'stageStream'] : ['pendingStage2', 'stage2Stream'];
+    for (const stream of [this[live], this[pending]]) if (stream) for (const t of stream.getTracks()) t.stop();
+    if (this[live]) this.unpublish(slot);
+    this[live] = this[pending] = null;
   }
 
-  setStage(info) {
-    if (this.stage && (!info || info.id !== this.stage.id)) {
-      this.unsubscribe(`${this.stage.id}:stage`);
-      this.onStage(null);
+  setStage(info, slot = 'stage') {
+    const show = slot === 'stage' ? this.onStage : this.onStage2;
+    const cur = this[slot];
+    if (cur && (!info || info.id !== cur.id)) {
+      this.unsubscribe(`${cur.id}:${slot}`);
+      show?.(null);
     }
-    this.stage = info;
-    if (info && info.id !== this.net.id) this.subscribe(info.id, 'stage');
+    this[slot] = info;
+    if (info && info.id !== this.net.id) this.subscribe(info.id, slot);
   }
 
   setScreen(info) { this.screen = info; }

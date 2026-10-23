@@ -1,6 +1,7 @@
 import { DurableObject } from 'cloudflare:workers';
 import { cleanName, cleanLook, cleanEquip, EMOTES, ITEM_REACH } from './shared.js';
 import { roomTrack, roomEventTick } from './progress.js';
+import { roomEditorMethods, ROOM_SPAWN } from './editor.js';
 
 // Cada sala del juego es una instancia de Room (un Durable Object).
 // - Reenvía posiciones, chat, AFK y estado del micrófono.
@@ -24,7 +25,7 @@ const PICKUP_LOCK = 5_000, GROUND_LIFE = 60_000;
 const FLOOD_MAX = 5, FLOOD_WINDOW = 10_000, REPEAT_WINDOW = 30_000;
 const DEFAULT_SETTINGS = { chat: true, voice: true, screen: true, items: true, dj: true, artists: true };
 // Partes que toman los artistas en la consola (además de la pantalla del hall, que es this.screen)
-const PARTS = ['luces', 'escenario'];
+const PARTS = ['luces', 'escenario', 'escenario2']; // escenario2: la segunda pantalla de una sala personal (editor)
 const SPAWN = { x: -27.5, z: 0 }; // junto a la puerta de entrada (ver museum.js)
 // Servidor de audio (Cloudflare Realtime SFU)
 const SFU_API = 'https://rtc.live.cloudflare.com/v1/apps/';
@@ -32,7 +33,7 @@ const SFU_API = 'https://rtc.live.cloudflare.com/v1/apps/';
 const TURN_API = 'https://rtc.live.cloudflare.com/v1/turn/keys/';
 const TURN_TTL = 6 * 3600;           // s que duran las credenciales que se reparten
 const TURN_REUSE = 60 * 60_000;      // ms que la sala reutiliza las mismas (bien por debajo del TTL)
-const KINDS = ['voice', 'dj', 'stage']; // pistas que se pueden publicar
+const KINDS = ['voice', 'dj', 'stage', 'stage2']; // pistas que se pueden publicar
 // Voz: se escucha hasta 10 m (el cliente elige a los 4 más cercanos que hablan). Acá se
 // deja un margen, porque las posiciones llegan con un poco de atraso.
 const VOICE_RANGE = 20;
@@ -220,6 +221,7 @@ export class Room extends DurableObject {
         t: 'welcome', id: meta.id, players: this.players(ws), chat, screen: this.screen, dj: this.dj, parts: this.parts, lights: this.lights, groups: this.groups,
         room: { name: await this.roomName(), owner: await this.ownerId(), settings: this.settings, mod: meta.mod, silenced: !!this.silenced[user.id] },
         ground: this.ground.map((g) => ({ ...g, age: Date.now() - g.at })),
+        layout: await this.layout(),
       });
       this.broadcast({ t: 'join', ...this.publicInfo(meta) }, ws);
       await this.accounts().presence(await this.roomName(), [user.id]);
@@ -365,7 +367,7 @@ export class Room extends DurableObject {
             return this.notice(ws, silenced ? 'Estás silenciado en esta sala.' : 'La consola de artistas está deshabilitada en esta sala.');
           }
           if (cur && cur.id !== meta.id && this.byId(cur.id)) return this.send(ws, { t: 'part', part, busy: true, name: cur.name });
-          this.parts[part] = { id: meta.id, name: meta.name, ...(part === 'escenario' ? { streamId: String(msg.streamId ?? '').slice(0, 100) } : {}) };
+          this.parts[part] = { id: meta.id, name: meta.name, ...(part !== 'luces' ? { streamId: String(msg.streamId ?? '').slice(0, 100) } : {}) };
           this.broadcast({ t: 'part', part, on: true, ...this.parts[part] });
         } else if (cur?.id === meta.id) this.releasePart(part);
         break;
@@ -379,6 +381,9 @@ export class Room extends DurableObject {
         this.broadcast({ t: 'luces', s }, ws);
         break;
       }
+      case 'edit':
+        await this.editMessage(ws, meta, msg);
+        break;
       case 'drop':
         await this.drop(ws, meta, msg);
         break;
@@ -489,9 +494,11 @@ export class Room extends DurableObject {
         this.send(target, { t: 'teleport', x: s[0] + 1, y: s[1], z: s[2] + 0.5, by: meta.name });
         break;
       }
-      case 'spawn':
-        this.send(target, { t: 'teleport', x: SPAWN.x, y: 0, z: SPAWN.z, by: meta.name });
+      case 'spawn': {
+        const sp = (await this.ownerId()) ? ROOM_SPAWN : SPAWN; // las salas personales tienen su propia entrada
+        this.send(target, { t: 'teleport', x: sp.x, y: 0, z: sp.z, by: meta.name });
         break;
+      }
       case 'setting': {
         if (!(msg.key in DEFAULT_SETTINGS)) return;
         this.settings[msg.key] = !!msg.value;
@@ -574,6 +581,7 @@ export class Room extends DurableObject {
     if (!tm?.joined || !tm.sfu) return 'not-yet';
     if (kind === 'dj') return this.dj?.id === tm.id ? (tm.pubs?.dj ? null : 'not-yet') : 'denied';
     if (kind === 'stage') return this.parts.escenario?.id === tm.id ? (tm.pubs?.stage ? null : 'not-yet') : 'denied';
+    if (kind === 'stage2') return this.parts.escenario2?.id === tm.id ? (tm.pubs?.stage2 ? null : 'not-yet') : 'denied';
     if (kind !== 'voice') return 'denied';
     if (!tm.pubs?.voice) return 'not-yet';
     if (this.silenced[tm.userId] || (!this.settings.voice && !tm.mod)) return 'denied';
@@ -600,7 +608,7 @@ export class Room extends DurableObject {
     if (msg.op === 'push') {
       // Publicar mis pistas: voz siempre; música y video solo si la cabina / la pantalla son mías
       const tracks = (Array.isArray(msg.tracks) ? msg.tracks : []).slice(0, 3).filter((t) => KINDS.includes(t?.kind) && typeof t.mid === 'string');
-      const allowed = (k) => (k === 'voice' && !meta.guest) || (k === 'dj' && this.dj?.id === meta.id) || (k === 'stage' && this.parts.escenario?.id === meta.id);
+      const allowed = (k) => (k === 'voice' && !meta.guest) || (k === 'dj' && this.dj?.id === meta.id) || (k === 'stage' && this.parts.escenario?.id === meta.id) || (k === 'stage2' && this.parts.escenario2?.id === meta.id);
       if (!sdp || !tracks.length || !tracks.every((t) => allowed(t.kind))) return reply({ ok: false, error: 'denied' });
       const r = await this.sfuApi(`${base}/tracks/new`, 'POST', {
         sessionDescription: { type: 'offer', sdp },
@@ -947,3 +955,6 @@ function cleanLights(s) {
   };
   return out;
 }
+
+// Editor de salas: plantilla y muebles de las salas personales (server/editor.js)
+Object.assign(Room.prototype, roomEditorMethods);
