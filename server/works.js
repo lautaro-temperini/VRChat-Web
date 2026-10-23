@@ -126,6 +126,7 @@ export const worksMethods = {
       id, me.id, kind, title, clip(f.description, 600), clip(f.technique, 80), clip(f.year, 12), link,
       Math.round(Number(f.w)) || 0, Math.round(Number(f.h)) || 0, creator ? 'verificada' : 'pendiente', Date.now());
     if (creator) this.rotate();
+    this.progressTrack(me.id, 'postular');
     return { ok: true, id, verified: creator };
   },
 
@@ -203,6 +204,7 @@ export const worksMethods = {
     if (reason === 'otro' && !detail) return { ok: false, error: 'Contá el motivo.' };
     this.sql.exec('INSERT OR REPLACE INTO work_votes (work_id, user_id, vote, reason, text, created) VALUES (?, ?, ?, ?, ?, ?)',
       w.id, me.id, vote, vote === 'no' ? reason : null, detail, Date.now());
+    this.progressTrack(me.id, 'curada', w.id);
 
     const others = this.sql.exec('SELECT * FROM work_votes WHERE work_id = ? AND user_id != ?', w.id, me.id).toArray();
     const otherNo = others.find((v) => v.vote === 'no');
@@ -255,6 +257,7 @@ export const worksMethods = {
         this.sql.exec("UPDATE works SET status = 'expuesta', slot = ?, shown_at = ?, ends_at = ? WHERE id = ?", s.idx, now, now + SHOW_TIME, next.id);
         this.sql.exec('UPDATE slots SET work_id = ?, ends_at = ? WHERE kind = ? AND idx = ?', next.id, now + SHOW_TIME, kind, s.idx);
         this.notifyData(next.author, 'work_showing', next.author, { title: next.title });
+        this.progressTrack(next.author, 'expuesta', next.id);
       }
     }
   },

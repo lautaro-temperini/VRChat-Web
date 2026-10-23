@@ -1,5 +1,6 @@
 import { DurableObject } from 'cloudflare:workers';
 import { cleanName, cleanLook, cleanEquip, EMOTES } from './shared.js';
+import { roomTrack, roomEventTick } from './progress.js';
 
 // Cada sala del juego es una instancia de Room (un Durable Object).
 // - Reenvía posiciones, chat, AFK y estado del micrófono.
@@ -172,6 +173,7 @@ export class Room extends DurableObject {
       } else alive.push(m.userId);
     }
     if (alive.length) await this.accounts().presence(await this.roomName(), [...new Set(alive)]);
+    await roomEventTick(this); // progresión: asistir a eventos
     await this.scheduleAlarm();
   }
 
@@ -217,6 +219,7 @@ export class Room extends DurableObject {
       });
       this.broadcast({ t: 'join', ...this.publicInfo(meta) }, ws);
       await this.accounts().presence(await this.roomName(), [user.id]);
+      await roomTrack(this, ws, user.id, 'sala'); // progresión: visitar salas de otros
       await this.scheduleAlarm();
       return;
     }
@@ -249,6 +252,7 @@ export class Room extends DurableObject {
       case 'emote': {
         if (!EMOTES[msg.e]) return;
         this.broadcast({ t: 'emote', id: meta.id, e: msg.e }, ws);
+        await roomTrack(this, ws, meta.userId, 'gesto');
         break;
       }
       case 'mic': {
