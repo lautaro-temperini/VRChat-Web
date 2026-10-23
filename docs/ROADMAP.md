@@ -181,7 +181,15 @@ La música del DJ y el puente OSC ya están hechos. Falta:
 | Títulos: perderlos | Solo un admin quita el título de Creador o Curador, a mano |
 | Bajar obras | Solo los admins pueden sacar una obra que ya entró (de la cola o del Museo) |
 | Registro de curadores | Los admins ven quién verificó y quién denegó cada obra |
-| Museo rotativo: sin definir | Cuántas obras puede postular cada persona (el usuario lo está pensando). Los requisitos exactos para ser Curador van con el punto 3 |
+| Museo rotativo: sin definir | Cuántas obras puede postular cada persona (el usuario lo está pensando) |
+| Curadores: arranque | Mientras no haya curadores, verifican los admins; además el admin puede nombrar curadores fundadores a mano |
+| Curadores: requisitos | Nivel + participación (propuesta a ajustar: nivel 10+ y haber visto 50 obras distintas del Museo) |
+| Progresión | Niveles por puntos (**privados**, solo los ve uno) + insignias por logros (**públicas**, se ven en el perfil) |
+| Progresión: qué suma | Descubrir (ver obras, visitar salas), exponer (obras aceptadas), curar (verificar/denegar) y asistir a eventos (sets de DJ, inauguraciones, pasar música o luces). Cada cosa da puntos **una sola vez** (la misma obra o sala no suma dos veces) |
+| Me gusta y progresión | Los me gusta son solo sociales: **no dan puntos** (para que no se farmee). Puede haber una insignia por recibir cierta cantidad |
+| Misiones | Un camino fijo para empezar + misiones diarias |
+| Recompensas | Niveles y misiones dan **objetos** (sin moneda). La progresión se hace **después del editor de salas**, cuando ya haya muebles para dar |
+| Eventos | Cualquier set de DJ o show de la consola, en cualquier sala, con **más de 5 personas** presentes. Cuenta haber estado **5 minutos** (aunque estés AFK) |
 | Voz: servidor | Servidor de audio (Cloudflare Realtime SFU) para que nadie vea la IP de otro |
 | Voz: a quién escuchás | Los 4 más cercanos **que estén hablando**, dentro de 10 m. Si uno se calla, entra el siguiente |
 | Voz: grupos | Se invita con E desde el perfil. Hasta 4 personas. Solo en la misma sala (si alguien se va, deja de escucharse) |
