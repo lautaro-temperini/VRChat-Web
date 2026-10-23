@@ -825,14 +825,22 @@ export function buildMuseum(scene, renderer, quality) {
     stage: screenApi,
     // Cabina del DJ: dónde se para (mirando a la pista), dónde se baja y los dos parlantes [izq., der.]
     dj: {
-      spot: { x: 17.05, y: 0.4, z: 0, yaw: -Math.PI / 2 },
+      spot: { x: 17.05, y: 0.4, z: 0, yaw: -Math.PI / 2, exit: { x: 15.2, z: 0 } },
       exit: { x: 15.2, z: 0 },
       speakers: [new THREE.Vector3(16.2, 1.6, -4), new THREE.Vector3(16.2, 1.6, 4)],
       setBooth,
       setMusic(level) { music.level = level; music.on = level >= 0; },
     },
     // Consola de artistas: cartel con quién tiene cada parte, y las luces que mandan por OSC
-    artists: { setSign: setArtists, setLights(s) { lightOverride = s; } },
+    // spots: dónde queda fijo cada artista mientras tiene el control (detrás de la consola, mirando a la pista)
+    artists: {
+      setSign: setArtists,
+      setLights(s) { lightOverride = s; },
+      spots: {
+        luces: { x: vjX - 0.95, y: 0, z: -0.8, yaw: Math.PI / 2, exit: { x: vjX - 2.2, z: -0.8 } },
+        escenario: { x: vjX - 0.95, y: 0, z: 0.8, yaw: Math.PI / 2, exit: { x: vjX - 2.2, z: 0.8 } },
+      },
+    },
     bounds: { minY: 0.2, maxY: H - 0.2 },
     spawn: { x: X0 + 2.5, z: 0, yaw: -Math.PI / 2 },
     update(dt, t) { for (const fn of animated) fn(dt, t); },

@@ -101,9 +101,9 @@ La música del DJ y el puente OSC ya están hechos. Falta:
 | DJ + pantalla | Pueden estar las dos a la vez |
 | DJ: cartel y avisos | Cartel "DJ: nombre" + track. En el chat: arranque, fin y "Ahora suena". El track se lee solo de un archivo de texto (Chrome/Edge); si no se configura, no se muestra |
 | Artistas: qué | Luces por OSC (focos, luz del escenario, LEDs: una sola parte) y visuales como video desde su PC (pantalla compartida) |
-| Artistas: quién y cuántos | Cualquiera (el dueño/mods pueden deshabilitar la consola). Varios a la vez, una parte cada uno: luces, pantalla del escenario, pantalla del hall → 2 VJ + 1 DJ + 1 de luces |
-| Artistas: dónde | Consola junto al escenario (E). La pantalla del hall también se toma con E sobre ella |
-| Pantalla del escenario | Nueva, detrás del DJ, solo video (sin audio) |
+| Artistas: quién y cuántos | Cualquiera (el dueño/mods pueden deshabilitar la consola). Varios a la vez, una parte cada uno: luces y pantalla → 1 VJ + 1 DJ + 1 de luces |
+| Artistas: dónde | Cabina de VJ y luces, abajo del balcón oeste (E). La pantalla también se toma con E sobre ella. Al tomar el control quedan fijos en la cabina (como el DJ); para salir, E y "Soltar" |
+| Pantalla del escenario | Ocupa toda la pared detrás del DJ, solo video (sin audio). Es la única pantalla |
 | Luces + DJ | Si hay artista en luces, manda él (el latido con la música se apaga). Al soltar, vuelven a automático |
 | Artistas: cartel y avisos | Cartel en la consola con quién tiene cada parte + aviso en el chat al tomar/soltar |
 | Sala principal (planta) | 48 × 22 m. Hall (oeste): puerta doble de entrada, barra con banquetas (sur), baño con paredes de collage que sobresale al norte, esculturas junto a la pared del medio, plantas solo acá. Pista (este): paredes negras sin cuadros, balcón en U (2º piso) sobre tres paredes con sillones, escaleras desde el hall (norte y sur), cabina de VJ + luces abajo del balcón oeste, escenario con DJ |

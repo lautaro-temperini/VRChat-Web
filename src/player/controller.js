@@ -141,7 +141,7 @@ export class PlayerController {
     this.bodyYaw = spot.yaw;
     this.crouchToggle = false;
   }
-  leaveBooth(exit) {
+  leaveBooth(exit = this.booth?.exit) {
     if (!this.booth) return;
     this.booth = null;
     this.pos.set(exit.x, this.pos.y, exit.z);

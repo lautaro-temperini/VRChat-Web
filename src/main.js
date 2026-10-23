@@ -706,7 +706,7 @@ function removeRemote(id) {
 net
   .on('welcome', (m) => {
     for (const id of [...remotes.keys()]) removeRemote(id);
-    if (rtc.djStream || ctrl.booth) endMySet(); // cambié de sala o se reconectó: la cabina ya no es mía
+    if (rtc.djStream || ctrl.booth) endMySet(); // cambié de sala o se reconectó: la cabina (de DJ o de artistas) ya no es mía
     rtc.reset(); // conexión nueva con el servidor de audio (vuelve a publicar mi micrófono si lo tenía)
     groups.all = m.groups ?? {};
     rtc.setScreen(m.screen);
@@ -836,6 +836,8 @@ net
       parts[m.part] = { id: m.id, name: m.name, streamId: m.streamId };
       if (m.part === 'luces' && mine) { myLights = defaultLights(); bridge.start(); }
       if (m.part === 'escenario') { if (mine) rtc.startStage(); else rtc.setStage({ id: m.id, streamId: m.streamId }); }
+      // Como el DJ: queda fijo en la cabina de VJ y luces hasta soltar el control
+      if (mine && !ctrl.booth) { ctrl.enterBooth(world.artists.spots[m.part]); closeOverlays(); toast('Tenés el control. E para soltarlo.'); }
       system(m.part === 'luces' ? `💡 ${who} ${mine ? 'tomaste' : 'tomó'} las luces.` : `🎬 ${who} ${mine ? 'estás pasando' : 'está pasando'} visuales en la pantalla.`);
     } else {
       delete parts[m.part];
@@ -989,7 +991,8 @@ function findTarget() {
 }
 
 function interact() {
-  if (ctrl.booth) { openDJPanel(); return; }
+  // En una cabina: la E abre su panel para terminar (DJ) o soltar el control (VJ / luces)
+  if (ctrl.booth) { rtc.djStream ? openDJPanel() : openArtists(); return; }
   if (ctrl.sitting) { ctrl.stand(); return; }
   if (!target) return;
   fpArms.poke();
@@ -1044,7 +1047,7 @@ $('dj-stop').onclick = () => { net.send({ t: 'dj', on: false }); endMySet(); };
 rtc.onMusicEnded = () => { if (rtc.djStream) { net.send({ t: 'dj', on: false }); endMySet(); } };
 function endMySet(close = true) {
   rtc.stopMusic();
-  ctrl.leaveBooth(world.dj.exit);
+  ctrl.leaveBooth();
   if (close && body.classList.contains('djing')) closeOverlays();
 }
 
@@ -1127,6 +1130,9 @@ function releasePart(part) {
 function endPart(part) {
   if (part === 'luces') { bridge.stop(); myLights = null; lightsDirty = false; }
   if (part === 'escenario') rtc.stopStage();
+  // Sale de la cabina cuando ya no tiene ninguna parte (y no es el DJ)
+  const holds = Object.entries(parts).some(([p, h]) => p !== part && h.id === net.id);
+  if (ctrl.booth && !rtc.djStream && !holds) ctrl.leaveBooth();
 }
 
 // La pantalla: E para pasar video (si está libre), dejar de pasarlo, o verla en grande
