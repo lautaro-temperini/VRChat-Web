@@ -22,7 +22,7 @@
 .pg-list li.current::before { content: '▸'; color: var(--accent); }
 .pg-list li.done { color: var(--muted); text-decoration: line-through; }
 .pg-list li.done::before { content: '✓'; color: #3dff9a; }
-.pg-list li.locked { color: var(--muted); opacity: .6; }
+.pg-list li.later { color: var(--muted); opacity: .6; }
 
 /* Insignias */
 .pg-badges { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 6px; }

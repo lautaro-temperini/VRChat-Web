@@ -92,7 +92,7 @@ export function createProgress({ net, me, openPhone }) {
       box.append(el('h2', 'pg-h', 'Para empezar'));
       const list = el('ol', 'pg-list');
       for (const s of state.path) {
-        const li = el('li', s.done ? 'done' : s.current ? 'current' : 'locked', s.done || s.current ? s.text : '???');
+        const li = el('li', s.done ? 'done' : s.current ? 'current' : 'later', s.done || s.current ? s.text : '…');
         list.append(li);
       }
       box.append(list);
