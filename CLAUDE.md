@@ -64,6 +64,14 @@ npm run deploy   # build + wrangler deploy
 - **Grupos de voz** (`groupMessage` en la sala, guardados por cuenta en el storage de la sala): privados,
   hasta 4, maneja el que lo armó. Anti-acoso en `accounts.js` (`groupInviteCheck`, `groupRejected`,
   tabla `group_rejects`); ignorar ahora vive en la cuenta (tabla `ignores`, rutas `ignores`/`ignore`).
+- **Salas personales y editor** (`src/world/rooms.js`, `templates.js`, `furniture.js`, `editor.js`; servidor
+  `server/editor.js`): el diseño de cada sala vive en el storage de su Room (clave `layout`); catálogos
+  `ROOM_TEMPLATES` y `FURNITURE` en `server/shared.js`. Muebles especiales puestos: `items.owner_id = 'room:<id>'`.
+- **Progresión** (`server/progress.js` mezclado en `Accounts`, `src/ui/progress.js`): puntos una sola vez por
+  cosa (`progress_log`), insignias, camino y diarias. Enganches con `progressTrack(...)` en works/accounts/room.
+- **Carga de modelos:** usar `loadGLTF` de `src/loaders.js` (Draco, meshopt, KTX2), no `new GLTFLoader()`.
+- **Museo y `merge.js`:** las mallas quietas se juntan al final de `buildMuseum`. Lo que se mueve o cambia
+  después lleva `userData.dynamic = true` (ver `docs/ramas/rendimiento.md`).
 - **No pisables:** `noStand` en los colliders (obras, cabinas, atril); el controlador no te deja parado encima.
 
 - **Windows:** wrangler falla con SQLite si la ruta del proyecto es muy larga; por eso
@@ -82,7 +90,7 @@ npm run deploy   # build + wrangler deploy
   el juego corre a muy pocos cuadros: para probar física llamar a `ctrl.update(1/60)` en un bucle.
 - **Protocolo de la sala** (mensajes `t`): `join`, `s` (estado `[x,y,z,yaw,vel,pose]`, pose 0–5: parado, agachado, sentado, trepando, aire, saltando baranda), `afk`,
   `mic`, `look`, `chat`, `sfu` (pedidos al servidor de audio: push/unpush/pull/unpull/answer), `sfu-cut`,
-  `pub` (alguien publicó su voz), `group` (invite/respond/leave/kick), `groups` (estado de los grupos), `screen`, `drop`, `pickup`, `mod`, `trade`, `emote` (gestos), `dj` (cabina: on/off, track), `part` (consola de artistas: luces / escenario), `luces` (estado de las luces por OSC).
+  `pub` (alguien publicó su voz), `sfu` op `ice` (servidores TURN), `group` (invite/respond/leave/kick), `groups` (estado de los grupos), `screen`, `drop`, `pickup`, `mod`, `trade`, `emote` (gestos), `dj` (cabina: on/off, track), `part` (consola de artistas: luces / escenario), `luces` (estado de las luces por OSC), `edit` (editor: template/add/update/remove) → `layout`, `piece`, `piece-`, `edit-fail`, `progress` (avisos de progresión).
 - **Puente OSC:** `npm run puente` (sin dependencias) recibe OSC en el puerto 9000 y lo pasa a la pestaña
   del juego por http://127.0.0.1:9001. Direcciones en `src/net/osc.js`.
 - El servidor nunca confía en el cliente para nombre, ropa ni objetos: los lee de `Accounts`.

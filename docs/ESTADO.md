@@ -37,18 +37,25 @@ Se postula en el atril de la entrada; curadores verifican (1) o deniegan (2, con
 los desacuerdos y baja obras; Creadores (3 aceptadas seguidas) entran sin verificar. Archivos en R2.
 Código: `server/works.js`, `src/ui/works.js`, lugares en `src/world/museum.js` (`works`).
 
+### Trabajo en paralelo (23/10): 4 agentes, juntados en main
+Cada rama dejó su nota en `docs/ramas/` (qué hizo, archivos, protocolo, migraciones).
+- **Editor de salas** (paso 3): ✅ salas personales con plantilla (loft, galería, club, terraza), muebles
+  básicos y especiales, editor desde arriba (PC y celular), fotos como cuadros, hasta 2 pantallas.
+  `src/world/{rooms,templates,furniture,editor,stage2}.js`, `server/editor.js`.
+- **Progresión** (paso 4): ✅ puntos y niveles privados, insignias, camino inicial, misiones diarias,
+  Curador automático (nivel 8 + 30 obras vistas). `server/progress.js`, `src/ui/progress.js`.
+- **Personaje**: tipos de cuerpo (flaco, promedio, gordo, musculoso), peso/músculo y selector RGB. Base
+  elegida: **MakeHuman** (CC0), que se arma en Blender en la PC del usuario (`docs/ramas/personaje-blender.md`).
+- **Rendimiento**: piezas quietas del Museo juntas (menos de la mitad de draw calls), `src/loaders.js`
+  (Draco/meshopt/KTX2), TURN opcional para la voz, `scripts/medir.mjs`. Lo más pesado que queda: las
+  animaciones del personaje (13 MB de 17 MB).
+
 ### Antes de eso (ya estaba)
 Museo con DJ (música desde la PC), consola de artistas (luces por OSC y visuales), red social en el
 celular del personaje (amigos, muro, galería, avisos), atril con notas y corazones, salas personales con
 privacidad, favoritas, personaje Quaternius con animaciones de Mixamo, inventario e intercambios.
 
 ### Diseño definido (sin programar todavía)
-Los pasos 3 a 5 del plan ya tienen sus decisiones en ROADMAP.md:
-- **Editor de salas:** plantillas loft, galería, club y terraza; solo edita el dueño; máximo 100 objetos;
-  catálogo libre de muebles básicos; los cambios se ven al soltar el click (Esc cancela).
-  La sala de xvvave usa la plantilla club.
-- **Progresión:** niveles privados + insignias públicas; suman descubrir, exponer, curar y eventos (más de
-  5 personas, 5 minutos); los me gusta no dan puntos; recompensas = muebles (va después del editor).
 - **Diseños de artistas:** estampas, cuadros y modelos 3D; control automático (no de contenido);
   copias ilimitadas para regalar; título Diseñador (solo reconocimiento).
 - **Stamina:** cualquier consumible o gesto con consentimiento → 2 minutos sin gastar.
@@ -62,11 +69,15 @@ Los pasos 3 a 5 del plan ya tienen sus decisiones en ROADMAP.md:
 - **Para subirlo online:** cargar las 3 claves con `wrangler secret put` (ver README → "Subirlo online")
   y agregar la dirección de vuelta online en Google Cloud y en Discord. Para el Museo rotativo: activar
   R2 en Cloudflare (pide tarjeta, tiene capa gratis) y `npx wrangler r2 bucket create galeria-obras`.
+- **TURN (opcional, voz en redes cerradas):** `npx wrangler secret put TURN_KEY_ID` y `TURN_KEY_API_TOKEN`
+  (Cloudflare → Realtime → TURN). Revisar antes cómo se cobra.
 - **Nombrar curadores fundadores** con `/curador nick` en el chat (mientras tanto verifican los admins).
 
 ### Para programar, en este orden
-1. **Editor de salas** con plantillas (paso 3) y catálogo de muebles.
-2. **Progresión, misiones e insignias** (paso 4). Ahí se define cómo se gana el título de Curador.
+1. **Conectar recompensas con muebles:** que la progresión también dé muebles especiales (falta definir
+   la rareza de cada uno; ver `docs/ramas/progresion.md` → "Pendiente para conectar con el editor").
+2. **Personaje MakeHuman:** cuando lleguen los `.glb` de Blender, apuntar `avatar.js` a ellos (ver
+   `docs/ramas/personaje.md`). Y achicar las animaciones (ual.glb y FBX) para celular.
 3. **Diseños de artistas como objetos** y más mapas públicos (paso 5).
 4. **Revisión de permisos del servidor y pruebas automáticas** (cuando se junten las ramas de los agentes):
    revisar que cada acción (intercambios, moderación, Museo, grupos) valide quién, qué y dónde, como ya
@@ -75,8 +86,8 @@ Los pasos 3 a 5 del plan ya tienen sus decisiones en ROADMAP.md:
 5. **Primera prueba con gente real:** inauguración con 5–10 artistas exponiendo.
 
 ### Pendientes sueltos (consultar antes)
-Tipos de cuerpo y más ropa/peinados/cejas, selector RGB, stamina con consumibles (falta cómo se consigue
-cada uno), reportar, nombre y marca definitivos, AR, comprimir modelos para celular (KTX2/Draco).
+Más ropa/peinados/cejas, stamina con consumibles (falta cómo se consigue
+cada uno), reportar, nombre y marca definitivos, AR.
 
 ## Cómo probar
 

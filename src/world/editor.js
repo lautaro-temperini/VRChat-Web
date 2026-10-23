@@ -635,7 +635,15 @@ export function createRoomEditor({ world, scene, camera, renderer, net, rtc, ctr
     const account = me();
     isOwner = !!account && !account.guest && m.room?.owner === account.id;
     btn.hidden = !isOwner;
-    if (isOwner && !m.layout?.chosen) setTimeout(() => chooseTemplate(true), 1200);
+    if (isOwner && !m.layout?.chosen) askTemplate();
+  }
+  // La primera vez: pregunta la plantilla cuando no hay otro panel abierto (ej. los controles al entrar)
+  function askTemplate() {
+    setTimeout(() => {
+      if (world.layout?.chosen) return;
+      if (document.body.classList.contains('controls')) return askTemplate();
+      chooseTemplate(true);
+    }, 1200);
   }
 
   const api_ = { onWelcome, update, open, close, useScreen2: () => stage2.use(), screen2Prompt: () => stage2.prompt(), get active() { return active; }, get selected() { return selected; } };
