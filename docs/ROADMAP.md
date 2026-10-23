@@ -218,3 +218,4 @@ La música del DJ y el puente OSC ya están hechos. Falta:
 | Voz: invitaciones (anti-acoso) | Bloqueo creciente al rechazar: 1º rechazo, no te puede reinvitar por 1 min; 2º, 10 min; 3º, hasta mañana. No se le avisa que lo rechazaste. Alguien ignorado o restringido no te puede invitar (y no se entera) |
 | Invitados: cómo se ve lo bloqueado | Las opciones se ven igual, con un candado 🔒; al tocarlas aparece "Para … tenés que crear una cuenta (es gratis)" con un botón "Crear cuenta" |
 | Voz: grupo | Suena como una llamada (sin distancia ni dirección). La invitación sin respuesta vence al minuto y no cuenta como rechazo. Quien está en un grupo figura "En grupo" y no se lo puede invitar a otro hasta que salga |
+| Ingreso | Mail + contraseña, **Google** y **Discord** (Facebook no). Después de entrar con Google/Discord se elige el nickname único. Mismo mail confirmado por Google/Discord = la misma cuenta |
