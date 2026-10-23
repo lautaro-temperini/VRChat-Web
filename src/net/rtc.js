@@ -1,42 +1,60 @@
-// Voz y pantalla compartida, de jugador a jugador (WebRTC, P2P).
-// El servidor de la sala solo pasa las "señales" para que dos navegadores se encuentren;
-// el audio y el video viajan directo entre ellos.
+// Voz, música del DJ y pantalla del escenario, por el servidor de audio de Cloudflare (Realtime SFU).
+// Nadie se conecta directo con nadie: cada navegador manda y recibe todo por Cloudflare,
+// así ningún jugador ve la IP de otro. La sala hace de intermediaria con la API
+// (tiene la clave) y decide qué puede escuchar cada uno (distancia, grupos, silenciados).
 //
-// - Voz: cada voz suena desde la posición de su personaje (audio espacial 3D):
-//   más fuerte cerca, más bajo lejos, y a la izquierda/derecha según dónde esté.
-// - Pantalla: quien comparte manda su pantalla a todos; se ve en la pantalla gigante
-//   y su audio sale desde ahí.
-// - DJ: quien está en la cabina manda su música (estéreo, buena calidad) y sale por los
-//   dos parlantes del escenario: el canal izquierdo por uno y el derecho por el otro.
-//
-// Límite conocido: sin un servidor TURN, algunas redes muy cerradas (ciertas oficinas
-// o datos móviles) pueden no conectarse. Se agrega al subirlo online.
+// - Voz: escuchás a los 4 más cercanos que estén hablando, dentro de 10 m, con audio 3D.
+//   En un grupo privado solo escuchás a tu grupo (desde cualquier lugar de la sala).
+// - DJ: la música (estéreo, buena calidad) sale por los dos parlantes del escenario:
+//   el canal izquierdo por uno y el derecho por el otro. Se escucha también estando en grupo.
+// - Pantalla del escenario (VJ): solo video.
 
-const ICE = [{ urls: ['stun:stun.cloudflare.com:3478', 'stun:stun.l.google.com:19302'] }];
+const ICE = [{ urls: 'stun:stun.cloudflare.com:3478' }];
+const HEAR_RANGE = 10;      // m: hasta dónde se escucha una voz
+const PRELOAD_RANGE = 12;   // m: me suscribo un poco antes, así no se pierde la primera palabra
+const DROP_RANGE = 18;      // m: recién acá suelto la suscripción (para no ir y venir)
+const MAX_AUDIBLE = 4;      // voces que suenan a la vez (las más cercanas que estén hablando)
+const MAX_PRELOAD = 8;      // voces a las que estoy suscripto a la vez (fuera de un grupo)
+const RETRY = 1500;         // ms entre intentos si la pista todavía no está publicada
 
 export class RTC {
   constructor(net) {
     this.net = net;
-    this.peers = new Map();   // id del jugador -> { pc, polite, makingOffer, ignoreOffer }
-    this.sounds = new Map();  // clave -> { el, src, panner, analyser, data }
+    this.sounds = new Map();  // clave -> { el, src, panner, gain, analyser, data }
     this.mic = null;          // mi micrófono (MediaStream)
-    this.muted = false;
-    this.screenStream = null; // mi pantalla, si la estoy compartiendo
-    this.screen = null;       // { id, streamId } de quien comparte en la sala
     this.djStream = null;     // mi música, si estoy en la cabina
-    this.dj = null;           // { id, streamId, name, track } de quien pasa música en la sala
+    this.dj = null;           // { id, name, track } de quien pasa música en la sala
     this.stageStream = null;  // mi video en la pantalla del escenario (VJ)
-    this.stage = null;        // { id, streamId } de quien pasa video en la pantalla del escenario
+    this.stage = null;        // { id } de quien pasa video en la pantalla del escenario
+    this.screen = null;       // (la pantalla del hall ya no existe; se guarda por compatibilidad)
     this.onStage = () => {};  // (video | null) cuando cambia la pantalla del escenario
-    this.remoteStreams = new Map(); // id del stream -> { id del jugador, stream } (para ubicar la música si llega antes del aviso)
-    this.ctx = null;
-    this.onScreen = () => {}; // (video | null, idDelDueño) cuando cambia la pantalla de la sala
+    this.onScreen = () => {};
     this.onMic = () => {};    // ('off' | 'on') cuando empiezo o dejo de hablar
     this.talking = false;     // apretando V
     this.voiceEnabled = true; // chat de voz activado en Ajustes
     this.mediaMuted = false;  // M: música / pantalla de la sala en silencio
     this.mutedUsers = new Set(); // ids de jugadores muteados por mí
     this.volumes = { master: 1, voices: 1, media: 1 };
+    this.ctx = null;
+    this.flat = new Set();    // voces de mi grupo: suenan "en la oreja", sin distancia
+    this.reset();
+  }
+
+  // Cambié de sala o me reconecté: todo empieza de cero (la sesión de Cloudflare es por conexión)
+  reset() {
+    try { this.pc?.close(); } catch { /* ya cerrada */ }
+    this.pc = null;
+    this.chain = Promise.resolve();
+    this.rid = 0;
+    this.waiting = new Map();   // rid -> resolve
+    this.local = {};            // tipo -> transceiver que publico (voice / dj / stage)
+    this.subs = new Map();      // "id:tipo" -> { mid, state: 'pending' | 'on' }
+    this.byMid = new Map();     // mid -> "id:tipo"
+    this.retries = new Map();   // "id:tipo" -> timeout
+    for (const key of [...this.sounds.keys()]) if (key !== 'me:dj') this.dropSound(key);
+    this.flat.clear();
+    // Si ya tenía micrófono, lo vuelvo a publicar en la sala nueva
+    if (this.mic) this.publish('voice', this.mic.getAudioTracks()[0], this.mic);
   }
 
   // El navegador solo deja sonar audio después de un click o tecla: se llama ahí
@@ -45,7 +63,7 @@ export class RTC {
       this.ctx = new AudioContext();
       this.master = this.ctx.createGain();
       this.master.connect(this.ctx.destination);
-      // Dos "buses": voces y medios de la sala (pantalla compartida, música)
+      // Dos "buses": voces y medios de la sala (música, pantalla)
       this.voicesBus = this.ctx.createGain();
       this.mediaBus = this.ctx.createGain();
       this.voicesBus.connect(this.master);
@@ -72,102 +90,202 @@ export class RTC {
   // Mutear a un jugador: deja de sonar su voz (solo para mí)
   setUserMuted(id, muted) {
     if (muted) this.mutedUsers.add(id); else this.mutedUsers.delete(id);
-    const s = this.sounds.get(id);
-    if (s) s.gain.gain.value = muted ? 0 : 1;
   }
 
-  // ---------- Conexiones ----------
+  // ---------- Conexión con Cloudflare (a través de la sala) ----------
 
-  peer(id) {
-    let p = this.peers.get(id);
-    if (p) return p;
-    const pc = new RTCPeerConnection({ iceServers: ICE });
-    // "Negociación perfecta": si los dos ofrecen a la vez, el "educado" cede
-    p = { pc, polite: this.net.id < id, makingOffer: false, ignoreOffer: false };
-    pc.onnegotiationneeded = async () => {
-      try {
-        p.makingOffer = true;
-        await pc.setLocalDescription(stereo(await pc.createOffer()));
-        this.signal(id, { description: pc.localDescription });
-      } catch (e) { console.warn('rtc offer', e); } finally { p.makingOffer = false; }
-    };
-    pc.onicecandidate = ({ candidate }) => { if (candidate) this.signal(id, { candidate }); };
-    pc.ontrack = (e) => this.onTrack(id, e);
-    pc.onconnectionstatechange = () => { if (pc.connectionState === 'failed') pc.restartIce(); };
-    this.peers.set(id, p);
-    for (const stream of [this.mic, this.screenStream, this.djStream, this.stageStream]) {
-      if (!stream) continue;
-      for (const t of stream.getTracks()) {
-        const sender = pc.addTrack(t, stream);
-        if (stream === this.djStream) setBitrate(sender);
+  // Pedido a la sala, que lo pasa a la API de Cloudflare y responde
+  request(op, data = {}) {
+    const rid = ++this.rid;
+    return new Promise((resolve) => {
+      this.waiting.set(rid, resolve);
+      this.net.send({ t: 'sfu', rid, op, ...data });
+      setTimeout(() => { if (this.waiting.delete(rid)) resolve({ ok: false, error: 'timeout' }); }, 15_000);
+    });
+  }
+
+  onSfu(m) {
+    const resolve = this.waiting.get(m.rid);
+    if (!resolve) return;
+    this.waiting.delete(m.rid);
+    resolve(m);
+  }
+
+  // Las negociaciones van de a una (si no, el navegador se confunde)
+  queue(fn) {
+    const run = this.chain.then(fn).catch((e) => { console.warn('sfu', e); });
+    this.chain = run;
+    return run;
+  }
+
+  peer() {
+    if (this.pc) return this.pc;
+    const pc = new RTCPeerConnection({ iceServers: ICE, bundlePolicy: 'max-bundle' });
+    pc.ontrack = (e) => this.onTrack(e);
+    this.pc = pc;
+    return pc;
+  }
+
+  // Publicar una pista mía (voz, música o video)
+  publish(kind, track, stream) {
+    if (!track) return Promise.resolve();
+    return this.queue(async () => {
+      const pc = this.peer();
+      const tr = pc.addTransceiver(track, { direction: 'sendonly', streams: [stream] });
+      if (kind === 'dj') setBitrate(tr.sender);
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(kind === 'dj' ? stereo(offer) : offer);
+      const r = await this.request('push', { sdp: pc.localDescription.sdp, tracks: [{ mid: tr.mid, kind }] });
+      if (!r.ok) { tr.stop(); console.warn('sfu push', r.error); return; }
+      await pc.setRemoteDescription({ type: 'answer', sdp: r.sdp });
+      this.local[kind] = tr;
+    });
+  }
+
+  unpublish(kind) {
+    return this.queue(async () => {
+      const tr = this.local[kind];
+      if (!tr) return;
+      delete this.local[kind];
+      await this.request('unpush', { kinds: [kind] });
+      try { tr.sender.replaceTrack(null); tr.stop(); } catch { /* ya cerrada */ }
+    });
+  }
+
+  // Suscribirme a la pista de otro jugador
+  subscribe(id, kind) {
+    const key = `${id}:${kind}`;
+    if (this.subs.has(key)) return;
+    this.subs.set(key, { state: 'pending' });
+    this.queue(async () => {
+      if (!this.subs.has(key)) return; // la solté mientras esperaba
+      const r = await this.request('pull', { items: [{ id, kind }] });
+      const t = r.tracks?.[0];
+      if (!r.ok || !t || t.error) {
+        this.subs.delete(key);
+        // Todavía no publicó (o la sala no me deja): reintento en un rato si sigue haciendo falta
+        if (t?.error === 'not-yet' || r.error === 'timeout') this.retry(key, id, kind);
+        return;
       }
+      this.subs.set(key, { mid: t.mid, state: 'on' });
+      this.byMid.set(t.mid, key);
+      if (r.sdp) await this.answer(r.sdp);
+    });
+  }
+
+  retry(key, id, kind) {
+    clearTimeout(this.retries.get(key));
+    this.retries.set(key, setTimeout(() => {
+      this.retries.delete(key);
+      if (this.wanted(id, kind)) this.subscribe(id, kind);
+    }, RETRY));
+  }
+
+  // ¿Todavía quiero esa pista? (la música y el video sí mientras sigan; las voces las decide updateVoices)
+  wanted(id, kind) {
+    if (kind === 'dj') return this.dj?.id === id;
+    if (kind === 'stage') return this.stage?.id === id;
+    return !!this.voiceWanted?.has(id);
+  }
+
+  async answer(sdp) {
+    const pc = this.peer();
+    await pc.setRemoteDescription({ type: 'offer', sdp });
+    const ans = await pc.createAnswer();
+    await pc.setLocalDescription(ans);
+    await this.request('answer', { sdp: ans.sdp });
+  }
+
+  unsubscribe(key) {
+    clearTimeout(this.retries.get(key));
+    this.retries.delete(key);
+    const sub = this.subs.get(key);
+    if (!sub) return;
+    this.subs.delete(key);
+    this.dropSound(key.endsWith(':voice') ? key.split(':')[0] : key);
+    if (key.endsWith(':stage') && this.stage) this.onStage(null);
+    if (!sub.mid) return;
+    this.byMid.delete(sub.mid);
+    this.queue(() => this.request('unpull', { mids: [sub.mid] }));
+  }
+
+  // La sala me cortó pistas que ya no puedo escuchar (por ejemplo, alguien entró a un grupo privado)
+  cut(mids = []) {
+    for (const mid of mids) {
+      const key = this.byMid.get(mid);
+      if (!key) continue;
+      this.byMid.delete(mid);
+      this.subs.delete(key);
+      this.dropSound(key.endsWith(':voice') ? key.split(':')[0] : key);
     }
-    return p;
   }
 
-  signal(to, data) { this.net.send({ t: 'rtc', to, data }); }
-
-  async onSignal(from, { description, candidate } = {}) {
-    const p = this.peer(from);
-    const pc = p.pc;
-    try {
-      if (description) {
-        const collision = description.type === 'offer' && (p.makingOffer || pc.signalingState !== 'stable');
-        p.ignoreOffer = !p.polite && collision;
-        if (p.ignoreOffer) return;
-        await pc.setRemoteDescription(description);
-        if (description.type === 'offer') {
-          await pc.setLocalDescription(stereo(await pc.createAnswer()));
-          this.signal(from, { description: pc.localDescription });
-        }
-      } else if (candidate) {
-        try { await pc.addIceCandidate(candidate); } catch (e) { if (!p.ignoreOffer) throw e; }
-      }
-    } catch (e) { console.warn('rtc signal', e); }
-  }
-
-  // Alguien entró a la sala: si tengo micrófono o pantalla, me conecto con él
-  playerJoined(id) {
-    if (this.mic || this.screenStream || this.djStream || this.stageStream) this.peer(id);
-  }
+  playerJoined() {}
 
   playerLeft(id) {
-    const p = this.peers.get(id);
-    if (p) { p.pc.close(); this.peers.delete(id); }
-    for (const key of [id, `${id}:screen`, `${id}:dj`]) this.dropSound(key);
-    for (const [sid, r] of this.remoteStreams) if (r.id === id) this.remoteStreams.delete(sid);
-    if (this.screen?.id === id) this.setScreen(null);
+    for (const key of [...this.subs.keys()]) if (key.startsWith(`${id}:`)) this.unsubscribe(key);
+    this.dropSound(id);
+    this.flat.delete(id);
     if (this.dj?.id === id) this.setDJ(null);
     if (this.stage?.id === id) this.setStage(null);
   }
 
-  // ---------- Audio espacial ----------
-
-  onTrack(id, e) {
-    const stream = e.streams[0];
-    if (!stream) return;
-    this.remoteStreams.set(stream.id, { id, stream });
-    if (this.stage && this.stage.id === id && stream.id === this.stage.streamId) {
-      if (e.track.kind === 'video') this.onStage(videoOf(stream));
-      return;
+  // ---------- Qué voces escucho ----------
+  // Se llama cada medio segundo con los jugadores de la sala:
+  // [{ id, pos, mic, hasVoice, group, blocked }], mi posición y mi grupo (o null)
+  updateVoices(players, myPos, myGroup) {
+    const wanted = new Set();
+    const cands = [];
+    for (const p of players) {
+      if (!p.hasVoice || p.blocked) continue;
+      if (myGroup ? p.group !== myGroup : !!p.group) continue; // grupo privado: solo entre ellos
+      const d = p.pos ? p.pos.distanceTo(myPos) : Infinity;
+      cands.push({ ...p, d });
     }
-    if (this.dj && this.dj.id === id && stream.id === this.dj.streamId) {
-      if (e.track.kind === 'audio') this.addMusic(`${id}:dj`, stream);
-      return;
-    }
-    const isScreen = this.screen && this.screen.id === id && stream.id === this.screen.streamId;
-    if (e.track.kind === 'video') {
-      if (!isScreen) return;
-      const video = document.createElement('video');
-      Object.assign(video, { muted: true, playsInline: true, autoplay: true, srcObject: stream });
-      video.play().catch(() => {});
-      this.onScreen(video, id);
+    cands.sort((a, b) => a.d - b.d);
+    let audible;
+    if (myGroup) {
+      for (const p of cands) wanted.add(p.id);
+      audible = cands.filter((p) => p.mic === 'on').slice(0, MAX_AUDIBLE);
     } else {
-      this.addSound(isScreen ? `${id}:screen` : id, stream, isScreen);
+      let n = 0;
+      for (const p of cands) {
+        const subscribed = this.subs.has(`${p.id}:voice`);
+        if (n < MAX_PRELOAD && (p.d <= PRELOAD_RANGE || (subscribed && p.d <= DROP_RANGE))) { wanted.add(p.id); n++; }
+      }
+      audible = cands.filter((p) => p.mic === 'on' && p.d <= HEAR_RANGE).slice(0, MAX_AUDIBLE);
     }
+    this.voiceWanted = wanted;
+    if (this.voiceEnabled) for (const id of wanted) this.subscribe(id, 'voice');
+    for (const key of [...this.subs.keys()]) {
+      if (!key.endsWith(':voice')) continue;
+      const id = key.split(':')[0];
+      if (!this.voiceEnabled || !wanted.has(id)) this.unsubscribe(key);
+    }
+    // Volumen de cada voz: suena si está entre las audibles y no la muteé
+    const on = new Set(audible.map((p) => p.id));
+    const t = this.ctx?.currentTime ?? 0;
+    for (const [key, s] of this.sounds) {
+      if (s.panners || !s.gain || key.includes(':')) continue;
+      const v = on.has(key) && !this.mutedUsers.has(key) ? 1 : 0;
+      s.gain.gain.setTargetAtTime(v, t, 0.08);
+    }
+    this.flat = myGroup ? new Set(cands.map((p) => p.id)) : new Set();
   }
 
-  addSound(key, stream, isScreen) {
+  // ---------- Audio ----------
+
+  onTrack(e) {
+    const key = this.byMid.get(e.transceiver.mid);
+    if (!key) return;
+    const [id, kind] = key.split(':');
+    const stream = new MediaStream([e.track]);
+    if (kind === 'voice') this.addSound(id, stream);
+    else if (kind === 'dj') this.addMusic(`${id}:dj`, stream);
+    else if (kind === 'stage' && this.stage?.id === id) this.onStage(videoOf(stream));
+  }
+
+  addSound(key, stream) {
     this.dropSound(key);
     const ctx = this.audio();
     // Chrome necesita el stream enganchado a un <audio> (mudo) para que suene por WebAudio
@@ -176,16 +294,13 @@ export class RTC {
     el.srcObject = stream;
     el.play().catch(() => {});
     const src = ctx.createMediaStreamSource(stream);
-    const panner = new PannerNode(ctx, {
-      panningModel: 'HRTF', distanceModel: 'inverse',
-      refDistance: isScreen ? 4 : 1.5, rolloffFactor: isScreen ? 0.7 : 1.3, maxDistance: 60,
-    });
+    const panner = new PannerNode(ctx, { panningModel: 'HRTF', distanceModel: 'inverse', refDistance: 1.5, rolloffFactor: 1.3, maxDistance: 60 });
     const analyser = ctx.createAnalyser();
     analyser.fftSize = 256;
     const gain = ctx.createGain();
-    gain.gain.value = this.mutedUsers.has(key) ? 0 : 1;
+    gain.gain.value = 0; // updateVoices decide si suena
     src.connect(analyser);
-    src.connect(panner).connect(gain).connect(isScreen ? this.mediaBus : this.voicesBus);
+    src.connect(panner).connect(gain).connect(this.voicesBus);
     this.sounds.set(key, { el, src, panner, gain, analyser, data: new Uint8Array(analyser.fftSize) });
   }
 
@@ -264,11 +379,12 @@ export class RTC {
       if (s.panners) {
         // Música: cada canal en su parlante
         const spk = positionOf(key);
-        if (spk) s.panners.forEach((p, i) => { p.positionX.setTargetAtTime(spk[i].x, t, 0.05); p.positionY.setTargetAtTime(spk[i].y, t, 0.05); p.positionZ.setTargetAtTime(spk[i].z, t, 0.05); });
+        if (spk) s.panners.forEach((pn, i) => { pn.positionX.setTargetAtTime(spk[i].x, t, 0.05); pn.positionY.setTargetAtTime(spk[i].y, t, 0.05); pn.positionZ.setTargetAtTime(spk[i].z, t, 0.05); });
         continue;
       }
       if (!s.panner) continue;
-      const pos = positionOf(key);
+      // Mi grupo suena como una llamada: sin distancia ni dirección
+      const pos = this.flat.has(key) ? p : positionOf(key);
       if (!pos) continue;
       s.panner.positionX.setTargetAtTime(pos.x, t, 0.05);
       s.panner.positionY.setTargetAtTime(pos.y, t, 0.05);
@@ -302,11 +418,7 @@ export class RTC {
         return { ok: false, error: 'No se pudo usar el micrófono (¿le diste permiso al navegador?).' };
       }
       for (const t of this.mic.getAudioTracks()) t.enabled = this.talking;
-      for (const id of this.remoteIds()) {
-        const p = this.peers.get(id);
-        if (p) for (const t of this.mic.getTracks()) p.pc.addTrack(t, this.mic);
-        else this.peer(id);
-      }
+      this.publish('voice', this.mic.getAudioTracks()[0], this.mic);
     }
     if (this.mic) for (const t of this.mic.getAudioTracks()) t.enabled = this.talking;
     this.net.send({ t: 'mic', v: this.micState });
@@ -320,55 +432,12 @@ export class RTC {
     if (!on && this.mic) {
       this.talking = false;
       for (const t of this.mic.getTracks()) t.stop();
-      for (const { pc } of this.peers.values()) {
-        for (const s of pc.getSenders()) if (s.track && s.track.kind === 'audio' && this.mic.getTracks().includes(s.track)) pc.removeTrack(s);
-      }
       this.mic = null;
+      this.unpublish('voice');
       this.net.send({ t: 'mic', v: 'off' });
       this.onMic('off');
     }
     this.applyVolumes();
-  }
-  remoteIds() { return this.getRemoteIds?.() ?? []; }
-
-  // ---------- Pantalla compartida ----------
-
-  async startScreen() {
-    this.audio();
-    let stream;
-    try {
-      stream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 30 }, audio: true });
-    } catch {
-      return { ok: false, error: 'Se canceló o el navegador no permite compartir pantalla.' };
-    }
-    this.screenStream = stream;
-    stream.getVideoTracks()[0].addEventListener('ended', () => this.stopScreen());
-    // Primero aviso a la sala (así los demás saben que este stream es una pantalla)…
-    this.net.send({ t: 'screen', on: true, streamId: stream.id });
-    this.screen = { id: this.net.id, streamId: stream.id };
-    // …y después mando el video
-    for (const id of this.remoteIds()) {
-      const p = this.peers.get(id);
-      if (p) for (const t of stream.getTracks()) p.pc.addTrack(t, stream);
-      else this.peer(id);
-    }
-    const local = document.createElement('video');
-    Object.assign(local, { muted: true, playsInline: true, autoplay: true, srcObject: stream });
-    local.play().catch(() => {});
-    this.onScreen(local, this.net.id);
-    return { ok: true };
-  }
-
-  stopScreen() {
-    const stream = this.screenStream;
-    if (!stream) return;
-    this.screenStream = null;
-    for (const t of stream.getTracks()) t.stop();
-    for (const { pc } of this.peers.values()) {
-      for (const sender of pc.getSenders()) if (sender.track && stream.getTracks().includes(sender.track)) pc.removeTrack(sender);
-    }
-    this.net.send({ t: 'screen', on: false });
-    this.setScreen(null);
   }
 
   // ---------- Música del DJ ----------
@@ -405,7 +474,7 @@ export class RTC {
     }
     for (const t of stream.getAudioTracks()) t.contentHint = 'music';
     this.pendingMusic = stream;
-    return { ok: true, streamId: stream.id };
+    return { ok: true, streamId: 'dj' };
   }
 
   // La sala confirmó que la cabina es mía: empiezo a mandar la música
@@ -415,24 +484,15 @@ export class RTC {
     this.pendingMusic = null;
     this.djStream = stream;
     stream.getAudioTracks()[0]?.addEventListener('ended', () => this.onMusicEnded?.());
-    for (const id of this.remoteIds()) {
-      const p = this.peers.get(id);
-      if (p) for (const t of stream.getTracks()) setBitrate(p.pc.addTrack(t, stream));
-      else this.peer(id);
-    }
+    this.publish('dj', stream.getAudioTracks()[0], stream);
     // Me analizo a mí mismo para las luces (sin sonar: ya lo escucho en mi PC)
     const src = this.ctx.createMediaStreamSource(stream);
     this.sounds.set('me:dj', { el: null, src, ...this.beatAnalyser(src) });
   }
 
   stopMusic() {
-    for (const stream of [this.djStream, this.pendingMusic]) {
-      if (!stream) continue;
-      for (const t of stream.getTracks()) t.stop();
-      for (const { pc } of this.peers.values()) {
-        for (const sender of pc.getSenders()) if (sender.track && stream.getTracks().includes(sender.track)) pc.removeTrack(sender);
-      }
-    }
+    for (const stream of [this.djStream, this.pendingMusic]) if (stream) for (const t of stream.getTracks()) t.stop();
+    if (this.djStream) this.unpublish('dj');
     this.djStream = this.pendingMusic = null;
     const me = this.sounds.get('me:dj');
     if (me) { me.src.disconnect(); this.sounds.delete('me:dj'); }
@@ -440,12 +500,9 @@ export class RTC {
 
   // Mensaje de la sala sobre quién pasa música
   setDJ(info) {
-    if (this.dj && (!info || info.id !== this.dj.id)) this.dropSound(`${this.dj.id}:dj`);
+    if (this.dj && (!info || info.id !== this.dj.id)) this.unsubscribe(`${this.dj.id}:dj`);
     this.dj = info;
-    if (info && info.id !== this.net.id) {
-      const r = this.remoteStreams.get(info.streamId);
-      if (r) { this.dropSound(info.id); this.addMusic(`${info.id}:dj`, r.stream); }
-    }
+    if (info && info.id !== this.net.id) this.subscribe(info.id, 'dj');
   }
 
   // ---------- Pantalla del escenario (VJ): solo video ----------
@@ -454,7 +511,7 @@ export class RTC {
     try {
       const stream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 30 }, audio: false });
       this.pendingStage = stream;
-      return { ok: true, streamId: stream.id };
+      return { ok: true, streamId: 'stage' };
     } catch {
       return { ok: false, error: 'Se canceló o el navegador no permite compartir pantalla.' };
     }
@@ -467,42 +524,26 @@ export class RTC {
     this.pendingStage = null;
     this.stageStream = stream;
     stream.getVideoTracks()[0]?.addEventListener('ended', () => this.onStageEnded?.());
-    for (const id of this.remoteIds()) {
-      const p = this.peers.get(id);
-      if (p) for (const t of stream.getTracks()) p.pc.addTrack(t, stream);
-      else this.peer(id);
-    }
+    this.publish('stage', stream.getVideoTracks()[0], stream);
     this.onStage(videoOf(stream));
   }
 
   stopStage() {
-    for (const stream of [this.stageStream, this.pendingStage]) {
-      if (!stream) continue;
-      for (const t of stream.getTracks()) t.stop();
-      for (const { pc } of this.peers.values()) {
-        for (const sender of pc.getSenders()) if (sender.track && stream.getTracks().includes(sender.track)) pc.removeTrack(sender);
-      }
-    }
+    for (const stream of [this.stageStream, this.pendingStage]) if (stream) for (const t of stream.getTracks()) t.stop();
+    if (this.stageStream) this.unpublish('stage');
     this.stageStream = this.pendingStage = null;
   }
 
   setStage(info) {
-    if (!info && this.stage) this.onStage(null);
-    this.stage = info;
-    if (info && info.id !== this.net.id) {
-      const r = this.remoteStreams.get(info.streamId);
-      if (r?.stream.getVideoTracks().length) this.onStage(videoOf(r.stream));
+    if (this.stage && (!info || info.id !== this.stage.id)) {
+      this.unsubscribe(`${this.stage.id}:stage`);
+      this.onStage(null);
     }
+    this.stage = info;
+    if (info && info.id !== this.net.id) this.subscribe(info.id, 'stage');
   }
 
-  // Mensaje de la sala sobre quién comparte
-  setScreen(info) {
-    if (!info && this.screen) {
-      this.dropSound(`${this.screen.id}:screen`);
-      this.onScreen(null, this.screen.id);
-    }
-    this.screen = info;
-  }
+  setScreen(info) { this.screen = info; }
 }
 
 // Opus en estéreo y con más calidad (por defecto WebRTC lo arma para voz, en mono)

@@ -26,8 +26,11 @@ Guía para trabajar en este proyecto con Claude Code. Leé también [docs/ROADMA
   - `Accounts` (una instancia global): usuarios, sesiones, inventario, amigos, presencia y toda la
     red social (fotos, notas, muro, me gusta, corazones, favoritas, avisos, restringidos).
   - `Room` (una por sala): tiempo real por WebSocket con hibernación.
-- **Voz y pantalla:** WebRTC P2P en malla; la sala solo pasa las señales. Sin TURN todavía. Próximo:
-  servidor de audio (SFU) para ocultar las IPs y escuchar solo a los más cercanos / grupos.
+- **Voz, música del DJ y pantalla del escenario:** por Cloudflare Realtime SFU (`src/net/rtc.js`):
+  nadie se conecta directo con nadie, así nadie ve la IP de otro. La sala (`server/room.js` →
+  `sfuMessage`) es la intermediaria con la API (tiene la clave) y decide quién puede escuchar a quién.
+  Clave: `REALTIME_APP_TOKEN` en `.dev.vars` (local, ignorado por git) y con
+  `npx wrangler secret put REALTIME_APP_TOKEN` online. El App ID está en `wrangler.jsonc`.
 
 ## Comandos
 
@@ -49,6 +52,12 @@ npm run deploy   # build + wrangler deploy
   restringir (oculta sus publicaciones del muro) vive en la cuenta (rutas `blocks`/`block`). Reportar está
   postergado: las rutas `report`/`reports` existen en el servidor pero no hay botón.
 - **Antiflood** del chat en `server/room.js` (`FLOOD_MAX`, `FLOOD_WINDOW`, `REPEAT_WINDOW`).
+- **Voz:** el cliente se suscribe a los más cercanos (`updateVoices`, cada 0,5 s) y suenan los 4 más
+  cercanos que hablan dentro de 10 m. La sala valida cada suscripción (`pullBlocked`: distancia con margen,
+  grupos, silenciados) y corta las que ya no valen (`enforce` → mensaje `sfu-cut`). Pistas: `<idConexión>-voice|dj|stage`.
+- **Grupos de voz** (`groupMessage` en la sala, guardados por cuenta en el storage de la sala): privados,
+  hasta 4, maneja el que lo armó. Anti-acoso en `accounts.js` (`groupInviteCheck`, `groupRejected`,
+  tabla `group_rejects`); ignorar ahora vive en la cuenta (tabla `ignores`, rutas `ignores`/`ignore`).
 - **No pisables:** `noStand` en los colliders (obras, cabinas, atril); el controlador no te deja parado encima.
 
 - **Windows:** wrangler falla con SQLite si la ruta del proyecto es muy larga; por eso
@@ -66,7 +75,8 @@ npm run deploy   # build + wrangler deploy
   ground, roomPanel, `setHour(h)` para probar día/noche…). Si el panel del navegador está oculto,
   el juego corre a muy pocos cuadros: para probar física llamar a `ctrl.update(1/60)` en un bucle.
 - **Protocolo de la sala** (mensajes `t`): `join`, `s` (estado `[x,y,z,yaw,vel,pose]`), `afk`,
-  `mic`, `look`, `chat`, `rtc`, `screen`, `drop`, `pickup`, `mod`, `trade`, `emote` (gestos), `dj` (cabina: on/off, track), `part` (consola de artistas: luces / escenario), `luces` (estado de las luces por OSC).
+  `mic`, `look`, `chat`, `sfu` (pedidos al servidor de audio: push/unpush/pull/unpull/answer), `sfu-cut`,
+  `pub` (alguien publicó su voz), `group` (invite/respond/leave/kick), `groups` (estado de los grupos), `screen`, `drop`, `pickup`, `mod`, `trade`, `emote` (gestos), `dj` (cabina: on/off, track), `part` (consola de artistas: luces / escenario), `luces` (estado de las luces por OSC).
 - **Puente OSC:** `npm run puente` (sin dependencias) recibe OSC en el puerto 9000 y lo pasa a la pestaña
   del juego por http://127.0.0.1:9001. Direcciones en `src/net/osc.js`.
 - El servidor nunca confía en el cliente para nombre, ropa ni objetos: los lee de `Accounts`.

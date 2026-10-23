@@ -4,8 +4,10 @@ import { api } from '../net/api.js';
 // Panel de la sala (Tab): info de la sala, jugadores conectados y moderación.
 // Tres acciones distintas, solo para mí:
 // - Mutear: no escucho su voz.
-// - Ignorar: no escucho su voz ni veo sus mensajes en la sala.
+// - Ignorar (guardado en la cuenta): no escucho su voz ni veo sus mensajes en la sala,
+//   y no me puede invitar a un grupo de voz.
 // - Restringir (guardado en la cuenta): no veo sus publicaciones (muro y fotos).
+// - Grupo de voz: quién está, salir y (si lo armaste vos) sacar a alguien.
 // - Moderación (dueño de la sala o admin): silenciar, traer, mandar a la entrada,
 //   expulsar, banear y habilitar/deshabilitar funciones de la sala.
 
@@ -20,17 +22,25 @@ function saveSet(key, set) {
   try { localStorage.setItem(key, JSON.stringify([...set])); } catch { /* sin almacenamiento */ }
 }
 
-export function createRoomPanel({ net, rtc, remotes, ui, me, roomTitle, openProfile }) {
+export function createRoomPanel({ net, rtc, remotes, ui, me, roomTitle, openProfile, groups }) {
   const muted = loadSet('muted');     // userIds
-  const ignored = loadSet('ignored'); // userIds ignorados (voz y texto)
+  const ignored = loadSet('ignored'); // userIds ignorados (voz y texto; vive en la cuenta, acá queda una copia)
   const restricted = new Set();        // userIds restringidos (publicaciones; vive en la cuenta)
   let reports = [];
-  // Traer la lista de restringidos de la cuenta
+  // Traer de la cuenta los restringidos y los ignorados (y subir los ignorados que estaban solo en este navegador)
   async function syncBlocks() {
-    const r = await api('blocks');
-    if (!r.ok) return;
-    restricted.clear();
-    for (const b of r.blocks) restricted.add(b.id);
+    const [b, i] = await Promise.all([api('blocks'), api('ignores')]);
+    if (b.ok) {
+      restricted.clear();
+      for (const x of b.blocks) restricted.add(x.id);
+    }
+    if (i.ok) {
+      const server = new Set(i.ignores);
+      for (const id of ignored) if (!server.has(id)) api('ignore', { method: 'POST', body: { id, on: true } });
+      for (const id of server) ignored.add(id);
+      saveSet('ignored', ignored);
+      applyMutes();
+    }
     render();
   }
   let room = { settings: {}, mod: false, owner: null, silenced: false };
@@ -50,6 +60,7 @@ export function createRoomPanel({ net, rtc, remotes, ui, me, roomTitle, openProf
     on ? set.add(userId) : set.delete(userId);
     if (key === 'restricted') api('block', { method: 'POST', body: { id: userId, on } });
     else saveSet(key, set);
+    if (key === 'ignored') api('ignore', { method: 'POST', body: { id: userId, on } });
     applyMutes();
     render();
   }
@@ -86,6 +97,7 @@ export function createRoomPanel({ net, rtc, remotes, ui, me, roomTitle, openProf
     if (!isMe && ignored.has(p.userId)) tag('Ignorado');
     if (!isMe && restricted.has(p.userId)) tag('Restringido');
     if (p.guest) tag('Invitado');
+    if (p.group) tag(p.group === groups.mine() ? 'Tu grupo' : 'En grupo', 'group');
     top.append(name, tags);
     el.append(top);
     if (isMe) return el;
@@ -109,6 +121,37 @@ export function createRoomPanel({ net, rtc, remotes, ui, me, roomTitle, openProf
     }
     el.append(btns);
     return el;
+  }
+
+  // Mi grupo de voz: quiénes están, salir y sacar (solo el que lo armó)
+  function renderGroup() {
+    const box = $('rp-group');
+    box.innerHTML = '';
+    const gid = groups.mine();
+    const g = gid && groups.all[gid];
+    if (!g) return;
+    const myId = me()?.id;
+    const h = document.createElement('h2');
+    h.className = 'sub-h';
+    h.textContent = 'Tu grupo de voz (privado)';
+    box.append(h);
+    for (const userId of g.members) {
+      const r = [...remotes.values()].find((x) => x.userId === userId);
+      const el = document.createElement('div');
+      el.className = 'player-row';
+      const top = document.createElement('div');
+      top.className = 'top';
+      const n = document.createElement('b');
+      n.textContent = userId === myId ? `${me()?.name ?? 'Vos'} (vos)` : r?.name ?? 'Fuera de la sala';
+      const tags = document.createElement('span');
+      tags.className = 'tags';
+      if (userId === g.leader) { const t = document.createElement('span'); t.className = 'tag group'; t.textContent = 'Lo armó'; tags.append(t); }
+      top.append(n, tags);
+      if (userId === myId) top.append(btn('Salir del grupo', () => net.send({ t: 'group', op: 'leave' })));
+      else if (g.leader === myId) top.append(btn('Sacar', () => confirmMod('Sacar del grupo', r?.name ?? 'esta persona', () => net.send({ t: 'group', op: 'kick', userId }))));
+      el.append(top);
+      box.append(el);
+    }
   }
 
   function render() {
@@ -140,10 +183,11 @@ export function createRoomPanel({ net, rtc, remotes, ui, me, roomTitle, openProf
     const list = $('rp-players');
     list.innerHTML = '';
     const mine = me();
-    list.append(row({ name: mine?.name ?? 'Vos', mod: room.mod, silenced: room.silenced, talking: rtc.talking }, true));
+    list.append(row({ name: mine?.name ?? 'Vos', mod: room.mod, silenced: room.silenced, talking: rtc.talking, group: groups.mine() }, true));
     for (const r of remotes.values()) {
-      list.append(row({ id: r.id, userId: r.userId, name: r.name, mod: r.mod, afk: r.afk, talking: r.speaking, silenced: r.silenced, guest: r.guest, remote: r }, false));
+      list.append(row({ id: r.id, userId: r.userId, name: r.name, mod: r.mod, afk: r.afk, talking: r.speaking, silenced: r.silenced, guest: r.guest, group: groups.of(r.userId), remote: r }, false));
     }
+    renderGroup();
 
     const bansBox = $('rp-bans');
     bansBox.innerHTML = '';

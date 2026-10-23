@@ -386,8 +386,23 @@ function toggleMedia() {
 $('btn-media').onclick = toggleMedia;
 
 // Panel de la sala (Tab)
+// Grupos de voz de la sala (privados): gid -> { leader, members: [userIds] }
+const groups = {
+  all: {},
+  of(userId) { for (const [gid, g] of Object.entries(this.all)) if (g.members.includes(userId)) return gid; return null; },
+  mine() { return account ? this.of(account.id) : null; },
+};
+function applyGroups() {
+  const mine = groups.mine();
+  for (const r of remotes.values()) {
+    const g = groups.of(r.userId);
+    r.setGroup(!g ? null : g === mine ? 'mio' : 'otro');
+  }
+  roomPanel.render();
+}
+
 const roomPanel = createRoomPanel({
-  net, rtc, remotes, me: () => account, roomTitle: () => roomTitle,
+  net, rtc, remotes, me: () => account, roomTitle: () => roomTitle, groups,
   ui: { openOverlay, closeOverlays, isOpen: (cls) => body.classList.contains(cls) },
   openProfile: (r) => openProfile(r),
 });
@@ -656,6 +671,8 @@ net
   .on('welcome', (m) => {
     for (const id of [...remotes.keys()]) removeRemote(id);
     if (rtc.djStream || ctrl.booth) endMySet(); // cambié de sala o se reconectó: la cabina ya no es mía
+    rtc.reset(); // conexión nueva con el servidor de audio (vuelve a publicar mi micrófono si lo tenía)
+    groups.all = m.groups ?? {};
     rtc.setScreen(m.screen);
     setDJ(m.dj);
     // Si tenía luces o pantalla y me reconecté o cambié de sala, las suelto de mi lado
@@ -667,7 +684,7 @@ net
     rtc.setStage(parts.escenario ? { id: parts.escenario.id, streamId: parts.escenario.streamId } : null);
     refreshArtists();
     m.players.forEach(addRemote);
-    for (const p of m.players) rtc.playerJoined(p.id);
+    applyGroups();
     if (rtc.mic) net.send({ t: 'mic', v: rtc.micState });
     roomPanel.setRoom(m.room ?? {});
     if (me.phone) net.send({ t: 'phone', v: true });
@@ -712,7 +729,7 @@ net
   })
   .on('picked', () => { toast('¡Lo juntaste! Está en tu inventario (I).'); if (body.classList.contains('inventory')) social.openInventory(); })
   .on('dropped', ({ equip }) => setEquip(equip))
-  .on('join', (p) => { addRemote(p); roomPanel.applyMutes(); rtc.playerJoined(p.id); system(`${p.name} entró a la sala.`); setStatus(); })
+  .on('join', (p) => { addRemote(p); roomPanel.applyMutes(); applyGroups(); system(`${p.name} entró a la sala.`); setStatus(); })
   .on('leave', ({ id }) => {
     const r = remotes.get(id);
     if (r) system(`${r.name} salió.`);
@@ -725,7 +742,22 @@ net
   .on('look', ({ id, name: n, look: l, equip }) => { const r = remotes.get(id); if (r) { r.setLook(l, equip); r.setName(n); } })
   .on('mic', ({ id, v }) => remotes.get(id)?.setMic(v))
   .on('emote', ({ id, e }) => remotes.get(id)?.avatar.gesture(e))
-  .on('rtc', (m) => rtc.onSignal(m.from, m.data))
+  .on('sfu', (m) => rtc.onSfu(m))
+  .on('sfu-cut', ({ mids }) => rtc.cut(mids))
+  .on('pub', ({ id, kind }) => { const r = remotes.get(id); if (r && kind === 'voice') r.hasVoice = true; })
+  .on('groups', ({ groups: g }) => { groups.all = g ?? {}; applyGroups(); })
+  .on('group', (m) => {
+    if (m.op === 'sent') toast(`Invitaste a ${m.name} a tu grupo de voz.`);
+    else if (m.op === 'invite') {
+      toast(`${m.name} te invita a su grupo de voz (privado: solo se escuchan entre ustedes).`, { actions: [
+        { label: 'Aceptar', yes: true, onClick: () => net.send({ t: 'group', op: 'respond', from: m.from, accept: true }) },
+        { label: 'Rechazar', onClick: () => net.send({ t: 'group', op: 'respond', from: m.from, accept: false }) },
+      ], time: 60_000 });
+    } else if (m.op === 'joined') system(m.me ? '🔒 Entraste al grupo de voz: ahora solo te escucha tu grupo.' : `🔒 ${m.name} entró a tu grupo de voz.`);
+    else if (m.op === 'left') system('Saliste del grupo de voz: volvés a escuchar a los que tenés cerca.');
+    else if (m.op === 'gone') system(`${m.name} salió de tu grupo de voz.`);
+    else if (m.op === 'kicked') system('Te sacaron del grupo de voz.');
+  })
   .on('screen', (m) => {
     if (m.busy) return toast(`Ya está compartiendo ${remotes.get(m.id)?.name ?? 'otra persona'}. Esperá a que termine.`);
     if (m.id === net.id) return;
@@ -1256,7 +1288,7 @@ addEventListener('blur', () => { talk(false); releaseTab(); }); // si la ventana
 const clock = new THREE.Clock();
 const staminaEl = $('stamina');
 const staminaFill = staminaEl.querySelector('.fill');
-let sendTimer = 0, lastSent = '', lastSentAt = 0, frame = 0;
+let sendTimer = 0, lastSent = '', lastSentAt = 0, frame = 0, voiceTimer = 0;
 // Si anda lento: se apaga el post-procesado y se baja la resolución ya mismo (y la próxima vez arranca más abajo)
 const fpsWatch = new FpsWatch(quality, () => {
   composer = null;
@@ -1273,6 +1305,15 @@ renderer.setAnimationLoop(() => {
   ground.update(dt, t, account?.id);
   rtc.update(camera, (key) => (key.endsWith(':dj') ? world.dj.speakers : key.endsWith(':screen') ? world.screen.position : remotes.get(key)?.mouth()));
   world.dj.setMusic(rtc.dj ? rtc.musicLevel() : -1);
+  // Qué voces escucho (los 4 más cercanos que hablan, o mi grupo): cada medio segundo
+  voiceTimer += dt;
+  if (voiceTimer >= 0.5 && net.ready) {
+    voiceTimer = 0;
+    const myGroup = groups.mine();
+    rtc.updateVoices([...remotes.values()].map((r) => ({
+      id: r.id, pos: r.avatar.root.position, mic: r.mic, hasVoice: r.hasVoice, group: groups.of(r.userId), blocked: rtc.mutedUsers.has(r.id),
+    })), ctrl.pos, myGroup);
+  }
 
   // Barra de stamina: aparece solo cuando no está llena
   staminaEl.classList.toggle('show', ctrl.stamina < 0.999 && ctrl.enabled);

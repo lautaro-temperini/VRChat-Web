@@ -520,3 +520,9 @@ body.notes #notes { display: flex; }
 .report-card textarea { padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line); background: rgba(10, 6, 30, 0.55); color: var(--text); font: 600 14px var(--font); resize: none; user-select: text; }
 .guest-tag { font: 800 9.5px var(--font); letter-spacing: .6px; text-transform: uppercase; padding: 1px 6px; border-radius: 6px; background: rgba(255, 255, 255, 0.18); color: #fff; }
 .guest-note { padding: 12px; border-radius: 14px; border: 1px dashed var(--line); color: var(--muted); font-size: 13.5px; line-height: 1.45; margin-bottom: 10px; }
+
+/* Grupo de voz */
+.group-tag { display: block; margin: 2px auto 0; width: max-content; font: 800 9.5px var(--font); letter-spacing: .6px; text-transform: uppercase; padding: 1px 6px; border-radius: 6px; background: rgba(160, 120, 255, 0.35); color: #fff; }
+.nametag.in-my-group .group-tag { background: #a078ff; color: #12062b; }
+.nametag.in-my-group .name { color: #d8c8ff; }
+.tag.group { background: #a078ff; color: #12062b; }

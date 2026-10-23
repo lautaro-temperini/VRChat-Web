@@ -3,8 +3,10 @@ import { cleanName, cleanLook, cleanEquip, EMOTES } from './shared.js';
 
 // Cada sala del juego es una instancia de Room (un Durable Object).
 // - Reenvía posiciones, chat, AFK y estado del micrófono.
-// - Pasa las señales WebRTC entre jugadores (la voz y la pantalla compartida
-//   viajan directo de jugador a jugador, P2P; el servidor solo los presenta).
+// - Hace de intermediaria con el servidor de audio de Cloudflare (Realtime SFU): la voz,
+//   la música y el video pasan por Cloudflare, así nadie ve la IP de otro. Acá se decide
+//   quién puede escuchar a quién (distancia, grupos privados, silenciados).
+// - Grupos de voz (party): privados, hasta 4, los arma y maneja quien invita primero.
 // - Coordina quién comparte pantalla, los intercambios y los objetos en el suelo.
 // - Moderación: el dueño de la sala (salas "u-<id>") y los admins pueden
 //   expulsar, banear, silenciar, mover jugadores y habilitar/deshabilitar funciones.
@@ -23,6 +25,14 @@ const DEFAULT_SETTINGS = { chat: true, voice: true, screen: true, items: true, d
 // Partes que toman los artistas en la consola (además de la pantalla del hall, que es this.screen)
 const PARTS = ['luces', 'escenario'];
 const SPAWN = { x: -27.5, z: 0 }; // junto a la puerta de entrada (ver museum.js)
+// Servidor de audio (Cloudflare Realtime SFU)
+const SFU_API = 'https://rtc.live.cloudflare.com/v1/apps/';
+const KINDS = ['voice', 'dj', 'stage']; // pistas que se pueden publicar
+// Voz: se escucha hasta 10 m (el cliente elige a los 4 más cercanos que hablan). Acá se
+// deja un margen, porque las posiciones llegan con un poco de atraso.
+const VOICE_RANGE = 20;
+// Grupos de voz
+const GROUP_MAX = 4, GROUP_INVITE_LIFE = 60_000;
 
 // Estado de un jugador: [x, y, z, rotación, velocidad, pose]
 // pose: 0 parado, 1 agachado, 2 sentado, 3 trepando, 4 en el aire
@@ -48,6 +58,8 @@ export class Room extends DurableObject {
     this.invites = new Map();  // "de>para" -> hora de la invitación a intercambiar
     this.trades = new Map();   // id -> intercambio en curso
     this.tradeOf = new Map();  // jugador -> id del intercambio
+    this.pulls = new Map();    // conexión -> Map("id:tipo" -> mid) de lo que está escuchando
+    this.ginvites = new Map(); // "deUsuario>paraUsuario" -> hora de la invitación al grupo
   }
 
   accounts() {
@@ -62,7 +74,8 @@ export class Room extends DurableObject {
   // Ajustes, baneos, silenciados y objetos en el suelo se guardan (sobreviven si la sala se duerme)
   async load() {
     if (this.loaded) return;
-    const s = await this.ctx.storage.get(['settings', 'bans', 'silenced', 'ground']);
+    const s = await this.ctx.storage.get(['settings', 'bans', 'silenced', 'ground', 'groups']);
+    this.groups = s.get('groups') ?? {}; // gid -> { leader: userId, members: [userIds en orden de entrada] }
     this.settings = { ...DEFAULT_SETTINGS, ...(s.get('settings') ?? {}) };
     this.bans = s.get('bans') ?? {};         // userId -> { name, at }
     this.silenced = s.get('silenced') ?? {}; // userId -> true
@@ -94,6 +107,7 @@ export class Room extends DurableObject {
     return {
       id: m.id, userId: m.userId, name: m.name, look: m.look, equip: m.equip ?? [],
       afk: !!m.afk, mic: m.mic ?? 'off', silenced: !!this.silenced?.[m.userId], mod: !!m.mod, phone: !!m.phone, guest: !!m.guest,
+      voice: !!m.pubs?.voice,
       s: this.states.get(m.id) ?? null,
     };
   }
@@ -161,11 +175,11 @@ export class Room extends DurableObject {
   }
 
   async webSocketMessage(ws, raw) {
-    // Las señales WebRTC (descripciones de sesión) son más largas que el resto
-    if (typeof raw !== 'string' || raw.length > 20_000) return;
+    // Las descripciones de sesión del servidor de audio (SDP) son más largas que el resto
+    if (typeof raw !== 'string' || raw.length > 64_000) return;
     let msg;
     try { msg = JSON.parse(raw); } catch { return; }
-    if (msg.t !== 'rtc' && raw.length > 4096) return;
+    if (msg.t !== 'sfu' && raw.length > 4096) return;
     await this.load();
     const meta = ws.deserializeAttachment();
     this.lastSeen.set(meta.id, Date.now());
@@ -196,7 +210,7 @@ export class Room extends DurableObject {
       if (s) this.states.set(meta.id, s);
       const chat = (await this.ctx.storage.get('chat')) ?? [];
       this.send(ws, {
-        t: 'welcome', id: meta.id, players: this.players(ws), chat, screen: this.screen, dj: this.dj, parts: this.parts, lights: this.lights,
+        t: 'welcome', id: meta.id, players: this.players(ws), chat, screen: this.screen, dj: this.dj, parts: this.parts, lights: this.lights, groups: this.groups,
         room: { name: await this.roomName(), owner: await this.ownerId(), settings: this.settings, mod: meta.mod, silenced: !!this.silenced[user.id] },
         ground: this.ground.map((g) => ({ ...g, age: Date.now() - g.at })),
       });
@@ -279,12 +293,12 @@ export class Room extends DurableObject {
         this.broadcast({ t: 'chat', ...entry });
         break;
       }
-      case 'rtc': {
-        // Señal WebRTC para un jugador puntual
-        if (typeof msg.to !== 'string' || msg.to === meta.id) return;
-        this.send(this.byId(msg.to), { t: 'rtc', from: meta.id, data: msg.data });
+      case 'sfu':
+        await this.sfuMessage(ws, meta, msg);
         break;
-      }
+      case 'group':
+        await this.groupMessage(ws, meta, msg);
+        break;
       case 'screen': {
         if (msg.on) {
           if (silenced || (!this.settings.screen && !meta.mod)) {
@@ -441,6 +455,7 @@ export class Room extends DurableObject {
         if (on && this.dj?.id === tm.id) this.stopDJ();
         if (on) for (const part of PARTS) if (this.parts[part]?.id === tm.id) this.releasePart(part);
         this.broadcast({ t: 'silenced', id: tm.id, v: on });
+        if (on) await this.enforce(); // nadie sigue escuchando su voz
         break;
       }
       case 'bring': {
@@ -467,8 +482,250 @@ export class Room extends DurableObject {
           for (const part of PARTS) if (this.parts[part] && !this.byId(this.parts[part].id)?.deserializeAttachment().mod) this.releasePart(part);
         }
         this.broadcast({ t: 'settings', settings: this.settings, by: meta.name });
+        if (msg.key === 'voice' && !msg.value) await this.enforce();
         break;
       }
+    }
+  }
+
+  // ---------- Servidor de audio (Cloudflare Realtime SFU) ----------
+  // El cliente nunca habla directo con la API (la clave es secreta): manda el pedido acá,
+  // la sala lo valida y lo pasa. Las pistas se llaman "<id de conexión>-<tipo>".
+
+  async sfuApi(path, method, body) {
+    if (!this.env.REALTIME_APP_TOKEN || !this.env.REALTIME_APP_ID) return { error: 'Falta configurar el servidor de audio.' };
+    try {
+      const r = await fetch(`${SFU_API}${this.env.REALTIME_APP_ID}/${path}`, {
+        method, headers: { Authorization: `Bearer ${this.env.REALTIME_APP_TOKEN}`, 'Content-Type': 'application/json' },
+        body: body ? JSON.stringify(body) : undefined,
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || j.errorCode) return { error: j.errorDescription || `Error ${r.status}` };
+      return j;
+    } catch {
+      return { error: 'No se pudo conectar con el servidor de audio.' };
+    }
+  }
+
+  async sfuSession(ws, meta) {
+    if (meta.sfu) return meta.sfu;
+    const r = await this.sfuApi('sessions/new', 'POST');
+    if (r.error) return null;
+    meta.sfu = r.sessionId;
+    ws.serializeAttachment(meta);
+    return meta.sfu;
+  }
+
+  groupOf(userId) {
+    for (const [gid, g] of Object.entries(this.groups)) if (g.members.includes(userId)) return gid;
+    return null;
+  }
+
+  // ¿Puede "viewer" escuchar/ver la pista "kind" de "tm"? Devuelve null si sí, o el motivo
+  pullBlocked(viewer, tm, kind) {
+    if (!tm?.joined || !tm.sfu) return 'not-yet';
+    if (kind === 'dj') return this.dj?.id === tm.id ? (tm.pubs?.dj ? null : 'not-yet') : 'denied';
+    if (kind === 'stage') return this.parts.escenario?.id === tm.id ? (tm.pubs?.stage ? null : 'not-yet') : 'denied';
+    if (kind !== 'voice') return 'denied';
+    if (!tm.pubs?.voice) return 'not-yet';
+    if (this.silenced[tm.userId] || (!this.settings.voice && !tm.mod)) return 'denied';
+    // Grupo privado: solo se escuchan entre ellos (desde cualquier lugar de la sala)
+    const ga = this.groupOf(viewer.userId), gb = this.groupOf(tm.userId);
+    if (ga || gb) return ga === gb ? null : 'denied';
+    const a = this.states.get(viewer.id), b = this.states.get(tm.id);
+    if (!a || !b) return 'denied';
+    return Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]) <= VOICE_RANGE ? null : 'denied';
+  }
+
+  async sfuMessage(ws, meta, msg) {
+    const reply = (data) => this.send(ws, { t: 'sfu', rid: msg.rid, ...data });
+    const sid = await this.sfuSession(ws, meta);
+    if (!sid) return reply({ ok: false, error: 'No se pudo conectar con el servidor de audio.' });
+    const base = `sessions/${sid}`;
+    const sdp = typeof msg.sdp === 'string' ? msg.sdp.slice(0, 60_000) : null;
+
+    if (msg.op === 'push') {
+      // Publicar mis pistas: voz siempre; música y video solo si la cabina / la pantalla son mías
+      const tracks = (Array.isArray(msg.tracks) ? msg.tracks : []).slice(0, 3).filter((t) => KINDS.includes(t?.kind) && typeof t.mid === 'string');
+      const allowed = (k) => k === 'voice' || (k === 'dj' && this.dj?.id === meta.id) || (k === 'stage' && this.parts.escenario?.id === meta.id);
+      if (!sdp || !tracks.length || !tracks.every((t) => allowed(t.kind))) return reply({ ok: false, error: 'denied' });
+      const r = await this.sfuApi(`${base}/tracks/new`, 'POST', {
+        sessionDescription: { type: 'offer', sdp },
+        tracks: tracks.map((t) => ({ location: 'local', mid: t.mid, trackName: `${meta.id}-${t.kind}` })),
+      });
+      if (r.error) return reply({ ok: false, error: r.error });
+      meta.pubs = { ...(meta.pubs ?? {}) };
+      for (const t of tracks) meta.pubs[t.kind] = t.mid;
+      ws.serializeAttachment(meta);
+      reply({ ok: true, sdp: r.sessionDescription?.sdp });
+      if (tracks.some((t) => t.kind === 'voice')) this.broadcast({ t: 'pub', id: meta.id, kind: 'voice' }, ws);
+      return;
+    }
+
+    if (msg.op === 'unpush') {
+      const kinds = (Array.isArray(msg.kinds) ? msg.kinds : []).filter((k) => meta.pubs?.[k]);
+      if (!kinds.length) return reply({ ok: true });
+      await this.sfuApi(`${base}/tracks/close`, 'PUT', { tracks: kinds.map((k) => ({ mid: meta.pubs[k] })), force: true });
+      for (const k of kinds) delete meta.pubs[k];
+      ws.serializeAttachment(meta);
+      return reply({ ok: true });
+    }
+
+    if (msg.op === 'pull') {
+      // Escuchar / ver pistas de otros: la sala decide si se puede
+      const items = (Array.isArray(msg.items) ? msg.items : []).slice(0, 8);
+      const out = [], want = [];
+      for (const it of items) {
+        const target = this.byId(String(it?.id ?? ''));
+        const tm = target?.deserializeAttachment();
+        const why = it?.id === meta.id ? 'denied' : this.pullBlocked(meta, tm, it?.kind);
+        if (why) out.push({ id: it?.id, kind: it?.kind, error: why });
+        else want.push({ it, tm });
+      }
+      if (!want.length) return reply({ ok: true, tracks: out });
+      const r = await this.sfuApi(`${base}/tracks/new`, 'POST', {
+        tracks: want.map(({ it, tm }) => ({ location: 'remote', sessionId: tm.sfu, trackName: `${tm.id}-${it.kind}` })),
+      });
+      if (r.error) return reply({ ok: false, error: r.error, tracks: out });
+      const mine = this.pulls.get(meta.id) ?? new Map();
+      this.pulls.set(meta.id, mine);
+      want.forEach(({ it, tm }, i) => {
+        const t = r.tracks?.[i];
+        if (!t || t.errorCode) return out.push({ id: it.id, kind: it.kind, error: 'not-yet' });
+        mine.set(`${tm.id}:${it.kind}`, t.mid);
+        out.push({ id: it.id, kind: it.kind, mid: t.mid });
+      });
+      return reply({ ok: true, tracks: out, sdp: r.requiresImmediateRenegotiation ? r.sessionDescription?.sdp : null });
+    }
+
+    if (msg.op === 'answer') {
+      if (!sdp) return reply({ ok: false });
+      const r = await this.sfuApi(`${base}/renegotiate`, 'PUT', { sessionDescription: { type: 'answer', sdp } });
+      return reply({ ok: !r.error, error: r.error });
+    }
+
+    if (msg.op === 'unpull') {
+      const mine = this.pulls.get(meta.id);
+      const mids = (Array.isArray(msg.mids) ? msg.mids : []).map(String).filter((mid) => mine && [...mine.values()].includes(mid)).slice(0, 16);
+      if (mids.length) await this.sfuApi(`${base}/tracks/close`, 'PUT', { tracks: mids.map((mid) => ({ mid })), force: true });
+      for (const [key, mid] of mine ?? []) if (mids.includes(mid)) mine.delete(key);
+      return reply({ ok: true });
+    }
+    reply({ ok: false, error: 'denied' });
+  }
+
+  // Cortar las voces que alguien ya no puede escuchar (entró a un grupo, lo silenciaron…)
+  async enforce() {
+    for (const ws of this.joined()) {
+      const meta = ws.deserializeAttachment();
+      const mine = this.pulls.get(meta.id);
+      if (!mine?.size || !meta.sfu) continue;
+      const cut = [];
+      for (const [key, mid] of mine) {
+        const [id, kind] = key.split(':');
+        if (kind !== 'voice') continue;
+        if (this.pullBlocked(meta, this.byId(id)?.deserializeAttachment(), 'voice') === 'denied') cut.push([key, mid]);
+      }
+      if (!cut.length) continue;
+      await this.sfuApi(`sessions/${meta.sfu}/tracks/close`, 'PUT', { tracks: cut.map(([, mid]) => ({ mid })), force: true });
+      for (const [key] of cut) mine.delete(key);
+      this.send(ws, { t: 'sfu-cut', mids: cut.map(([, mid]) => mid) });
+    }
+  }
+
+  // ---------- Grupos de voz ----------
+  // Privados: solo se escuchan entre ellos. Hasta 4. Quien lo arma es el líder: solo él invita
+  // y puede sacar a alguien; si se va, el líder pasa al siguiente. Solo dentro de esta sala.
+  // Anti-acoso (en la cuenta): si rechazás, esa persona no te puede reinvitar por un tiempo
+  // que crece, y quien está ignorado o restringido no te puede invitar (no se entera).
+
+  connOfUser(userId) {
+    return this.joined().find((ws) => ws.deserializeAttachment().userId === userId) ?? null;
+  }
+
+  async saveGroups() {
+    await this.ctx.storage.put('groups', this.groups);
+    this.broadcast({ t: 'groups', groups: this.groups });
+    await this.enforce();
+  }
+
+  // Sacar a alguien de su grupo (se fue, lo sacaron o se quedó solo)
+  removeFromGroup(userId) {
+    const gid = this.groupOf(userId);
+    if (!gid) return null;
+    const g = this.groups[gid];
+    g.members = g.members.filter((u) => u !== userId);
+    if (g.leader === userId) g.leader = g.members[0] ?? null;
+    if (g.members.length < 2) delete this.groups[gid];
+    return gid;
+  }
+
+  async groupMessage(ws, meta, msg) {
+    const now = Date.now();
+    for (const [k, at] of this.ginvites) if (now - at > GROUP_INVITE_LIFE) this.ginvites.delete(k);
+
+    if (msg.op === 'invite') {
+      const target = this.byId(String(msg.to ?? ''));
+      const tm = target?.deserializeAttachment();
+      if (!tm?.joined || tm.id === meta.id) return;
+      const sent = () => this.send(ws, { t: 'group', op: 'sent', name: tm.name });
+      const gid = this.groupOf(meta.userId);
+      if (gid && this.groups[gid].leader !== meta.userId) return this.notice(ws, 'Solo quien armó el grupo puede invitar.');
+      if (gid && this.groups[gid].members.length >= GROUP_MAX) return this.notice(ws, `El grupo está lleno (máximo ${GROUP_MAX}).`);
+      if (this.groupOf(tm.userId)) return this.notice(ws, `${tm.name} ya está en un grupo.`);
+      const key = `${meta.userId}>${tm.userId}`;
+      if (this.ginvites.has(key)) return sent();
+      // Si no puede invitarlo (rechazos recientes, ignorado o restringido) no se le avisa: parece enviada
+      const check = await this.accounts().groupInviteCheck(meta.userId, tm.userId);
+      if (check.ok) {
+        this.ginvites.set(key, now);
+        this.send(target, { t: 'group', op: 'invite', from: meta.id, name: meta.name });
+      }
+      return sent();
+    }
+
+    if (msg.op === 'respond') {
+      const from = this.byId(String(msg.from ?? ''));
+      const fm = from?.deserializeAttachment();
+      if (!fm?.joined) return;
+      const key = `${fm.userId}>${meta.userId}`;
+      if (!this.ginvites.delete(key)) return this.notice(ws, 'Esa invitación ya venció.');
+      if (!msg.accept) {
+        // Rechazo: no se le avisa a quien invitó; la cuenta lleva la cuenta de rechazos
+        await this.accounts().groupRejected(fm.userId, meta.userId);
+        return;
+      }
+      if (this.groupOf(meta.userId)) return this.notice(ws, 'Ya estás en un grupo. Salí primero.');
+      let gid = this.groupOf(fm.userId);
+      if (gid && this.groups[gid].leader !== fm.userId) return this.notice(ws, 'Esa invitación ya no vale.');
+      if (gid && this.groups[gid].members.length >= GROUP_MAX) return this.notice(ws, 'El grupo ya está lleno.');
+      if (!gid) {
+        gid = crypto.randomUUID().slice(0, 8);
+        this.groups[gid] = { leader: fm.userId, members: [fm.userId] };
+      }
+      this.groups[gid].members.push(meta.userId);
+      for (const w of this.joined()) {
+        const m = w.deserializeAttachment();
+        if (this.groups[gid].members.includes(m.userId)) this.send(w, { t: 'group', op: 'joined', name: meta.name, me: m.userId === meta.userId });
+      }
+      return this.saveGroups();
+    }
+
+    if (msg.op === 'leave') {
+      const gid = this.removeFromGroup(meta.userId);
+      if (!gid) return;
+      this.send(ws, { t: 'group', op: 'left' });
+      for (const u of this.groups[gid]?.members ?? []) this.send(this.connOfUser(u), { t: 'group', op: 'gone', name: meta.name });
+      return this.saveGroups();
+    }
+
+    if (msg.op === 'kick') {
+      const gid = this.groupOf(meta.userId);
+      const userId = String(msg.userId ?? '');
+      if (!gid || this.groups[gid].leader !== meta.userId || userId === meta.userId || !this.groups[gid].members.includes(userId)) return;
+      this.removeFromGroup(userId);
+      this.send(this.connOfUser(userId), { t: 'group', op: 'kicked' });
+      return this.saveGroups();
     }
   }
 
@@ -583,6 +840,7 @@ export class Room extends DurableObject {
   async leave(ws) {
     const meta = ws.deserializeAttachment();
     if (!meta?.joined) return;
+    await this.load();
     meta.joined = false;
     ws.serializeAttachment(meta);
     this.states.delete(meta.id);
@@ -596,6 +854,14 @@ export class Room extends DurableObject {
     const tradeId = this.tradeOf.get(meta.id);
     if (tradeId) this.endTrade(this.trades.get(tradeId), () => ({ op: 'closed', name: meta.name }));
     this.broadcast({ t: 'leave', id: meta.id }, ws);
+    this.pulls.delete(meta.id);
+    // Si se fue el último del grupo que quedaba en la sala, el grupo se disuelve
+    // (si queda alguien, sigue en el grupo: deja de escucharse hasta que vuelva)
+    const gid = this.groupOf(meta.userId);
+    if (gid) {
+      const present = new Set(this.joined().filter((w) => w !== ws).map((w) => w.deserializeAttachment().userId));
+      if (!this.groups[gid].members.some((u) => present.has(u))) { delete this.groups[gid]; await this.saveGroups(); }
+    }
     if (meta.userId) await this.accounts().presenceLeave(await this.roomName(), meta.userId);
   }
 

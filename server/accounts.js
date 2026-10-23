@@ -13,6 +13,10 @@ const unhex = (s) => new Uint8Array(s.match(/../g).map((h) => parseInt(h, 16)));
 const randomHex = (n) => hex(crypto.getRandomValues(new Uint8Array(n)));
 const sha256 = async (s) => hex(await crypto.subtle.digest('SHA-256', enc.encode(s)));
 const pick = (list) => list[Math.floor(Math.random() * list.length)];
+// Días según la hora de Argentina (GMT-3)
+const DAY = 86_400_000, ARG = 3 * 3_600_000;
+const argDay = (ts) => Math.floor((ts - ARG) / DAY);
+const argMidnight = (day) => (day + 1) * DAY + ARG;
 
 async function pbkdf2(password, saltHex) {
   const key = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveBits']);
@@ -107,6 +111,14 @@ export class Accounts extends DurableObject {
       CREATE TABLE IF NOT EXISTS blocks (
         user_id TEXT NOT NULL, blocked_id TEXT NOT NULL, created INTEGER NOT NULL,
         PRIMARY KEY (user_id, blocked_id)
+      );
+      CREATE TABLE IF NOT EXISTS ignores (
+        user_id TEXT NOT NULL, ignored_id TEXT NOT NULL, created INTEGER NOT NULL,
+        PRIMARY KEY (user_id, ignored_id)
+      );
+      CREATE TABLE IF NOT EXISTS group_rejects (
+        from_id TEXT NOT NULL, to_id TEXT NOT NULL, day INTEGER NOT NULL, count INTEGER NOT NULL, until INTEGER NOT NULL,
+        PRIMARY KEY (from_id, to_id)
       );
       CREATE TABLE IF NOT EXISTS reports (
         id TEXT PRIMARY KEY, reporter TEXT NOT NULL, target TEXT NOT NULL, reason TEXT NOT NULL,
@@ -708,6 +720,46 @@ export class Accounts extends DurableObject {
     if (on) this.sql.exec('INSERT OR IGNORE INTO blocks (user_id, blocked_id, created) VALUES (?, ?, ?)', me.id, otherId, Date.now());
     else this.sql.exec('DELETE FROM blocks WHERE user_id = ? AND blocked_id = ?', me.id, otherId);
     return this.blocks(token);
+  }
+
+  // ---------- Ignorar: no escucho su voz ni veo su texto en la sala (y no me puede invitar a un grupo) ----------
+
+  async ignores(token) {
+    const me = await this.userFromToken(token);
+    if (!me) return { ok: false, error: 'Sesión vencida.' };
+    const ids = this.sql.exec('SELECT ignored_id FROM ignores WHERE user_id = ?', me.id).toArray().map((r) => r.ignored_id);
+    return { ok: true, ignores: ids };
+  }
+
+  async setIgnore(token, otherId, on) {
+    const me = await this.userFromToken(token);
+    if (!me) return { ok: false, error: 'Sesión vencida.' };
+    if (!otherId || otherId === me.id) return { ok: false, error: 'No válido.' };
+    if (on) this.sql.exec('INSERT OR IGNORE INTO ignores (user_id, ignored_id, created) VALUES (?, ?, ?)', me.id, otherId, Date.now());
+    else this.sql.exec('DELETE FROM ignores WHERE user_id = ? AND ignored_id = ?', me.id, otherId);
+    return this.ignores(token);
+  }
+
+  // ---------- Invitaciones a grupos de voz (anti-acoso) ----------
+  // Si rechazás a alguien: 1º rechazo, no te puede reinvitar por 1 min; 2º, 10 min; 3º, hasta
+  // mañana (medianoche de Argentina). La cuenta de rechazos vuelve a cero cada día.
+  // Quien está ignorado o restringido nunca te puede invitar. A quien invita no se le avisa nada.
+
+  async groupInviteCheck(fromId, toId) {
+    const hit = (table, col) => this.sql.exec(`SELECT 1 FROM ${table} WHERE user_id = ? AND ${col} = ?`, toId, fromId).toArray().length > 0;
+    if (hit('ignores', 'ignored_id') || hit('blocks', 'blocked_id')) return { ok: false };
+    const r = this.sql.exec('SELECT until FROM group_rejects WHERE from_id = ? AND to_id = ?', fromId, toId).toArray()[0];
+    return { ok: !r || r.until <= Date.now() };
+  }
+
+  async groupRejected(fromId, toId) {
+    const now = Date.now();
+    const day = argDay(now);
+    const r = this.sql.exec('SELECT day, count FROM group_rejects WHERE from_id = ? AND to_id = ?', fromId, toId).toArray()[0];
+    const count = r && r.day === day ? r.count + 1 : 1;
+    const until = count === 1 ? now + 60_000 : count === 2 ? now + 10 * 60_000 : argMidnight(day);
+    this.sql.exec('INSERT OR REPLACE INTO group_rejects (from_id, to_id, day, count, until) VALUES (?, ?, ?, ?, ?)', fromId, toId, day, count, until);
+    return { ok: true };
   }
 
   // ---------- Reportes: llegan a los admins (contenido ilegal, robo de obras, acoso…) ----------

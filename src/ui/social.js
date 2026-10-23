@@ -229,6 +229,11 @@ export function createSocial({ net, ui, me, room, onEquip, onDrop }) {
       ui.closeOverlays();
     };
     $('act-visit').onclick = () => go(roomOf(profile.id));
+    // Grupo de voz privado: la sala responde si se mandó (o por qué no)
+    $('act-group').onclick = () => {
+      net.send({ t: 'group', op: 'invite', to: player.id });
+      ui.closeOverlays();
+    };
   }
 
   // ---------- Intercambios ----------

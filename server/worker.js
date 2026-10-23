@@ -82,6 +82,8 @@ async function api(request, env, path) {
     case 'POST login': result = await accounts.login(body.login ?? body.username, body.password); break;
     case 'GET blocks': result = await accounts.blocks(token); break;
     case 'POST block': result = await accounts.setBlock(token, String(body.id ?? ''), !!body.on); break;
+    case 'GET ignores': result = await accounts.ignores(token); break;
+    case 'POST ignore': result = await accounts.setIgnore(token, String(body.id ?? ''), !!body.on); break;
     case 'POST report': result = await accounts.report(token, body); break;
     case 'GET reports': result = await accounts.reports(token); break;
     case 'POST reportresolve': result = await accounts.resolveReport(token, body.id); break;

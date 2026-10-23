@@ -11,8 +11,8 @@ y las salas giran alrededor de exponer, descubrir y coleccionar arte.
 1. **Base para abrir al público**: registro con mail y nickname único; voz con IP oculta y grupos
    (escuchar a los más cercanos, party/grupo privado vs. público); antiflood en el chat; mutear,
    ignorar y restringir; aviso +18 y condiciones de uso; obras y cabinas no trepables; juntar las ramas.
-   ✅ Hecho todo menos la **voz con IP oculta y grupos**: falta el servidor de audio (SFU, Cloudflare
-   Realtime o LiveKit). El usuario tiene que activarlo y pasar las claves. Reportar quedó postergado.
+   ✅ Hecho (23/10: voz, música y pantalla del escenario por Cloudflare Realtime SFU, con grupos de voz).
+   Reportar quedó postergado. Para subirlo online falta cargar la clave con `wrangler secret put`.
 2. **Museo rotativo con postulaciones**: cada obra dura 24 h, cola con prioridad para usuarios.
    Cuadros (arte digital, shaders, diseños) y esculturas (modelos 3D, instalaciones interactivas).
    Empezar por imágenes y modelos 3D; shaders e instalaciones después (corren código: aislar y limitar).
@@ -81,9 +81,12 @@ La música del DJ y el puente OSC ya están hechos. Falta:
   no se encontró alternativa gratuita vigente. Queda en espera.
 
 ### Técnicos
-- Servidor TURN (Cloudflare Calls) para que la voz/pantalla conecten en redes cerradas.
+- Redes muy cerradas: el servidor de audio de Cloudflare suele andar igual (usa sus propias
+  direcciones); si alguien no conecta, sumar el TURN de Cloudflare.
+- La sala valida la distancia solo cuando alguien se suscribe a una voz (con margen de 20 m); si
+  después se aleja, el que dejó de escuchar es su cliente (que la suelta a los 18 m).
 - Comprimir modelos y texturas (KTX2/Draco) para celulares.
-- Mutear/ignorar hoy se guarda en el navegador (no en la cuenta); restringir sí vive en la cuenta.
+- Mutear se guarda en el navegador; ignorar y restringir viven en la cuenta.
 - Los baneos son por cuenta: un invitado nuevo puede volver a entrar.
 
 ## Decisiones de diseño (tomadas por el usuario)

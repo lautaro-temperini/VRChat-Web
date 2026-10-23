@@ -6,12 +6,13 @@ import { Avatar, POSE } from '../player/avatar.js';
 // y las suaviza para que el movimiento se vea continuo.
 
 export class RemotePlayer {
-  constructor(scene, { id, userId, name, look, equip, s, afk, mic, mod, silenced, phone, guest }) {
+  constructor(scene, { id, userId, name, look, equip, s, afk, mic, mod, silenced, phone, guest, voice }) {
     this.id = id;
     this.userId = userId;
     this.mod = !!mod;           // moderador de esta sala
     this.silenced = !!silenced; // silenciado por un moderador
     this.guest = !!guest;       // invitado (sin cuenta): se marca para que nadie se haga pasar por otro
+    this.hasVoice = !!voice;    // ya publicó su micrófono en el servidor de audio
     this.scene = scene;
     this.avatar = new Avatar(look, equip);
     this.avatar.phone = !!phone; // con el celular en la mano
@@ -42,7 +43,11 @@ export class RemotePlayer {
       g.textContent = 'Invitado';
       row.append(g);
     }
-    this.tag.append(this.bubble, row, this.afkEl);
+    // Grupo de voz: todos ven "En grupo" (así saben que no los escucha); sus compañeros ven una marca
+    this.groupEl = document.createElement('span');
+    this.groupEl.className = 'group-tag';
+    this.groupEl.hidden = true;
+    this.tag.append(this.bubble, row, this.groupEl, this.afkEl);
     this.label = new CSS2DObject(this.tag);
     this.label.position.y = 2.0;
     this.avatar.root.add(this.label);
@@ -73,6 +78,12 @@ export class RemotePlayer {
   // Desde dónde suena su voz (la boca, más o menos)
   mouth() { return this.avatar.root.position.clone().setY(this.avatar.root.position.y + 1.55 * this.avatar.scale); }
   setAfk(v) { this.afk = !!v; this.tag.classList.toggle('is-afk', this.afk); }
+  // group: null | 'otro' (está en un grupo) | 'mio' (está en mi grupo)
+  setGroup(group) {
+    this.groupEl.hidden = !group;
+    this.groupEl.textContent = group === 'mio' ? '◆ Tu grupo' : 'En grupo';
+    this.tag.classList.toggle('in-my-group', group === 'mio');
+  }
 
   setState([x, y, z, yaw, speed, pose = POSE.stand]) {
     this.target.set(x, y, z);

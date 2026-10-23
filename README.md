@@ -34,7 +34,7 @@ npm run dev
 | Cuentas | Registro con mail + nickname único (PBKDF2). Invitados solo para probar: miran, chatean y se mueven |
 | Red social | Celular del personaje: amigos y buscador, muro (notas y fotos de amigos + destacados, me gusta), galería y avisos. Atril con notas y corazones en cada sala personal |
 | Salas personales | Nombre, descripción y quién entra (abierta / amigos / cerrada); salas favoritas en el Mapa |
-| Voz y pantalla | WebRTC P2P: voz con audio espacial (mantener V) y pantalla compartida. Pronto: servidor de audio para ocultar las IPs |
+| Voz | Por el servidor de audio de Cloudflare (nadie ve la IP de otro): escuchás a los 4 más cercanos que hablan (10 m), con audio 3D. Grupos de voz privados de hasta 4 (E sobre alguien → Invitar al grupo) |
 | Objetos | Inventario, equipar accesorios, intercambiar o regalar, soltar en el suelo |
 | Cuidarse | Mutear (voz), ignorar (voz y texto) y restringir (publicaciones). Antiflood en el chat |
 | Moderación | Dueño de sala y admins: expulsar, banear, silenciar, traer, mandar a la entrada, habilitar/deshabilitar chat, voz, pantalla, objetos, DJ y consola |
