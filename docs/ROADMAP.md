@@ -171,3 +171,13 @@ La música del DJ y el puente OSC ya están hechos. Falta:
 | Moderación del Museo | Ignorar/restringir + antiflood; no depende de que el admin esté conectado |
 | Personajes | Mejorar con Blender + Tripo/Meshy (IA para objetos y decoración; cuerpos y ropa en Blender) |
 | Exploradores | Más mapas públicos |
+| Museo rotativo: lugares | Por ahora los que ya hay (9 cuadros y 2 esculturas) |
+| Museo rotativo: cola vacía | Si no hay nadie esperando, la obra actual se queda otras 24 h |
+| Museo rotativo: sin definir | Cómo entra una obra (la idea: abierto y libre, pero verificando que sean obras reales y no bromas) y cuántas puede postular cada persona. El usuario lo está pensando |
+| Voz: servidor | Servidor de audio (Cloudflare Realtime SFU) para que nadie vea la IP de otro |
+| Voz: a quién escuchás | Los 4 más cercanos **que estén hablando**, dentro de 10 m. Si uno se calla, entra el siguiente |
+| Voz: grupos | Se invita con E desde el perfil. Hasta 4 personas. Solo en la misma sala (si alguien se va, deja de escucharse) |
+| Voz: en grupo | Privado: solo te escucha el grupo y solo escuchás al grupo. La música del DJ y el audio de la sala siguen (eso se maneja con la M) |
+| Voz: quién maneja el grupo | El que lo creó: solo él invita y puede sacar a alguien; si se va, pasa al siguiente |
+| Voz: se ve | Los del grupo ven una marca sobre sus compañeros, y todos ven "En grupo" debajo del nombre |
+| Voz: invitaciones (anti-acoso) | Bloqueo creciente al rechazar: 1º rechazo, no te puede reinvitar por 1 min; 2º, 10 min; 3º, hasta mañana. No se le avisa que lo rechazaste. Alguien ignorado o restringido no te puede invitar (y no se entera) |
