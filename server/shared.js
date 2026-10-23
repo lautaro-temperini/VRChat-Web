@@ -43,6 +43,14 @@ DANCES.forEach((name, i) => { EMOTES[`baile${i + 1}`] = { name, loop: true, danc
 export const HAIR_STYLES = ['corto', 'largo', 'rapado', 'rodete', 'rulos', 'coleta'];
 export const TOPS = ['remera', 'buzo'];
 export const BODIES = ['masc', 'fem'];
+// Tipos de cuerpo del editor básico: cada uno es un punto de los deslizadores del avanzado
+// (peso: flaco 0 … gordo 1; músculo: poco 0 … mucho 1). Promedio = 0,5 / 0,5.
+export const BODY_TYPES = {
+  flaco: { name: 'Flaco', weight: 0.15, muscle: 0.35 },
+  promedio: { name: 'Promedio', weight: 0.5, muscle: 0.5 },
+  gordo: { name: 'Gordo', weight: 0.9, muscle: 0.45 },
+  musculoso: { name: 'Musculoso', weight: 0.5, muscle: 0.95 },
+};
 const COLOR_KEYS = ['skin', 'hair', 'eyes', 'shirt', 'pants', 'shoes'];
 
 export function cleanName(name) {
@@ -62,8 +70,12 @@ export function cleanLook(look) {
   if (typeof look.beard === 'boolean') out.beard = look.beard;
   const num = (v, lo, hi) => (Number.isFinite(Number(v)) ? Math.min(hi, Math.max(lo, Number(v))) : undefined);
   const height = num(look.height, 1.55, 1.95);
+  // build (contextura) es del editor viejo: se sigue aceptando pero el personaje ya no lo usa
   const build = num(look.build, 0.85, 1.2);
+  const weight = num(look.weight, 0, 1), muscle = num(look.muscle, 0, 1);
   if (height !== undefined) out.height = height;
   if (build !== undefined) out.build = build;
+  if (weight !== undefined) out.weight = weight;
+  if (muscle !== undefined) out.muscle = muscle;
   return out;
 }

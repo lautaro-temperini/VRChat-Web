@@ -150,9 +150,9 @@
 
   <aside id="editor" class="panel">
     <h1 class="display">Tu personaje</h1>
-    <div class="tabs">
-      <button class="tab active">Básico</button>
-      <button class="tab" disabled title="Sliders de cara y cuerpo">Avanzado <small>pronto</small></button>
+    <div class="tabs" id="look-tabs">
+      <button class="tab active" data-ltab="basic">Básico</button>
+      <button class="tab" data-ltab="advanced">Avanzado</button>
     </div>
     <label class="field">Nombre
       <input id="name" maxlength="20" placeholder="¿Cómo te llamás?" />
@@ -160,12 +160,18 @@
     <label class="field">Sobre mí
       <textarea id="bio" maxlength="280" rows="3" placeholder="Contá algo de vos: qué música te gusta, qué hacés…"></textarea>
     </label>
-    <div id="swatches"></div>
+    <div id="swatches" data-ltab="basic"></div>
+    <div id="look-advanced" data-ltab="advanced" hidden>
+      <label class="field">Peso <span class="range-ends">flaco · gordo</span>
+        <input id="weight" type="range" min="0" max="1" step="0.01" />
+      </label>
+      <label class="field">Músculo <span class="range-ends">poco · mucho</span>
+        <input id="muscle" type="range" min="0" max="1" step="0.01" />
+      </label>
+      <div id="rgb-colors"></div>
+    </div>
     <label class="field">Altura <span id="height-val"></span>
       <input id="height" type="range" min="1.55" max="1.95" step="0.01" />
-    </label>
-    <label class="field">Contextura
-      <input id="build" type="range" min="0.85" max="1.2" step="0.01" />
     </label>
     <div id="account"></div>
     <button id="btn-enter" class="cta">Guardar</button>

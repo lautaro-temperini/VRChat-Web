@@ -15,7 +15,7 @@ import { LOCO, locomotionClips, gestureClip } from './anims.js';
 export const DEFAULT_LOOK = {
   body: 'masc', skin: '#d9a07a', hair: '#3b2416', hairStyle: 'corto', beard: false, eyes: '#4a3020',
   top: 'buzo', shirt: '#ff7a3d', pants: '#2b3445', shoes: '#f4f4f4',
-  height: 1.75, build: 1,
+  height: 1.75, weight: 0.5, muscle: 0.5,
 };
 
 export const LOOK_OPTIONS = {
@@ -319,7 +319,7 @@ export class Avatar {
     this.uniforms.uSleeve.value = L.top === 'buzo' ? 1.02 : 0.42;
     if (this.model?.type !== L.body) this.loadBody(L.body);
     else this.syncHair();
-    if (this.model) this.applyBuild();
+    if (this.model) this.applyShape();
     const def = BODIES[L.body] ?? BODIES.masc;
     this.scale = L.height / 1.75;
     this.root.scale.setScalar(L.height / def.height);
@@ -370,7 +370,7 @@ export class Avatar {
     }).catch((e) => console.warn('No se pudieron cargar las animaciones', e));
     this.root.add(scene);
     this.attachAccessories();
-    this.applyBuild();
+    this.applyShape();
     this.syncHair();
   }
 
@@ -406,6 +406,7 @@ export class Avatar {
         this.hairMeshes.push(mesh);
       });
     }
+    this.applyShape();
     this.updateHairVisibility();
   }
 
@@ -415,11 +416,27 @@ export class Avatar {
     for (const h of this.hairMeshes) h.visible = !(hat && h.userData.style === 'corto');
   }
 
-  // Contextura: torso más ancho (hombros incluidos) y extremidades más gruesas
-  applyBuild() {
-    const R = this.model.rig, b = this.look.build;
-    R.widen('spine_01', 0.6 + b * 0.4, ['clavicle_l', 'clavicle_r', 'neck_01']);
-    const limb = 0.8 + b * 0.2;
+  // Tipo de cuerpo (peso y músculo, 0..1; 0,5 = promedio). Si el modelo trae deformaciones
+  // (morph targets peso_bajo/peso_alto/musculo_bajo/musculo_alto, también en pelo y ropa)
+  // se usan esas; si no, se aproxima ensanchando huesos (personaje viejo, sin deformaciones).
+  applyShape() {
+    const m = this.model;
+    if (!m) return;
+    const { weight, muscle } = this.look;
+    const infl = {
+      peso_bajo: Math.max(0, 0.5 - weight) * 2, peso_alto: Math.max(0, weight - 0.5) * 2,
+      musculo_bajo: Math.max(0, 0.5 - muscle) * 2, musculo_alto: Math.max(0, muscle - 0.5) * 2,
+    };
+    let morphs = false;
+    for (const o of [...m.meshes, ...this.hairMeshes]) {
+      const dict = o.morphTargetDictionary;
+      if (!dict) continue;
+      for (const [k, v] of Object.entries(infl)) if (dict[k] !== undefined) { o.morphTargetInfluences[dict[k]] = v; morphs = true; }
+    }
+    if (morphs) return;
+    const R = m.rig, w = weight - 0.5, mu = muscle - 0.5;
+    R.widen('spine_01', 1 + w * 0.6 + mu * 0.15, ['clavicle_l', 'clavicle_r', 'neck_01']);
+    const limb = 1 + w * 0.3 + mu * 0.25;
     for (const n of ['upperarm_l', 'upperarm_r', 'thigh_l', 'thigh_r']) R.bones[n].bone.scale.set(limb, 1, limb);
   }
 
