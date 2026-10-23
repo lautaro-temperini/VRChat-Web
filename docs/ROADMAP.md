@@ -147,7 +147,8 @@ La música del DJ y el puente OSC ya están hechos. Falta:
 | Celular | Inicio = Amigos (conectados primero) + buscador de gente. Apps: Notas (mías), Galería (mía), Avisos. Al abrirlo el personaje lo saca y los demás lo ven (también caminando) |
 | Notas del dueño | Tipo Twitter: solo escribe el dueño; los visitantes solo leen (en el atril de su sala) |
 | Atril | Libro abierto en la sala personal; E para leer las notas. Contador de corazones arriba |
-| Corazones | Uno por visitante por sala; cuentan para la sala y para el dueño. El dueño no se puede dar a sí mismo |
+| Corazones | Uno por visitante por sala (los invitados también pueden dar corazones y me gusta); cuentan para la sala y para el dueño. El dueño no se puede dar a sí mismo |
+| Contador de corazones | Hoy en el atril. Con el editor, el dueño decide dónde va; también podría mostrarse en la red social o en un dashboard (idea, sin definir) |
 | Galería del perfil | Subir y borrar fotos, hasta 30. Visibilidad la elige el dueño (todos / amigos / solo yo). No se cuelgan en la sala por defecto: el dueño decide qué objeto con imagen la muestra (llega con el editor) |
 | Salas favoritas | Dentro del Mapa, con lista propia arriba; se puede marcar la sala actual |
 | Avisos | Solo solicitudes de amistad (enviadas y aceptadas), en el celular |
@@ -164,7 +165,7 @@ La música del DJ y el puente OSC ya están hechos. Falta:
 | Salas | Todas distintas; solo el Museo (home de todos) es igual para todos |
 | Economía | Sí. Fuentes: misiones/niveles y diseños subidos por artistas, que pasan a ser objetos intercambiables |
 | Registro | Con mail (frena las cuentas múltiples; 3–4 por persona no rompen nada) y nickname único |
-| Movimiento | Agacharse, sentarse y trepar se quedan (naturales). La stamina se recupera con un trago, comida, un beso… (a definir; el beso con consentimiento) |
+| Movimiento | Agacharse, sentarse y trepar se quedan (naturales). La stamina se recupera con **cualquier consumible** (trago, comida…) **o un gesto con consentimiento** (beso…); el efecto dura **2 minutos** |
 | Contenido | +18; no se modera el contenido en sí, pero hay mutear, ignorar y restringir; reportar queda para más adelante |
 | Soltar objetos | Es la única forma de deshacerse de un objeto. Regalar = intercambio donde el otro no pone nada (ya funciona) |
 | Cabinas y obras | No trepables (los parlantes sí) |
@@ -181,7 +182,7 @@ La música del DJ y el puente OSC ya están hechos. Falta:
 | Títulos: perderlos | Solo un admin quita el título de Creador o Curador, a mano |
 | Bajar obras | Solo los admins pueden sacar una obra que ya entró (de la cola o del Museo) |
 | Registro de curadores | Los admins ven quién verificó y quién denegó cada obra |
-| Museo rotativo: sin definir | Cuántas obras puede postular cada persona (el usuario lo está pensando) |
+| Museo rotativo: por persona | Sin límite: cada uno postula las obras que quiera |
 | Curadores: arranque | Mientras no haya curadores, verifican los admins; además el admin puede nombrar curadores fundadores a mano |
 | Curadores: requisitos | Nivel + participación (propuesta a ajustar: nivel 10+ y haber visto 50 obras distintas del Museo) |
 | Progresión | Niveles por puntos (**privados**, solo los ve uno) + insignias por logros (**públicas**, se ven en el perfil) |
