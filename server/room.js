@@ -36,12 +36,12 @@ const GROUP_MAX = 4, GROUP_INVITE_LIFE = 60_000;
 const GUEST_VOICE = 'Creá una cuenta (es gratis) para usar la voz y los grupos. Los invitados chatean solo por texto.';
 
 // Estado de un jugador: [x, y, z, rotación, velocidad, pose]
-// pose: 0 parado, 1 agachado, 2 sentado, 3 trepando, 4 en el aire
+// pose: 0 parado, 1 agachado, 2 sentado, 3 trepando, 4 en el aire, 5 saltando una baranda
 function cleanState(s) {
   if (!Array.isArray(s) || s.length !== 6) return null;
   if (!s.every((v) => typeof v === 'number' && Number.isFinite(v))) return null;
   const out = s.map((v) => Math.round(v * 100) / 100);
-  out[5] = Math.min(4, Math.max(0, Math.round(s[5])));
+  out[5] = Math.min(5, Math.max(0, Math.round(s[5])));
   return out;
 }
 

@@ -211,7 +211,8 @@ class Rig {
   }
 }
 
-export const POSE = { stand: 0, crouch: 1, sit: 2, climb: 3, air: 4 };
+export const POSE = { stand: 0, crouch: 1, sit: 2, climb: 3, air: 4, vault: 5 };
+export const VAULT_TIME = 0.6; // segundos que dura saltar una baranda
 
 // Celular (en coordenadas del modelo en pose T, colgado de la mano derecha):
 // largo a lo largo de Z, pantalla mirando a +X; al doblar el brazo queda vertical mirando la cara.
@@ -255,8 +256,9 @@ export class Avatar {
     this.phase = 0;
     this.amount = 0;
     this.time = Math.random() * 10;
-    this.weights = { stand: 1, crouch: 0, sit: 0, climb: 0, air: 0 };
-    this.j = { hip: [0, 0], knee: [0, 0], sx: [0, 0], sz: [0, 0], el: [0, 0], y: 0, lean: 0, tilt: 0, neck: 0 };
+    this.weights = { stand: 1, crouch: 0, sit: 0, climb: 0, air: 0, vault: 0 };
+    this.vaultT = 1;
+    this.j = { hip: [0, 0], knee: [0, 0], sx: [0, 0], sz: [0, 0], el: [0, 0], y: 0, lean: 0, tilt: 0, roll: 0, neck: 0 };
     this.scale = 1;
     this.gest = null;   // gesto en curso: { name, t, action? }
     this.talking = false; // hablando por voz: usa la animación de hablar cuando está quieto
@@ -465,7 +467,12 @@ export class Avatar {
     const a = this.amount, am = Math.min(a, 1);
     const sprint = THREE.MathUtils.clamp((speed - 5.2) / 1.5, 0, 1) * am;
     this.phase += dt * speed * (pose === POSE.crouch ? 3.4 : 2.3) / this.scale;
-    const { crouch, sit, climb, air } = w;
+    const { crouch, sit, climb, air, vault } = w;
+    // Saltar la baranda: el avance (0..1) lo lleva cada avatar, así se ve igual en los demás
+    if (pose === POSE.vault && this.prevPose !== POSE.vault) this.vaultT = 0;
+    this.prevPose = pose;
+    this.vaultT = Math.min(1, this.vaultT + dt / VAULT_TIME);
+    const V = vaultPose(this.vaultT);
     const k = 18; // qué tan rápido siguen las articulaciones a su pose
     const J = this.j;
 
@@ -490,6 +497,8 @@ export class Avatar {
       knee = mix(knee, 0.7 + side * 0.5, air);
       hip = mix(hip, -1.25 + side * 0.2, climb);
       knee = mix(knee, 1.7, climb);
+      hip = mix(hip, V.hip[i], vault);
+      knee = mix(knee, V.knee[i], vault);
       hip = mix(hip, -1.55, sit);
       knee = mix(knee, 1.55, sit);
       knee = mix(knee, gp.knee ?? knee, gw);
@@ -505,6 +514,7 @@ export class Avatar {
       let el = -(0.2 + 0.55 * am + 0.75 * sprint) - crouch * 0.5;
       sx = mix(sx, -0.5, air); sz = mix(sz, side * 0.85, air); el = mix(el, -0.6, air);
       sx = mix(sx, -2.75, climb); sz = mix(sz, side * 0.2, climb); el = mix(el, -0.35, climb);
+      sx = mix(sx, V.sx[i], vault); sz = mix(sz, V.sz[i], vault); el = mix(el, V.el[i], vault);
       sx = mix(sx, -0.45, sit); sz = mix(sz, side * 0.12, sit); el = mix(el, -0.95, sit);
       if (gw > 0.001) { sx = mix(sx, gp.sx[i], gw); sz = mix(sz, gp.sz[i], gw); el = mix(el, gp.el[i], gw); }
       J.sx[i] = damp(J.sx[i], sx, k, dt);
@@ -513,11 +523,12 @@ export class Avatar {
     });
 
     // Cuerpo: rebote, inclinación al correr, curvas y aterrizajes
-    const lean = 0.05 * am + 0.2 * sprint + crouch * 0.35 + climb * 0.35;
+    const lean = 0.05 * am + 0.2 * sprint + crouch * 0.35 + climb * 0.35 + V.lean * vault;
     const bob = Math.abs(Math.sin(this.phase)) * (0.035 + 0.03 * sprint) * am;
-    J.y = damp(J.y, bob - crouch * 0.36 - sit * 0.42 - landing * 0.12 + (gp.y ?? 0) * gw, 20, dt);
+    J.y = damp(J.y, bob - crouch * 0.36 - sit * 0.42 - landing * 0.12 + V.y * vault + (gp.y ?? 0) * gw, 20, dt);
     J.lean = damp(J.lean, lean, 10, dt);
     J.tilt = damp(J.tilt, THREE.MathUtils.clamp(-turn * 0.07, -0.22, 0.22) * am + (gp.tilt ?? 0) * gw, 8, dt);
+    J.roll = damp(J.roll, V.roll * vault, 16, dt); // de costado (solo al saltar una baranda)
     J.neck = damp(J.neck, -lean * 0.7, 10, dt);
     if (this.model?.anim) this.animate(dt, speed, gw);
     else this.applyPose(J, am);
@@ -554,8 +565,8 @@ export class Avatar {
     const stand = blend(speed, [[0, 'idle'], [1.6, 'walk'], [3.2, 'jog']]);
     if (this.talking) { stand.talk = stand.idle; stand.idle = 0; }
     for (const [k, v] of Object.entries(stand)) target[k] += v * w.stand;
-    // Agacharse y saltar se hacen por código (abajo); mientras tanto la base es quieto
-    const proc = Math.min(1, w.crouch + w.air);
+    // Agacharse, saltar y pasar barandas se hacen por código (abajo); mientras tanto la base es quieto
+    const proc = Math.min(1, w.crouch + w.air + w.vault);
     target.idle += proc;
     target.climb += w.climb;
     // Trepar dura lo que tarda el juego en subirte (0,42 s): la animación arranca de cero cada vez
@@ -608,7 +619,7 @@ export class Avatar {
     const root = R.bones.root;
     // El hueso raíz está en un marco con Z hacia arriba: el desplazamiento se pasa a ese marco
     root.bone.position.copy(root.restPos).add(_v.set(0, J.y * legRatio, 0).applyQuaternion(root.parentInv));
-    R.euler('root', J.lean, 0, J.tilt);
+    R.euler('root', J.lean, J.roll, J.tilt);
     R.euler('spine_02', 0, Math.sin(this.phase) * 0.12 * am, 0);
     R.euler('neck_01', J.neck, Math.sin(this.time * 0.4) * 0.18 * (1 - am) * (1 - this.weights.sit * 0.5), 0);
     [['l', 1], ['r', -1]].forEach(([s, side]) => {
@@ -632,6 +643,29 @@ export class Avatar {
 const _v = new THREE.Vector3(), _q2 = new THREE.Quaternion(), _q3 = new THREE.Quaternion();
 const ARM_BONES = ['upperarm_l', 'lowerarm_l', 'upperarm_r', 'lowerarm_r'];
 const PROC_BONES = ['root', 'spine_02', 'neck_01', 'thigh_l', 'calf_l', 'thigh_r', 'calf_r', ...ARM_BONES];
+
+// Saltar una baranda de costado (u = 0..1): apoya las manos, pasa las piernas juntas hacia un
+// costado con el cuerpo inclinado, se suelta con una mano y cae estirándose
+function vaultPose(u) {
+  const S = THREE.MathUtils.smoothstep;
+  const plant = S(u, 0, 0.25), swing = S(u, 0.2, 0.55), out = S(u, 0.65, 1);
+  const tuck = swing * (1 - out);
+  const hip = (i) => mix(mix(-0.8 * plant, -1.65 + (i ? -0.2 : 0.2), swing), -0.3 - (i ? 0.25 : 0), out);
+  const knee = (i) => mix(mix(0.9 * plant, 1.9 + (i ? 0.15 : 0), swing), 0.4 + (i ? 0.35 : 0), out);
+  // Brazo izquierdo (i = 1) apoyado en el pasamanos, recto hacia abajo; el derecho se abre para equilibrar
+  const arm = (i) => i
+    ? { sx: mix(-0.85 * plant, -0.25, swing) * (1 - out) - 0.5 * out, sz: mix(0.1, 0.2, swing) * (1 - out) + 0.9 * out, el: -0.1 - 0.5 * out }
+    : { sx: mix(-0.85 * plant, -0.6, swing) * (1 - out) - 0.5 * out, sz: mix(-0.1, -1.3, swing) * (1 - out) - 0.9 * out, el: -0.1 - 0.6 * swing };
+  const A = [arm(0), arm(1)];
+  return {
+    hip: [hip(0), hip(1)],
+    knee: [knee(0), knee(1)],
+    sx: [A[0].sx, A[1].sx], sz: [A[0].sz, A[1].sz], el: [A[0].el, A[1].el],
+    lean: 0.55 * plant * (1 - out) - 0.15 * out,
+    roll: 0.75 * tuck,
+    y: -0.1 * tuck,
+  };
+}
 
 // Pesos para mezclar animaciones según un valor (ej. velocidad): [[valor, nombre], …] ordenados
 function blend(x, points) {
