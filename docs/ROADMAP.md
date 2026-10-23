@@ -19,26 +19,32 @@ y las salas giran alrededor de exponer, descubrir y coleccionar arte.
    ✅ Hecho (23/10): imágenes y modelos 3D, guardados en R2. Shaders e instalaciones, más adelante.
    Para subirlo online: activar R2 y crear el bucket (`npx wrangler r2 bucket create galeria-obras`).
 3. **Editor de salas** y salas distintas entre sí (solo el Museo es igual para todos), con plantillas
-   (loft, galería, club, terraza). ✅ Diseño definido. Va **antes** que la progresión (las recompensas son muebles).
+   (loft, galería, club, terraza). ✅ Hecho (23/10): plantillas, muebles básicos y especiales, editor
+   para PC y celular, fotos como cuadros, hasta 2 pantallas (ver `docs/ramas/editor-salas.md`).
+   Falta: reemplazar los muebles hechos por código por un pack (a aprobar) y modelos subidos por usuarios.
 4. **Progresión y misiones ligadas al arte** (descubrir, exponer, curar, asistir a eventos; no tiempo
-   conectado), con objetos de recompensa. Niveles privados e insignias públicas. ✅ Diseño definido.
+   conectado), con objetos de recompensa. Niveles privados e insignias públicas. ✅ Hecho (23/10): puntos,
+   niveles, insignias, camino inicial, misiones diarias y Curador automático (ver `docs/ramas/progresion.md`).
+   Falta: que las recompensas incluyan los muebles especiales (definir la rareza de cada uno).
 5. **Proceso de arte**: IA (Tripo/Meshy) para muebles, decoración y esculturas; Blender para cuerpos
    y ropa; **diseños de artistas como objetos del juego** (entran a la base y se pueden intercambiar).
    Más mapas públicos para exploradores. ✅ Diseño definido (copias ilimitadas para regalar, título Diseñador).
 
-Pendiente transversal: **primera prueba con personas reales** (inauguración con 5–10 artistas exponiendo).
+Pendientes transversales, en orden:
+- **Revisión de permisos del servidor y pruebas automáticas** (dos clientes, desconexión, reconexión,
+  acciones a la vez) y partir `src/main.js` en módulos. Antes de abrir al público.
+- **Primera prueba con personas reales** (inauguración con 5–10 artistas exponiendo).
 
 ## Pedidos del 20/10 todavía pendientes
 
 La música del DJ y el puente OSC ya están hechos. Falta:
 
-- **Editor de sala dentro del juego** (elegir objetos de un catálogo, moverlos, rotarlos, escalarlos; se
-  guarda por sala) y **modelos subidos por usuarios** si cumplen requisitos. **Consultar los requisitos**;
+- ~~Editor de sala dentro del juego~~ ✅ (paso 3). Falta: **modelos subidos por usuarios** si cumplen requisitos. **Consultar los requisitos**;
   propuesta NO decidida: GLB/glTF, tamaño máximo, tope de triángulos, texturas hasta 2K, escala en metros,
   sin scripts, licencia propia o CC0. Almacenamiento sugerido: R2, validación en el servidor.
-- **Personaje**: tipos de cuerpo (flaco, gordo, musculoso, atlético…; consultar la lista final; morph
-  targets o bases distintas, escalar huesos no alcanza), más peinados, cejas, ropa y accesorios, selector
-  RGB completo. Personalización objetivo: contextura, altura, peinados, ojos, piel, boca, nariz, cejas,
+- **Personaje**: ✅ tipos de cuerpo (flaco, promedio, gordo, musculoso + peso y músculo) y selector RGB
+  completo (23/10; con Superhero se aproximan ensanchando huesos, con MakeHuman serán deformaciones reales).
+  Falta: más peinados, cejas, ropa y accesorios. Personalización objetivo: contextura, altura, peinados, ojos, piel, boca, nariz, cejas,
   orejas, forma de la cara, aros, lentes, gorro, remera, buzo, pantalones, zapatos.
 - **Más adelante**: avatares propios (esqueleto estándar) y después gestos/scripts propios (gestos como
   datos; scripts solo en un entorno aislado). Consultar.
@@ -71,8 +77,6 @@ La música del DJ y el puente OSC ya están hechos. Falta:
   tiene capucha ni bolsillo) y la ropa se ve pegada al cuerpo. "Luego lo vemos".
 - **Peinados rulos y coleta** con el estilo del pack (hacerlos en Blender). Hoy se muestran como
   corto y rodete, pero el dato guardado de cada cuenta no se toca.
-- **Fotos colgadas como cuadros** en la sala propia (la galería, el atril y el muro ya están; esto
-  llega con el editor).
 - **AR** en las dos direcciones (obras/avatar en tu habitación; fotos/escaneos del mundo real al juego).
 - **Editor avanzado (capa 2)** con sliders de cara y cuerpo.
 - **Nombre y marca definitivos** (hoy "Galería Online" es provisorio).
@@ -80,11 +84,13 @@ La música del DJ y el puente OSC ya están hechos. Falta:
   no se encontró alternativa gratuita vigente. Queda en espera.
 
 ### Técnicos
-- Redes muy cerradas: el servidor de audio de Cloudflare suele andar igual (usa sus propias
-  direcciones); si alguien no conecta, sumar el TURN de Cloudflare.
+- Redes muy cerradas: ✅ TURN de Cloudflare listo (23/10), se activa cargando `TURN_KEY_ID` y
+  `TURN_KEY_API_TOKEN` con `wrangler secret put`. Revisar antes cómo se cobra.
 - La sala valida la distancia solo cuando alguien se suscribe a una voz (con margen de 20 m); si
   después se aleja, el que dejó de escuchar es su cliente (que la suelta a los 18 m).
-- Comprimir modelos y texturas (KTX2/Draco) para celulares.
+- Celulares: ✅ el Museo dibuja menos de la mitad de piezas (`src/world/merge.js`) y `src/loaders.js` ya
+  entiende Draco/meshopt/KTX2. Falta lo más pesado: las animaciones y texturas del personaje (13 de los
+  17 MB al entrar); hacerlo junto con el cambio a MakeHuman. Medir con `node scripts/medir.mjs`.
 - Mutear se guarda en el navegador; ignorar y restringir viven en la cuenta.
 - Los baneos son por cuenta: un invitado nuevo puede volver a entrar.
 
