@@ -38,7 +38,20 @@ const PHOTO_BYTES = 700 * 1024;   // el cliente achica y comprime antes de subir
 const NOTE_LENGTH = 280;          // largo máximo de una nota
 const FEED_FRIENDS = 30;          // muro: publicaciones tuyas y de amigos
 const FEED_FEATURED = 15;         // muro: "Destacados" (lo más nuevo del resto)
-const REPORT_REASONS = ['acoso', 'ilegal', 'plagio', 'spam', 'suplantacion', 'otro'];
+// Ingreso con Google y Discord (OAuth). "verified": el proveedor confirmó que el mail es suyo
+const OAUTH = {
+  google: {
+    auth: 'https://accounts.google.com/o/oauth2/v2/auth', token: 'https://oauth2.googleapis.com/token',
+    profile: 'https://openidconnect.googleapis.com/v1/userinfo', scope: 'openid email profile', extra: { prompt: 'select_account' },
+    read: (p) => ({ sub: p.sub && String(p.sub), email: p.email, verified: p.email_verified === true || p.email_verified === 'true', name: p.given_name || p.name }),
+  },
+  discord: {
+    auth: 'https://discord.com/oauth2/authorize', token: 'https://discord.com/api/oauth2/token',
+    profile: 'https://discord.com/api/users/@me', scope: 'identify email', extra: { prompt: 'none' },
+    read: (p) => ({ sub: p.id && String(p.id), email: p.email, verified: p.verified === true, name: p.global_name || p.username }),
+  },
+};
+const REPORT_REASONS =['acoso', 'ilegal', 'plagio', 'spam', 'suplantacion', 'otro'];
 
 export class Accounts extends DurableObject {
   constructor(ctx, env) {
@@ -111,6 +124,16 @@ export class Accounts extends DurableObject {
       CREATE TABLE IF NOT EXISTS blocks (
         user_id TEXT NOT NULL, blocked_id TEXT NOT NULL, created INTEGER NOT NULL,
         PRIMARY KEY (user_id, blocked_id)
+      );
+      CREATE TABLE IF NOT EXISTS oauth_states (
+        state TEXT PRIMARY KEY, provider TEXT NOT NULL, origin TEXT NOT NULL, guest_id TEXT, created INTEGER NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS oauth_links (
+        provider TEXT NOT NULL, sub TEXT NOT NULL, user_id TEXT NOT NULL, created INTEGER NOT NULL,
+        PRIMARY KEY (provider, sub)
+      );
+      CREATE TABLE IF NOT EXISTS login_codes (
+        code TEXT PRIMARY KEY, token TEXT NOT NULL, created INTEGER NOT NULL
       );
       CREATE TABLE IF NOT EXISTS ignores (
         user_id TEXT NOT NULL, ignored_id TEXT NOT NULL, created INTEGER NOT NULL,
@@ -211,9 +234,111 @@ export class Accounts extends DurableObject {
     const key = String(login ?? '').trim().toLowerCase();
     const row = this.sql.exec('SELECT * FROM users WHERE username = ? OR email = ?', key, key).toArray()[0];
     const fail = { ok: false, error: 'Usuario o contraseña incorrectos.' };
-    if (!row || typeof password !== 'string') return fail;
+    if (!row || !row.salt || typeof password !== 'string') return fail; // sin salt: entra solo con Google/Discord
     if (!sameText(await pbkdf2(password, row.salt), row.pass)) return fail;
     return { ok: true, token: await this.newSession(row.id), user: this.publicUser(row) };
+  }
+
+  // ---------- Ingreso con Google y Discord ----------
+  // 1) oauthStart: arma el link al proveedor (con un "state" de un solo uso que recuerda de dónde vino
+  //    y si era un invitado, para convertir esa cuenta y no perder el personaje).
+  // 2) oauthCallback: canjea el código, lee el mail y busca la cuenta: la ya vinculada, la que tiene
+  //    ese mail (si el proveedor lo confirmó: es la misma cuenta), el invitado que la pidió, o una nueva.
+  // 3) oauthFinish: el juego cambia el código de un solo uso por la sesión.
+  // 4) oauthNick: si es nueva, elige su nickname único (y acepta +18 si no lo había hecho).
+
+  async oauthStart(token, provider, origin) {
+    const cfg = OAUTH[provider];
+    const clientId = this.env[`${provider.toUpperCase()}_CLIENT_ID`];
+    if (!cfg || !clientId) return { ok: false, error: 'Esa forma de ingresar no está disponible.' };
+    // Solo vuelve a este mismo sitio (o a la página local de desarrollo)
+    if (!/^https:\/\/[a-z0-9.-]+$/i.test(origin) && !/^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin)) return { ok: false, error: 'Origen no válido.' };
+    const now = Date.now();
+    this.sql.exec('DELETE FROM oauth_states WHERE created < ?', now - 10 * 60_000);
+    const current = await this.userFromToken(token);
+    const state = randomHex(16);
+    this.sql.exec('INSERT INTO oauth_states (state, provider, origin, guest_id, created) VALUES (?, ?, ?, ?, ?)',
+      state, provider, origin, current && this.isGuest(current) ? current.id : null, now);
+    const params = new URLSearchParams({
+      client_id: clientId, redirect_uri: `${origin}/api/oauth/${provider}/callback`, response_type: 'code',
+      scope: cfg.scope, state, ...cfg.extra,
+    });
+    return { ok: true, url: `${cfg.auth}?${params}` };
+  }
+
+  async oauthCallback(provider, code, state, denied) {
+    const cfg = OAUTH[provider];
+    const st = this.sql.exec('SELECT * FROM oauth_states WHERE state = ? AND provider = ?', String(state ?? ''), provider).toArray()[0];
+    if (!cfg || !st || Date.now() - st.created > 10 * 60_000) return { ok: false, error: 'El ingreso venció. Probá de nuevo.' };
+    this.sql.exec('DELETE FROM oauth_states WHERE state = ?', st.state);
+    const fail = (error) => ({ ok: false, error, origin: st.origin });
+    if (denied || !code) return fail('Se canceló el ingreso.');
+
+    // Canjear el código por un acceso y leer el perfil
+    let profile;
+    try {
+      const tr = await fetch(cfg.token, {
+        method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' },
+        body: new URLSearchParams({
+          client_id: this.env[`${provider.toUpperCase()}_CLIENT_ID`], client_secret: this.env[`${provider.toUpperCase()}_CLIENT_SECRET`] ?? '',
+          code, grant_type: 'authorization_code', redirect_uri: `${st.origin}/api/oauth/${provider}/callback`,
+        }),
+      });
+      const tok = await tr.json();
+      if (!tok.access_token) return fail('No se pudo ingresar. Probá de nuevo.');
+      const pr = await fetch(cfg.profile, { headers: { Authorization: `Bearer ${tok.access_token}` } });
+      profile = cfg.read(await pr.json());
+    } catch {
+      return fail('No se pudo conectar. Probá de nuevo.');
+    }
+    if (!profile?.sub) return fail('No se pudo leer tu cuenta.');
+    const email = profile.verified && profile.email ? String(profile.email).trim().toLowerCase() : null;
+
+    let id = this.sql.exec('SELECT user_id FROM oauth_links WHERE provider = ? AND sub = ?', provider, profile.sub).toArray()[0]?.user_id;
+    if (id && !this.row(id)) id = null;
+    if (!id && email) id = this.sql.exec('SELECT id FROM users WHERE email = ?', email).toArray()[0]?.id;
+    if (!id && st.guest_id && this.isGuest(this.row(st.guest_id))) id = st.guest_id;
+    if (!id) {
+      id = randomHex(8);
+      let name = cleanName(profile.name || 'Artista');
+      if (this.nameTaken(name)) name = cleanName(`${name}${Math.floor(Math.random() * 900 + 100)}`);
+      this.sql.exec('INSERT INTO users (id, name, look, created) VALUES (?, ?, ?, ?)', id, name, JSON.stringify(cleanLook(null)), Date.now());
+    }
+    this.sql.exec('INSERT OR IGNORE INTO oauth_links (provider, sub, user_id, created) VALUES (?, ?, ?, ?)', provider, profile.sub, id, Date.now());
+    // Si la cuenta no tenía mail, guarda el confirmado (si nadie más lo usa)
+    if (email && !this.row(id).email && !this.sql.exec('SELECT 1 FROM users WHERE email = ?', email).toArray().length) {
+      this.sql.exec('UPDATE users SET email = ? WHERE id = ?', email, id);
+    }
+    const loginCode = randomHex(16);
+    this.sql.exec('DELETE FROM login_codes WHERE created < ?', Date.now() - 2 * 60_000);
+    this.sql.exec('INSERT INTO login_codes (code, token, created) VALUES (?, ?, ?)', loginCode, await this.newSession(id), Date.now());
+    return { ok: true, code: loginCode, origin: st.origin };
+  }
+
+  async oauthFinish(code) {
+    const r = this.sql.exec('SELECT * FROM login_codes WHERE code = ?', code).toArray()[0];
+    if (!r || Date.now() - r.created > 2 * 60_000) return { ok: false, error: 'El ingreso venció. Probá de nuevo.' };
+    this.sql.exec('DELETE FROM login_codes WHERE code = ?', code);
+    const row = await this.userFromToken(r.token);
+    if (!row) return { ok: false, error: 'No se pudo ingresar.' };
+    return { ok: true, token: r.token, user: this.publicUser(row), needsNick: !row.username, needsTerms: !row.terms };
+  }
+
+  // Cuenta entrada por Google/Discord que todavía no tiene nickname
+  async oauthNick(token, { nick, terms } = {}) {
+    const row = await this.userFromToken(token);
+    if (!row) return { ok: false, error: 'Sesión vencida.' };
+    if (row.username) return { ok: true, user: this.publicUser(row) };
+    const isLinked = this.sql.exec('SELECT 1 FROM oauth_links WHERE user_id = ?', row.id).toArray().length > 0;
+    if (!isLinked) return { ok: false, error: 'No válido.' };
+    nick = String(nick ?? '').trim();
+    const username = nick.toLowerCase();
+    if (!USERNAME.test(username)) return { ok: false, error: 'El nickname debe tener 3 a 20 caracteres: letras, números, punto o guion bajo.' };
+    if (!row.terms && !terms) return { ok: false, error: 'Tenés que confirmar que sos mayor de 18 y aceptar las condiciones.' };
+    if (this.sql.exec('SELECT 1 FROM users WHERE username = ?', username).toArray().length) return { ok: false, error: 'Ese nickname ya está en uso.' };
+    this.sql.exec('UPDATE users SET username = ?, name = ?, terms = COALESCE(terms, ?) WHERE id = ?', username, nick, Date.now(), row.id);
+    if (!this.row(row.id).starter) this.giveStarter(row.id);
+    return { ok: true, user: this.publicUser(this.row(row.id)) };
   }
 
   async auth(token) {

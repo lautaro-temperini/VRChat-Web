@@ -31,7 +31,7 @@ npm run dev
 | Día y noche | Según la hora de Argentina (GMT-3) |
 | Personaje | Modelo Quaternius con editor (piel, ojos, pelo, ropa, altura, contextura), animaciones de Mixamo y gestos/bailes |
 | Movimiento | Caminar, trotar (gasta stamina), saltar, trepar, agacharse, sentarse; 1ª/3ª persona con la rueda; manos en 1ª persona |
-| Cuentas | Registro con mail + nickname único (PBKDF2). Invitados solo para probar: miran, chatean y se mueven |
+| Cuentas | Registro con mail + nickname único (PBKDF2), o con Google o Discord. Invitados solo para probar: miran, chatean y se mueven |
 | Red social | Celular del personaje: amigos y buscador, muro (notas y fotos de amigos + destacados, me gusta), galería y avisos. Atril con notas y corazones en cada sala personal |
 | Salas personales | Nombre, descripción y quién entra (abierta / amigos / cerrada); salas favoritas en el Mapa |
 | Voz | Por el servidor de audio de Cloudflare (nadie ve la IP de otro): escuchás a los 4 más cercanos que hablan (10 m), con audio 3D. Grupos de voz privados de hasta 4 (E sobre alguien → Invitar al grupo) |

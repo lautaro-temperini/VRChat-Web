@@ -529,3 +529,20 @@ body.notes #notes { display: flex; }
 
 /* Opciones que los invitados ven pero no pueden usar: candado + aviso al tocar */
 .locked::after { content: ' 🔒'; font-size: .85em; }
+
+/* Ingreso con Google y Discord, y el paso de elegir nickname */
+#auth .oauth { display: flex; flex-direction: column; gap: 8px; }
+.oauth-btn {
+  display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; padding: 11px 14px;
+  border-radius: 12px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.06); color: inherit;
+  font: 700 14.5px var(--font); cursor: pointer;
+}
+.oauth-btn:hover { background: rgba(255, 255, 255, 0.12); }
+.oauth-btn:disabled { opacity: .6; cursor: wait; }
+.oauth-ico { width: 22px; height: 22px; border-radius: 6px; display: grid; place-items: center; font: 900 13px var(--font); color: #fff; }
+.oauth-ico.g { background: #fff; color: #4285f4; }
+.oauth-ico.d { background: #5865f2; }
+#auth .or { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 12px; }
+#auth .or::before, #auth .or::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+#auth[data-tab=nick] .no-nick, #auth[data-tab=nick] .tabs, #auth[data-tab=nick] .note:not(.only-nick),
+#auth[data-tab=nick]:not([data-terms]) #auth-terms-row, #auth:not([data-tab=nick]) .only-nick { display: none; }

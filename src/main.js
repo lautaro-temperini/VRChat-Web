@@ -174,7 +174,7 @@ function showAuth(tab, upgrade = false) {
   authEl.dataset.tab = tab;
   if (upgrade) authEl.dataset.upgrade = ''; else delete authEl.dataset.upgrade;
   for (const b of authEl.querySelectorAll('.tab')) b.classList.toggle('active', b.dataset.tab === tab);
-  $('auth-submit').textContent = { guest: 'Entrar como invitado', login: 'Entrar', register: 'Crear cuenta' }[tab];
+  $('auth-submit').textContent = { guest: 'Entrar como invitado', login: 'Entrar', register: 'Crear cuenta', nick: 'Listo' }[tab];
   $('auth-pass').autocomplete = tab === 'register' ? 'new-password' : 'current-password';
   $('auth-user-label').textContent = tab === 'login' ? 'Mail o nickname' : 'Nickname';
   $('auth-user').placeholder = tab === 'login' ? 'vos@mail.com o tu_nick' : 'tu_nick';
@@ -188,6 +188,34 @@ $('close-terms').onclick = () => $('terms').classList.remove('show');
 for (const b of authEl.querySelectorAll('.tab')) b.onclick = () => showAuth(b.dataset.tab, 'upgrade' in authEl.dataset);
 $('auth-cancel').onclick = () => openEditor();
 
+// Ingresar con Google o Discord: se va a su página y vuelve con #login=<código de un solo uso>
+for (const b of authEl.querySelectorAll('.oauth-btn')) {
+  b.onclick = async () => {
+    b.disabled = true;
+    if (joined) await saveProfile(); // si era invitado, su personaje pasa a la cuenta
+    const r = await api('oauthstart', { method: 'POST', body: { provider: b.dataset.provider, origin: location.origin } });
+    if (!r.ok) { b.disabled = false; $('auth-error').textContent = r.error; return; }
+    location.href = r.url;
+  };
+}
+async function finishOAuth() {
+  const h = new URLSearchParams(location.hash.slice(1));
+  if (!h.has('login') && !h.has('loginerror')) return false;
+  history.replaceState(null, '', location.pathname + location.search); // saco el código de la dirección
+  if (h.has('loginerror')) { showAuth('login'); $('auth-error').textContent = h.get('loginerror'); return true; }
+  const r = await api('oauthfinish', { method: 'POST', body: { code: h.get('login') } });
+  if (!r.ok) { showAuth('login'); $('auth-error').textContent = r.error; return true; }
+  session.token = r.token;
+  useAccount(r.user);
+  if (r.needsNick) {
+    // Cuenta nueva: falta el nickname (y aceptar +18 si no lo había hecho)
+    if (r.needsTerms) authEl.dataset.terms = ''; else delete authEl.dataset.terms;
+    showAuth('nick');
+    $('auth-user').value = '';
+  } else join();
+  return true;
+}
+
 $('auth-form').onsubmit = async (e) => {
   e.preventDefault();
   const tab = authEl.dataset.tab;
@@ -196,8 +224,10 @@ $('auth-form').onsubmit = async (e) => {
   let r;
   if (tab === 'guest') {
     r = await api('guest', { method: 'POST', body: { name: $('auth-name').value, look, terms: $('auth-terms').checked } });
+  } else if (tab === 'nick') {
+    r = await api('oauthnick', { method: 'POST', body: { nick: $('auth-user').value, terms: $('auth-terms').checked } });
   } else if (tab === 'login') {
-    r = await api('login', { method: 'POST', body: { login: $('auth-user').value, password: $('auth-pass').value } });
+    r = await api('login',{ method: 'POST', body: { login: $('auth-user').value, password: $('auth-pass').value } });
   } else {
     r = await api('register', { method: 'POST', body: { email: $('auth-email').value, nick: $('auth-user').value, password: $('auth-pass').value, look, terms: $('auth-terms').checked } });
   }
@@ -1394,6 +1424,7 @@ if (import.meta.env.DEV) window.__game = { ctrl, me, gesture, openDJPanel, openA
 })();
 (async () => {
   setStatus();
+  if (await finishOAuth()) return;
   if (session.token) {
     const r = await api('me');
     if (r.ok) { useAccount(r.user); join(); return; }

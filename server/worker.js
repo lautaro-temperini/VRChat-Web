@@ -71,6 +71,16 @@ async function api(request, env, path) {
     return json(result, result.ok ? 200 : 400);
   }
 
+  // Vuelta de Google / Discord: se canjea el código y se vuelve al juego con un código de un solo uso
+  // (el token de sesión nunca viaja en la dirección)
+  const cb = path.match(/^oauth\/(google|discord)\/callback$/);
+  if (cb && request.method === 'GET') {
+    const r = await accounts.oauthCallback(cb[1], q.get('code'), q.get('state'), q.get('error'));
+    const back = r.origin ?? new URL(request.url).origin;
+    const hash = r.ok ? `login=${r.code}` : `loginerror=${encodeURIComponent(r.error)}`;
+    return Response.redirect(`${back}/#${hash}`, 302);
+  }
+
   let body = {};
   if (request.method !== 'GET') {
     try { body = await request.json(); } catch { body = {}; }
@@ -82,6 +92,9 @@ async function api(request, env, path) {
     case 'POST login': result = await accounts.login(body.login ?? body.username, body.password); break;
     case 'GET blocks': result = await accounts.blocks(token); break;
     case 'POST block': result = await accounts.setBlock(token, String(body.id ?? ''), !!body.on); break;
+    case 'POST oauthstart': result = await accounts.oauthStart(token, String(body.provider ?? ''), String(body.origin ?? '')); break;
+    case 'POST oauthfinish': result = await accounts.oauthFinish(String(body.code ?? '')); break;
+    case 'POST oauthnick': result = await accounts.oauthNick(token, { nick: body.nick, terms: !!body.terms }); break;
     case 'GET ignores': result = await accounts.ignores(token); break;
     case 'POST ignore': result = await accounts.setIgnore(token, String(body.id ?? ''), !!body.on); break;
     case 'POST report': result = await accounts.report(token, body); break;
@@ -127,7 +140,7 @@ async function api(request, env, path) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-    const apiMatch = url.pathname.match(/^\/api\/([a-z]+)$/);
+    const apiMatch = url.pathname.match(/^\/api\/([a-z]+|oauth\/(?:google|discord)\/callback)$/);
     if (apiMatch) return api(request, env, apiMatch[1]);
 
     const wsMatch = url.pathname.match(/^\/ws\/([a-z0-9-]{1,32})$/i);

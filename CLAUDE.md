@@ -45,7 +45,9 @@ npm run deploy   # build + wrangler deploy
 ## Cosas a saber
 
 - **Ramas:** se trabaja sobre `main` (todas las ramas anteriores ya se juntaron ahí).
-- **Cuentas:** registro con mail + nickname único; se entra con cualquiera de los dos. Invitado =
+- **Cuentas:** registro con mail + nickname único; se entra con cualquiera de los dos, o con **Google / Discord**
+  (`oauthStart` → `/api/oauth/<proveedor>/callback` → `#login=<código>` → `oauthFinish`; si es nueva, `oauthNick`).
+  Client ID en `wrangler.jsonc`; `GOOGLE_CLIENT_SECRET` y `DISCORD_CLIENT_SECRET` en `.dev.vars` / `wrangler secret`. Invitado =
   cuenta sin `username` (`isGuest` en `accounts.js`): chatean por texto y escuchan voces públicas; sin hablar, grupos, me gusta, corazones, objetos, intercambios, muro, galería
   ni sala propia (cada método lo frena con `guestError()`). En el cliente esas opciones se ven con candado
   y avisan (`src/ui/guest.js`: `guestGate`, `lock`). Registrarse conserva el id.

@@ -119,6 +119,13 @@
         <button type="button" class="tab" data-tab="login">Iniciar sesión</button>
         <button type="button" class="tab" data-tab="register">Crear cuenta</button>
       </div>
+      <div class="oauth no-nick">
+        <button type="button" class="oauth-btn" data-provider="google"><span class="oauth-ico g">G</span> Continuar con Google</button>
+        <button type="button" class="oauth-btn" data-provider="discord"><span class="oauth-ico d">D</span> Continuar con Discord</button>
+        <p class="note">Solo usamos tu mail para tu cuenta. No publicamos nada.</p>
+        <div class="or"><span>o</span></div>
+      </div>
+      <p class="note only-nick">¡Ya casi! Elegí tu nickname: es único y es el nombre que ven los demás (3 a 20 letras, números, punto o guion bajo).</p>
       <label class="field only-guest">Tu nombre
         <input id="auth-name" maxlength="20" placeholder="¿Cómo te llamás?" />
       </label>
@@ -128,13 +135,13 @@
       <label class="field no-guest"><span id="auth-user-label">Nickname</span>
         <input id="auth-user" maxlength="120" autocomplete="username" placeholder="tu_nick" />
       </label>
-      <label class="field no-guest">Contraseña
+      <label class="field no-guest no-nick">Contraseña
         <input id="auth-pass" type="password" maxlength="200" autocomplete="current-password" placeholder="Mínimo 6 caracteres" />
       </label>
       <p class="note only-guest">Como invitado podés mirar, chatear y moverte. Para tener objetos, intercambiar, publicar y tener tu sala, creá una cuenta.</p>
       <p class="note only-register">El nickname es único: es el nombre que ven los demás (3 a 20 letras, números, punto o guion bajo).</p>
       <p class="note only-upgrade">Tu personaje de invitado pasa a esta cuenta.</p>
-      <label class="check no-login"><input type="checkbox" id="auth-terms" /> <span>Tengo 18 años o más y acepto las <button type="button" class="link" id="open-terms">condiciones de uso</button></span></label>
+      <label class="check no-login" id="auth-terms-row"><input type="checkbox" id="auth-terms" /> <span>Tengo 18 años o más y acepto las <button type="button" class="link" id="open-terms">condiciones de uso</button></span></label>
       <p class="error" id="auth-error"></p>
       <button class="cta" id="auth-submit">Entrar</button>
       <button type="button" class="link" id="auth-cancel">Volver</button>
