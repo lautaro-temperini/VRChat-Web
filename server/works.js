@@ -138,8 +138,20 @@ export const worksMethods = {
     return {
       ok: true, left: Math.max(0, DAILY_LIMIT - recent), limit: DAILY_LIMIT,
       creator: this.hasTitle(me.id, 'creador'), curator: this.isCurator(me.id), admin: this.isAdmin(me.id),
-      works: rows.map((w) => ({ ...this.workPublic(w, me.id), denyReason: w.deny_reason ? DENY_REASONS[w.deny_reason] : null, denyText: w.deny_text ?? '' })),
+      works: rows.map((w) => ({ ...this.workPublic(w, me.id), denyReason: w.deny_reason ? DENY_REASONS[w.deny_reason] : null, denyText: w.deny_text ?? '', queue: this.queueSpot(w) })),
     };
+  },
+
+  // Puesto en la fila de su tipo (las que esperan revisión conservan su lugar) y fecha estimada:
+  // la fila avanza a medida que vencen los lugares, cada uno 24 h. Es aproximada: si se deniega o
+  // se baja alguna de adelante, entra antes.
+  queueSpot(w) {
+    if (!['pendiente', 'en_disputa', 'verificada'].includes(w.status)) return null;
+    const ahead = this.sql.exec("SELECT COUNT(*) AS n FROM works WHERE kind = ? AND status IN ('pendiente', 'en_disputa', 'verificada') AND created < ?", w.kind, w.created).one().n;
+    const now = Date.now();
+    const ends = this.sql.exec('SELECT ends_at FROM slots WHERE kind = ?', w.kind).toArray()
+      .map((s) => Math.max(now, s.ends_at ?? now)).sort((x, y) => x - y);
+    return { pos: ahead + 1, eta: ends[ahead % ends.length] + Math.floor(ahead / ends.length) * SHOW_TIME };
   },
 
   // ¿Quién puede ver los archivos? Expuestas: todos. Si no: el autor, curadores y admins.

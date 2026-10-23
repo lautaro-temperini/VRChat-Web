@@ -191,6 +191,7 @@ La música del DJ y el puente OSC ya están hechos. Falta:
 | Museo rotativo: invitados | No pueden postular (tienen que crear cuenta) |
 | Museo rotativo: avisos | Al autor le llegan avisos al celular: verificada, denegada (con motivo), expuesta, título de Creador |
 | Museo rotativo: motivos | No es obra propia / plagio · No cumple las condiciones de uso · Archivo con problemas · Spam o repetida · Otro (con texto) |
+| Museo rotativo: fila | En "Mis obras" cada obra en espera muestra su puesto en la fila y una fecha estimada (aproximada) |
 | Museo rotativo: saltear | El curador puede pedir "Otra" si no quiere revisar la que le tocó |
 | Curadores: nombrar | Un admin escribe en el chat `/curador nick` (y `/creador nick`); el mismo comando lo quita |
 | Museo rotativo: archivos | Se guardan en Cloudflare R2. Cuadros: hasta 2048 px (se ven a 1024 en la pared). Modelos: GLB hasta 2 MB, 10.000 triángulos, texturas de 1K y 3 m de alto |

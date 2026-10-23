@@ -208,6 +208,11 @@ export function createWorks({ ui, me }) {
       const text = el('div', 'work-text');
       text.append(el('b', '', w.title), el('span', 'meta', `${w.kind === 'cuadro' ? 'Cuadro' : 'Escultura'} · ${STATUS[w.status] ?? w.status}`));
       if (w.status === 'expuesta' && w.endsAt) text.append(el('span', 'meta', `Hasta ${new Date(w.endsAt).toLocaleString('es-AR', { weekday: 'short', hour: '2-digit', minute: '2-digit' })}`));
+      if (w.queue) {
+        const when = new Date(w.queue.eta).toLocaleString('es-AR', { weekday: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+        const soon = w.queue.eta <= Date.now() + 60_000;
+        text.append(el('span', 'meta', `Puesto ${w.queue.pos} en la fila · ${soon ? (w.status === 'verificada' ? 'entra enseguida' : 'entra apenas la verifiquen') : `entraría aprox. el ${when}${w.status === 'verificada' ? '' : ' (si la verifican)'}`}`));
+      }
       if (w.status === 'denegada') text.append(el('span', 'work-error', `Motivo: ${w.denyReason}${w.denyText ? ` — ${w.denyText}` : ''}`));
       card.append(thumb, text);
       list.append(card);
