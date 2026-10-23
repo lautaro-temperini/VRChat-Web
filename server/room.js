@@ -1,5 +1,5 @@
 import { DurableObject } from 'cloudflare:workers';
-import { cleanName, cleanLook, cleanEquip, EMOTES } from './shared.js';
+import { cleanName, cleanLook, cleanEquip, EMOTES, ITEM_REACH } from './shared.js';
 
 // Cada sala del juego es una instancia de Room (un Durable Object).
 // - Reenvía posiciones, chat, AFK y estado del micrófono.
@@ -388,10 +388,18 @@ export class Room extends DurableObject {
 
   // ---------- Objetos en el suelo ----------
 
+  // ¿Está al alcance? Se mide desde la última posición que mandó el jugador, con margen por el retraso
+  inReach(meta, [x, y, z]) {
+    const s = this.states.get(meta.id);
+    if (!s) return false;
+    return Math.hypot(x - s[0], z - s[2]) <= ITEM_REACH + 1 && Math.abs(y - s[1]) <= 3;
+  }
+
   async drop(ws, meta, msg) {
     if (!this.settings.items && !meta.mod) return this.notice(ws, 'Soltar objetos está deshabilitado en esta sala.');
     const pos = [msg.x, msg.y, msg.z].map(Number);
     if (!pos.every(Number.isFinite)) return;
+    if (!this.inReach(meta, pos)) return this.notice(ws, 'Está muy lejos: soltalo más cerca tuyo.');
     const r = await this.accounts().dropItem(meta.userId, msg.iid);
     if (!r.ok) return this.notice(ws, r.error);
     const g = { ...r.item, owner: meta.userId, ownerName: meta.name, x: pos[0], y: pos[1], z: pos[2], at: Date.now() };
@@ -409,11 +417,13 @@ export class Room extends DurableObject {
   async pickup(ws, meta, msg) {
     const g = this.ground.find((x) => x.iid === msg.iid);
     if (!g) return this.notice(ws, 'Ese objeto ya no está.');
+    if (!this.inReach(meta, [g.x, g.y, g.z])) return this.notice(ws, 'Está muy lejos: acercate para juntarlo.');
     const age = Date.now() - g.at;
     if (g.owner !== meta.userId && age < PICKUP_LOCK) {
       return this.notice(ws, `Todavía no: podés juntarlo en ${Math.ceil((PICKUP_LOCK - age) / 1000)} s.`);
     }
     const r = await this.accounts().pickupItem(meta.userId, g.iid);
+    if (!r.ok && !r.gone) return this.notice(ws, r.error); // no se pudo guardar: queda en el piso
     this.ground = this.ground.filter((x) => x.iid !== g.iid);
     await this.ctx.storage.put('ground', this.ground);
     this.broadcast({ t: 'ground-', iid: g.iid, by: r.ok ? meta.name : null });

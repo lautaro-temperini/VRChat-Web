@@ -68,7 +68,11 @@ Los pasos 3 a 5 del plan ya tienen sus decisiones en ROADMAP.md:
 1. **Editor de salas** con plantillas (paso 3) y catálogo de muebles.
 2. **Progresión, misiones e insignias** (paso 4). Ahí se define cómo se gana el título de Curador.
 3. **Diseños de artistas como objetos** y más mapas públicos (paso 5).
-4. **Primera prueba con gente real:** inauguración con 5–10 artistas exponiendo.
+4. **Revisión de permisos del servidor y pruebas automáticas** (cuando se junten las ramas de los agentes):
+   revisar que cada acción (intercambios, moderación, Museo, grupos) valide quién, qué y dónde, como ya
+   se hizo con soltar/juntar objetos; pruebas con dos clientes, desconexión, reconexión y acciones a la
+   vez; y partir `src/main.js` en módulos.
+5. **Primera prueba con gente real:** inauguración con 5–10 artistas exponiendo.
 
 ### Pendientes sueltos (consultar antes)
 Tipos de cuerpo y más ropa/peinados/cejas, selector RGB, stamina con consumibles (falta cómo se consigue
