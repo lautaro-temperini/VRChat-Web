@@ -663,6 +663,13 @@ function showKicked(title, text) {
   $('kicked-go').onclick = () => (room === 'museo' ? location.reload() : social.go('museo'));
   openOverlay('kicked');
 }
+// Una sola conexión por cuenta: si se abre el juego en otra pestaña (o en otro dispositivo), esta se
+// desconecta. "Usar aquí" la vuelve a conectar (y desconecta a la otra)
+function showElsewhere() {
+  showKicked('Abriste el juego en otra pestaña', 'Tu cuenta solo puede estar conectada en un lugar a la vez.');
+  $('kicked-go').textContent = 'Usar aquí';
+  $('kicked-go').onclick = () => location.reload();
+}
 
 function openScreenView() {
   if (!screenVideo) return;
@@ -840,6 +847,7 @@ net
     if (r) { r.silenced = v; roomPanel.applyMutes(); }
     roomPanel.render();
   })
+  .on('elsewhere', () => showElsewhere())
   .on('kicked', ({ ban, by }) => showKicked(ban ? 'Te banearon de esta sala' : 'Te sacaron de la sala', `${by} ${ban ? 'te baneó: no vas a poder volver a entrar a esta sala.' : 'te expulsó. Podés volver a entrar más tarde.'}`))
   .on('teleport', ({ x, y, z, by }) => {
     ctrl.stand();
@@ -1122,6 +1130,7 @@ function setDJ(info) {
 }
 async function openDJPanel() {
   if (rtc.dj && rtc.dj.id !== net.id) return toast(`La cabina está ocupada: está pasando música ${rtc.dj.name}.`);
+  if (account?.guest) return guestGate('pasar música');
   const live = !!rtc.djStream;
   $('djpanel').dataset.mode = live ? 'live' : 'setup';
   $('dj-cancel').textContent = live ? 'Seguir pasando música' : 'Cancelar';
@@ -1217,6 +1226,7 @@ function renderArtists() {
   $('bridge-status').textContent = parts.luces?.id === net.id ? $('bridge-status').textContent : 'sin usar';
 }
 function openArtists() {
+  if (account?.guest) return guestGate('usar la consola de artistas');
   renderArtists();
   openOverlay('artists');
 }
@@ -1242,6 +1252,7 @@ function endPart(part) {
 // La pantalla: E para pasar video (si está libre), dejar de pasarlo, o verla en grande
 function useScreen() {
   const holder = parts.escenario;
+  if (!holder && account?.guest) return guestGate('pasar visuales');
   if (!holder) return takePart('escenario');
   if (holder.id === net.id) return releasePart('escenario');
   openScreenView();

@@ -313,3 +313,74 @@ test('API: los invitados no usan lo de cuentas', async () => {
   const r = await api('myroom', { method: 'PUT', token: g.token, body: { name: 'mía' } });
   assert.equal(r.ok, false);
 });
+
+// ---------- Decisiones del usuario (24/10) ----------
+
+test('una sola conexión por cuenta: la pestaña nueva manda, también desde otra sala', async () => {
+  const a = await account('un'), b = await account('un');
+  const cb = await joined(b.token);
+  const c1 = await joined(a.token);
+  await cb.wait((m) => m.t === 'join' && m.id === c1.id);
+  const c2 = await joined(a.token);
+  await c1.wait('elsewhere');
+  await cb.wait((m) => m.t === 'leave' && m.id === c1.id);
+  // Desde otra sala (su sala personal) también desconecta a la del Museo
+  const c3 = await joined(a.token, `u-${a.user.id}`);
+  await c2.wait('elsewhere');
+  await cb.wait((m) => m.t === 'leave' && m.id === c2.id);
+  // Al irse la que quedó, sigue sin fantasmas
+  const c4 = await joined((await account('un')).token);
+  assert.ok(!c4.welcome.players.some((p) => p.userId === a.user.id));
+  for (const c of [cb, c1, c2, c3, c4]) await c.close();
+});
+
+test('intercambio: dos pestañas de la misma cuenta no quedan a la vez', async () => {
+  const a = await account('tr');
+  const c1 = await joined(a.token), c2 = await joined(a.token);
+  await c1.wait('elsewhere');
+  c2.send({ t: 'trade', op: 'invite', to: c1.id });
+  await c2.wait((m) => m.t === 'trade' && m.op === 'busy');
+  await c1.close(); await c2.close();
+});
+
+test('los invitados no pasan música ni usan la consola', async () => {
+  const g = await guest();
+  const c = await joined(g.token);
+  c.send({ t: 'dj', on: true, streamId: 'x' });
+  await c.wait((m) => m.t === 'dj' && m.denied);
+  for (const part of ['luces', 'escenario']) {
+    c.send({ t: 'part', part, on: true, streamId: 'x' });
+    await c.wait((m) => m.t === 'part' && m.part === part && m.denied);
+  }
+  await c.close();
+});
+
+test('ingreso: después de 10 contraseñas mal hay que esperar', async () => {
+  const a = await account('lg');
+  for (let i = 0; i < 10; i++) {
+    const r = await api('login', { method: 'POST', body: { login: a.nick, password: `mal${i}` } });
+    assert.match(r.error, /incorrectos/);
+  }
+  const r = await api('login', { method: 'POST', body: { login: a.nick, password: 'secreto123' } });
+  assert.equal(r.ok, false);
+  assert.match(r.error, /Demasiados intentos/);
+});
+
+test('muro: hasta 20 notas por hora', async () => {
+  const a = await account('no');
+  for (let i = 0; i < 20; i++) assert.ok((await api('note', { method: 'POST', token: a.token, body: { text: `nota ${i}` } })).ok);
+  const r = await api('note', { method: 'POST', token: a.token, body: { text: 'una más' } });
+  assert.equal(r.ok, false);
+});
+
+test('amistad rechazada: no se vuelve a mandar en 24 h', async () => {
+  const a = await account('am'), b = await account('am');
+  assert.ok((await api('friendrequest', { method: 'POST', token: a.token, body: { id: b.user.id } })).ok);
+  await api('friendrespond', { method: 'POST', token: b.token, body: { id: a.user.id, accept: false } });
+  const r = await api('friendrequest', { method: 'POST', token: a.token, body: { id: b.user.id } });
+  assert.equal(r.ok, false);
+  const n = await api('notifications', { token: b.token });
+  assert.equal(n.items.filter((x) => x.type === 'friend_request').length, 1, 'le llegó un solo aviso');
+  // Al revés sí puede (el que rechazó cambia de idea)
+  assert.ok((await api('friendrequest', { method: 'POST', token: b.token, body: { id: a.user.id } })).ok);
+});

@@ -55,6 +55,12 @@ const OAUTH = {
   },
 };
 const REPORT_REASONS = ['acoso', 'ilegal', 'plagio', 'spam', 'suplantacion', 'otro'];
+// Frenos por IP (decisión del usuario, 24/10): intentos fallidos de contraseña y cuentas nuevas.
+// Se pueden cambiar con las variables LOGIN_FAILS / CREATE_PER_HOUR (las pruebas los suben).
+const LOGIN_FAILS = 10, LOGIN_WINDOW = 15 * 60_000;
+const CREATE_PER_HOUR = 20, HOUR = 3_600_000;
+const NOTES_PER_HOUR = 20;        // notas en el muro por persona (decisión del usuario)
+const FRIEND_RETRY = 24 * HOUR;   // si te rechazan la amistad, no se la volvés a mandar por 24 h
 const FAVORITES_MAX = 100;        // tope técnico (nadie llega jugando): que la base no crezca sin fin
 const TRADE_MAX = 12;             // objetos por lado en un intercambio (lo mismo que muestra la sala)
 const dim = (v) => Math.min(10_000, Math.max(0, Math.round(Number(v)) || 0)); // ancho/alto que manda el cliente
@@ -124,6 +130,7 @@ export class Accounts extends DurableObject {
     addCol('gallery_privacy', "TEXT NOT NULL DEFAULT 'todos'");  // todos | amigos | nadie
     addCol('email', 'TEXT');                                     // cuentas registradas (sin verificar por ahora)
     addCol('terms', 'INTEGER');                                  // cuándo aceptó +18 y condiciones
+    addCol('email_verified', 'INTEGER NOT NULL DEFAULT 0');      // 1 = lo confirmó Google/Discord
     this.sql.exec('CREATE UNIQUE INDEX IF NOT EXISTS users_email ON users (email)');
     // Restringir (ocultar todo de una persona) y reportes a los admins
     this.sql.exec(`
@@ -149,6 +156,16 @@ export class Accounts extends DurableObject {
         from_id TEXT NOT NULL, to_id TEXT NOT NULL, day INTEGER NOT NULL, count INTEGER NOT NULL, until INTEGER NOT NULL,
         PRIMARY KEY (from_id, to_id)
       );
+      CREATE TABLE IF NOT EXISTS limits (
+        key TEXT PRIMARY KEY, n INTEGER NOT NULL, since INTEGER NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS friend_rejects (
+        from_id TEXT NOT NULL, to_id TEXT NOT NULL, until INTEGER NOT NULL,
+        PRIMARY KEY (from_id, to_id)
+      );
+      CREATE TABLE IF NOT EXISTS conns (
+        user_id TEXT PRIMARY KEY, room TEXT NOT NULL, conn TEXT NOT NULL, created INTEGER NOT NULL
+      );
       CREATE TABLE IF NOT EXISTS reports (
         id TEXT PRIMARY KEY, reporter TEXT NOT NULL, target TEXT NOT NULL, reason TEXT NOT NULL,
         detail TEXT NOT NULL, room TEXT NOT NULL, created INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'abierto'
@@ -167,6 +184,31 @@ export class Accounts extends DurableObject {
   nameTaken(name, exceptId = '') {
     return this.sql.exec('SELECT 1 FROM users WHERE username = ? AND id != ?', String(name).trim().toLowerCase(), exceptId).toArray().length > 0;
   }
+
+  // ---------- Frenos por IP ----------
+  // Ventana fija: cuenta cuántas veces pasó algo desde "since"; al vencer, vuelve a cero.
+  // La IP se guarda solo como hash.
+
+  limitCount(key, window) {
+    const r = this.sql.exec('SELECT n, since FROM limits WHERE key = ?', key).toArray()[0];
+    return r && Date.now() - r.since < window ? r.n : 0;
+  }
+
+  limitAdd(key, window) {
+    const now = Date.now();
+    const n = this.limitCount(key, window);
+    this.sql.exec('INSERT OR REPLACE INTO limits (key, n, since) VALUES (?, ?, ?)', key, n + 1,
+      n ? this.sql.exec('SELECT since FROM limits WHERE key = ?', key).one().since : now);
+    if (Math.random() < 0.02) this.sql.exec('DELETE FROM limits WHERE since < ?', now - 2 * HOUR);
+  }
+
+  envNum(name, d) { const v = Number(this.env[name]); return Number.isFinite(v) && v > 0 ? v : d; }
+
+  // ¿Esta IP ya creó muchas cuentas (o invitados) en la última hora?
+  async createBlocked(ip) {
+    return this.limitCount(`c:${await sha256(String(ip ?? ''))}`, HOUR) >= this.envNum('CREATE_PER_HOUR', CREATE_PER_HOUR);
+  }
+  async createCount(ip) { this.limitAdd(`c:${await sha256(String(ip ?? ''))}`, HOUR); }
 
   // ---------- Usuarios y sesiones ----------
 
@@ -197,19 +239,21 @@ export class Accounts extends DurableObject {
   }
 
   // Invitado: solo para probar (sin objetos, intercambio, muro ni sala propia). Tiene que aceptar +18.
-  async guest(name, look, terms) {
+  async guest(name, look, terms, ip) {
     if (!terms) return { ok: false, error: 'Para entrar tenés que confirmar que sos mayor de 18 y aceptar las condiciones.' };
+    if (await this.createBlocked(ip)) return { ok: false, error: 'Se crearon muchas cuentas desde tu conexión. Probá de nuevo en un rato.' };
     const clean = cleanName(name);
     if (this.nameTaken(clean)) return { ok: false, error: 'Ese nombre es de una cuenta registrada. Elegí otro o iniciá sesión.' };
     const id = randomHex(8);
     this.sql.exec('INSERT INTO users (id, name, look, created, terms) VALUES (?, ?, ?, ?, ?)',
       id, clean, JSON.stringify(cleanLook(look)), Date.now(), Date.now());
+    await this.createCount(ip);
     return { ok: true, token: await this.newSession(id), user: this.publicUser(this.row(id)) };
   }
 
   // Crea una cuenta (mail + nickname único + contraseña), o convierte al invitado actual en cuenta
   // (conserva su personaje). El nickname es el nombre que ven los demás y no se repite.
-  async register(token, { email, nick, password, look, terms } = {}) {
+  async register(token, { email, nick, password, look, terms } = {}, ip) {
     email = String(email ?? '').trim().toLowerCase();
     nick = String(nick ?? '').trim();
     const username = nick.toLowerCase();
@@ -219,6 +263,7 @@ export class Accounts extends DurableObject {
     if (!terms) return { ok: false, error: 'Tenés que confirmar que sos mayor de 18 y aceptar las condiciones.' };
     if (this.sql.exec('SELECT 1 FROM users WHERE username = ?', username).toArray().length) return { ok: false, error: 'Ese nickname ya está en uso.' };
     if (this.sql.exec('SELECT 1 FROM users WHERE email = ?', email).toArray().length) return { ok: false, error: 'Ya hay una cuenta con ese mail. Iniciá sesión.' };
+    if (await this.createBlocked(ip)) return { ok: false, error: 'Se crearon muchas cuentas desde tu conexión. Probá de nuevo en un rato.' };
 
     const salt = randomHex(16);
     const pass = await pbkdf2(password, salt);
@@ -234,18 +279,22 @@ export class Accounts extends DurableObject {
       this.sql.exec('INSERT INTO users (id, username, name, email, pass, salt, look, created, terms) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
         id, username, nick, email, pass, salt, JSON.stringify(cleanLook(look)), Date.now(), Date.now());
       token = null;
+      await this.createCount(ip);
     }
     if (!this.row(id).starter) this.giveStarter(id); // los objetos iniciales llegan al registrarse
     return { ok: true, token: token ?? await this.newSession(id), user: this.publicUser(this.row(id)) };
   }
 
   // Se entra con el mail o con el nickname
-  async login(login, password) {
-    const key = String(login ?? '').trim().toLowerCase();
+  // Freno: 10 intentos fallidos cada 15 min por cuenta + IP (después hay que esperar)
+  async login(login, password, ip) {
+    const key = String(login ?? '').trim().toLowerCase().slice(0, 120);
+    const lim = `l:${await sha256(`${String(ip ?? '')}|${key}`)}`;
+    if (this.limitCount(lim, LOGIN_WINDOW) >= this.envNum('LOGIN_FAILS', LOGIN_FAILS)) return { ok: false, error: 'Demasiados intentos. Probá de nuevo en unos minutos.' };
     const row = this.sql.exec('SELECT * FROM users WHERE username = ? OR email = ?', key, key).toArray()[0];
-    const fail = { ok: false, error: 'Usuario o contraseña incorrectos.' };
-    if (!row || !row.salt || typeof password !== 'string') return fail; // sin salt: entra solo con Google/Discord
-    if (!sameText(await pbkdf2(password, row.salt), row.pass)) return fail;
+    const fail = () => { this.limitAdd(lim, LOGIN_WINDOW); return { ok: false, error: 'Usuario o contraseña incorrectos.' }; };
+    if (!row || !row.salt || typeof password !== 'string' || password.length > 200) return fail(); // sin salt: entra solo con Google/Discord
+    if (!sameText(await pbkdf2(password, row.salt), row.pass)) return fail();
     return { ok: true, token: await this.newSession(row.id), user: this.publicUser(row) };
   }
 
@@ -306,7 +355,17 @@ export class Accounts extends DurableObject {
 
     let id = this.sql.exec('SELECT user_id FROM oauth_links WHERE provider = ? AND sub = ?', provider, profile.sub).toArray()[0]?.user_id;
     if (id && !this.row(id)) id = null;
-    if (!id && email) id = this.sql.exec('SELECT id FROM users WHERE email = ?', email).toArray()[0]?.id;
+    if (!id && email) {
+      const byMail = this.sql.exec('SELECT * FROM users WHERE email = ?', email).toArray()[0];
+      id = byMail?.id;
+      // Mismo mail = misma cuenta. Pero si esa cuenta tiene contraseña y el mail nunca se confirmó,
+      // pudo registrarla otro con este mail: manda Google/Discord. La contraseña deja de valer y se
+      // cierran las otras sesiones (decisión del usuario, 24/10)
+      if (byMail && byMail.salt && !byMail.email_verified) {
+        this.sql.exec('UPDATE users SET pass = NULL, salt = NULL WHERE id = ?', byMail.id);
+        this.sql.exec('DELETE FROM sessions WHERE user_id = ?', byMail.id);
+      }
+    }
     if (!id && st.guest_id && this.isGuest(this.row(st.guest_id))) id = st.guest_id;
     if (!id) {
       id = randomHex(8);
@@ -319,6 +378,7 @@ export class Accounts extends DurableObject {
     if (email && !this.row(id).email && !this.sql.exec('SELECT 1 FROM users WHERE email = ?', email).toArray().length) {
       this.sql.exec('UPDATE users SET email = ? WHERE id = ?', email, id);
     }
+    if (email && this.row(id).email === email) this.sql.exec('UPDATE users SET email_verified = 1 WHERE id = ?', id);
     const loginCode = randomHex(16);
     this.sql.exec('DELETE FROM login_codes WHERE created < ?', Date.now() - 2 * 60_000);
     this.sql.exec('INSERT INTO login_codes (code, token, created) VALUES (?, ?, ?)', loginCode, await this.newSession(id), Date.now());
@@ -546,6 +606,8 @@ export class Accounts extends DurableObject {
     const rel = this.relation(me.id, otherId);
     if (rel === 'incoming') return this.friendRespond(token, otherId, true); // ya te había invitado: aceptar
     if (rel === 'none') {
+      const rej = this.sql.exec('SELECT until FROM friend_rejects WHERE from_id = ? AND to_id = ?', me.id, otherId).toArray()[0];
+      if (rej && rej.until > Date.now()) return { ok: false, error: 'Ya le mandaste una solicitud hace poco. Probá de nuevo mañana.' };
       this.sql.exec("INSERT INTO friends (a, b, status, created) VALUES (?, ?, 'pending', ?)", me.id, otherId, Date.now());
       this.notify(otherId, 'friend_request', me.id);
       this.progressTrack(me.id, 'amigo');
@@ -559,7 +621,12 @@ export class Accounts extends DurableObject {
     if (accept) {
       const changed = this.sql.exec("UPDATE friends SET status = 'accepted' WHERE a = ? AND b = ? AND status = 'pending'", otherId, me.id).rowsWritten;
       if (changed) { this.notify(otherId, 'friend_accepted', me.id); this.progressTrack(me.id, 'amigo'); }
-    } else this.sql.exec('DELETE FROM friends WHERE a = ? AND b = ?', otherId, me.id);
+    } else {
+      // Rechazar una solicitud pendiente: esa persona no te la puede volver a mandar por 24 h
+      const gone = this.sql.exec("DELETE FROM friends WHERE a = ? AND b = ? AND status = 'pending'", otherId, me.id).rowsWritten;
+      if (gone) this.sql.exec('INSERT OR REPLACE INTO friend_rejects (from_id, to_id, until) VALUES (?, ?, ?)', otherId, me.id, Date.now() + FRIEND_RETRY);
+      else this.sql.exec('DELETE FROM friends WHERE a = ? AND b = ?', otherId, me.id);
+    }
     return { ok: true, relation: this.relation(me.id, otherId) };
   }
 
@@ -656,6 +723,9 @@ export class Accounts extends DurableObject {
     if (this.isGuest(me)) return this.guestError();
     const clean = String(text ?? '').replace(/[\u0000-\u0009\u000b-\u001f]/g, '').trim().slice(0, NOTE_LENGTH);
     if (!clean) return { ok: false, error: 'La nota está vacía.' };
+    if (this.sql.exec('SELECT COUNT(*) AS n FROM notes WHERE owner = ? AND created > ?', me.id, Date.now() - HOUR).one().n >= NOTES_PER_HOUR) {
+      return { ok: false, error: `Podés publicar hasta ${NOTES_PER_HOUR} notas por hora. Probá en un rato.` };
+    }
     const id = randomHex(8);
     this.sql.exec('INSERT INTO notes (id, owner, text, created) VALUES (?, ?, ?, ?)', id, me.id, clean, Date.now());
     this.progressTrack(me.id, 'muro');
@@ -907,9 +977,19 @@ export class Accounts extends DurableObject {
   // mañana (medianoche de Argentina). La cuenta de rechazos vuelve a cero cada día.
   // Quien está ignorado o restringido nunca te puede invitar. A quien invita no se le avisa nada.
 
-  async groupInviteCheck(fromId, toId) {
+  // ¿toId ignoró o restringió a fromId?
+  shields(toId, fromId) {
     const hit = (table, col) => this.sql.exec(`SELECT 1 FROM ${table} WHERE user_id = ? AND ${col} = ?`, toId, fromId).toArray().length > 0;
-    if (hit('ignores', 'ignored_id') || hit('blocks', 'blocked_id')) return { ok: false };
+    return hit('ignores', 'ignored_id') || hit('blocks', 'blocked_id');
+  }
+
+  // Intercambios: quien está ignorado o restringido no te puede invitar (no se entera)
+  async tradeInviteCheck(fromId, toId) {
+    return { ok: !this.shields(toId, fromId) };
+  }
+
+  async groupInviteCheck(fromId, toId) {
+    if (this.shields(toId, fromId)) return { ok: false };
     const r = this.sql.exec('SELECT until FROM group_rejects WHERE from_id = ? AND to_id = ?', fromId, toId).toArray()[0];
     return { ok: !r || r.until <= Date.now() };
   }
@@ -951,6 +1031,19 @@ export class Accounts extends DurableObject {
     if (!me || !this.isAdmin(me.id)) return { ok: false, error: 'Solo para admins.' };
     this.sql.exec("UPDATE reports SET status = 'resuelto' WHERE id = ?", String(id ?? ''));
     return this.reports(token);
+  }
+
+  // ---------- Una sola conexión por cuenta (decisión del usuario, 24/10) ----------
+  // Como WhatsApp Web: la pestaña nueva manda. Cada sala avisa al entrar alguien y recibe la
+  // conexión anterior de esa cuenta (en esa u otra sala), para desconectarla.
+  async claimConn(userId, room, conn) {
+    const prev = this.sql.exec('SELECT room, conn FROM conns WHERE user_id = ?', userId).toArray()[0] ?? null;
+    this.sql.exec('INSERT OR REPLACE INTO conns (user_id, room, conn, created) VALUES (?, ?, ?, ?)', userId, room, conn, Date.now());
+    return prev && prev.conn !== conn ? prev : null;
+  }
+
+  async releaseConn(userId, conn) {
+    this.sql.exec('DELETE FROM conns WHERE user_id = ? AND conn = ?', userId, conn);
   }
 
   // ---------- Presencia (las salas avisan quién está adentro) ----------

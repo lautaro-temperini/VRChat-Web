@@ -628,7 +628,7 @@ export function createRoomEditor({ world, scene, camera, renderer, net, rtc, ctr
     });
 
   // Al entrar a la sala: el diseño, y si sos el dueño, el botón (y elegir plantilla la primera vez)
-  const stage2 = createStage2({ net, rtc, world, toast, ui });
+  const stage2 = createStage2({ net, rtc, world, toast, ui, me });
   function onWelcome(m) {
     if (m.layout) world.setLayout(m.layout);
     stage2.onWelcome(m);

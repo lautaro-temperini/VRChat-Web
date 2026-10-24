@@ -33,9 +33,8 @@ export class Net {
     };
     ws.onclose = (e) => {
       if (this.ws !== ws) return;
-      // Expulsado (4002) o baneado (4003): no reconectar
-      // Expulsado (4002), baneado (4003) o sala privada (4004): no reconectar
-      if (this.stopped || e.code === 4002 || e.code === 4003 || e.code === 4004) { this.id = null; this.emit('status', 'cerrado'); return; }
+      // Expulsado (4002), baneado (4003), sala privada (4004) o abierto en otra pestaña (4005): no reconectar
+      if (this.stopped || [4002, 4003, 4004, 4005].includes(e.code)) { this.id = null; this.emit('status', 'cerrado'); return; }
       this.id = null;
       this.emit('status', 'desconectado');
       setTimeout(() => this.connect(this.joinPayload), this.retry);

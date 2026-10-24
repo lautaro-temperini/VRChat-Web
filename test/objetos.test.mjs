@@ -80,16 +80,19 @@ test('intercambio: si el objeto se suelta a mitad, el intercambio falla y no se 
   await ca.close(); await cb.close();
 });
 
-test('intercambio: no con uno mismo (dos pestañas) ni con invitados', async () => {
-  const a = await account('tr'), g = await guest();
-  const c1 = await joined(a.token), c2 = await joined(a.token), cg = await joined(g.token);
-  c1.send({ t: 'trade', op: 'invite', to: c2.id });
-  assert.ok(await c2.none((m) => m.t === 'trade' && m.op === 'invite'), 'no se invita a la otra pestaña');
+test('intercambio: no con invitados, ni si te ignoraron', async () => {
+  const a = await account('tr'), g = await guest(), b = await account('tr');
+  const c1 = await joined(a.token), cg = await joined(g.token);
+  await api('ignore', { method: 'POST', token: b.token, body: { id: a.user.id, on: true } });
+  const cb = await joined(b.token);
+  c1.send({ t: 'trade', op: 'invite', to: cb.id });
+  assert.ok(await cb.none((m) => m.t === 'trade' && m.op === 'invite'), 'al que lo ignoró no le llega');
+  await cb.close();
   c1.send({ t: 'trade', op: 'invite', to: cg.id });
   await c1.wait((m) => m.t === 'notice' && /invitada/.test(m.text));
   cg.send({ t: 'trade', op: 'invite', to: c1.id });
   await cg.wait((m) => m.t === 'notice' && /cuenta/.test(m.text));
-  await c1.close(); await c2.close(); await cg.close();
+  await c1.close(); await cg.close();
 });
 
 test('intercambio: la invitación repetida no le llega 20 veces al otro', async () => {

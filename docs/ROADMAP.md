@@ -273,3 +273,10 @@ La música del DJ y el puente OSC ya están hechos. Falta:
 | Editor: especiales de ejemplo | Trono dorado, bola de espejos, sillón de terciopelo con neón y escultura de neón |
 | Paquete inicial (activado) | Las cuentas nuevas reciben 15 objetos al azar entre prendas y muebles especiales |
 | Editor: cambiar de plantilla (muebles básicos) | Se borran (con confirmación); arrancás con lo que trae la plantilla nueva |
+| Ingreso: mail sin confirmar (24/10) | Si alguien entra con Google/Discord a una cuenta con contraseña cuyo mail nunca se confirmó, **manda Google**: la contraseña deja de valer y se cierran las otras sesiones (evita que otro registre tu mail antes que vos) |
+| Frenos por IP (24/10) | Hasta 10 contraseñas mal cada 15 min por cuenta + IP ("Demasiados intentos. Probá de nuevo en unos minutos"). Hasta 20 invitados/cuentas nuevas por IP por hora |
+| Invitados: cabina y consola (24/10) | No pasan música ni toman luces o pantallas: candado y "Para pasar música tenés que crear una cuenta" |
+| Una sola conexión por cuenta (24/10) | Como WhatsApp Web: la pestaña nueva manda (aunque sea en otra sala u otro dispositivo); la vieja muestra "Abriste el juego en otra pestaña" con "Usar aquí" |
+| Muro: notas (24/10) | Hasta 20 notas por hora por persona |
+| Amistad rechazada (24/10) | No se le vuelve a mandar solicitud a esa persona por 24 h ("Ya le mandaste una solicitud hace poco. Probá de nuevo mañana."). El que rechazó sí puede mandarla |
+| Intercambios e ignorados (24/10) | Alguien ignorado o restringido no te puede invitar a intercambiar (no se entera, como con los grupos) |

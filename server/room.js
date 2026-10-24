@@ -41,6 +41,7 @@ const VOICE_RANGE = 20;
 const GROUP_MAX = 4, GROUP_INVITE_LIFE = 60_000;
 const TRADE_INVITE_LIFE = 60_000; // la invitación a intercambiar vence al minuto
 const GUEST_VOICE = 'Creá una cuenta (es gratis) para usar la voz y los grupos. Los invitados chatean solo por texto.';
+const GUEST_STAGE = 'Creá una cuenta (es gratis) para pasar música o usar la consola de artistas.';
 // Antiflood de todo lo que no es chat (ver allow): mensajes por conexión, con un margen amplio
 // por encima de lo que manda el juego (posición 10/s, luces 15/s, voz unos pocos por segundo).
 // Lo que pasa del límite se descarta en silencio. HEAVY: lo que escribe en la base o le pide algo a
@@ -290,6 +291,12 @@ export class Room extends DurableObject {
         layout: await this.layout(),
       });
       this.broadcast({ t: 'join', ...this.publicInfo(meta) }, ws);
+      // Una sola conexión por cuenta: la nueva manda y la anterior (acá o en otra sala) se desconecta
+      const prev = await this.accounts().claimConn(user.id, await this.roomName(), meta.id);
+      if (prev) {
+        if (prev.room === (await this.roomName())) await this.takeover(prev.conn);
+        else await this.env.ROOMS.get(this.env.ROOMS.idFromName(prev.room)).takeover(prev.conn).catch(() => {});
+      }
       await this.accounts().presence(await this.roomName(), [user.id]);
       await roomTrack(this, ws, user.id, 'sala'); // progresión: visitar salas de otros
       await this.scheduleAlarm();
@@ -376,6 +383,8 @@ export class Room extends DurableObject {
       case 'dj': {
         // Cabina del DJ: una persona a la vez (sin cola); cualquiera puede, salvo que la sala lo deshabilite
         if (msg.on) {
+          // Los invitados no pasan música (decisión del usuario, 24/10)
+          if (meta.guest) { this.send(ws, { t: 'dj', denied: true }); return this.notice(ws, GUEST_STAGE); }
           if (silenced || (!this.settings.dj && !meta.mod)) {
             this.send(ws, { t: 'dj', denied: true });
             return this.notice(ws, silenced ? 'Estás silenciado en esta sala.' : 'Pasar música está deshabilitado en esta sala.');
@@ -403,6 +412,8 @@ export class Room extends DurableObject {
         if (!PARTS.includes(part)) return;
         const cur = this.parts[part];
         if (msg.on) {
+          // Ni toman las luces o las pantallas
+          if (meta.guest) { this.send(ws, { t: 'part', part, denied: true }); return this.notice(ws, GUEST_STAGE); }
           if (silenced || (!this.settings.artists && !meta.mod)) {
             this.send(ws, { t: 'part', part, denied: true });
             return this.notice(ws, silenced ? 'Estás silenciado en esta sala.' : 'La consola de artistas está deshabilitada en esta sala.');
@@ -439,6 +450,16 @@ export class Room extends DurableObject {
         await this.tradeMessage(ws, meta, msg);
         break;
     }
+  }
+
+  // La misma cuenta entró desde otra pestaña (o dispositivo): esta conexión se desconecta.
+  // La llama la sala donde entró (puede ser esta misma u otra).
+  async takeover(conn) {
+    const ws = this.ctx.getWebSockets().find((w) => w.deserializeAttachment()?.id === conn);
+    if (!ws) return;
+    this.send(ws, { t: 'elsewhere' });
+    await this.leave(ws, { keepConn: true });
+    try { ws.close(4005, 'otra pestaña'); } catch { /* ya cerrada */ }
   }
 
   // El perfil y los objetos se leen de la cuenta (no se confía en lo que manda el cliente)
@@ -897,7 +918,9 @@ export class Room extends DurableObject {
         const key = `${me}>${msg.to}`;
         if (this.invites.has(key)) return;
         this.invites.set(key, now);
-        this.send(other, { t: 'trade', op: 'invite', from: me, name: meta.name, userId: meta.userId });
+        // Si el otro lo ignoró o restringió, la invitación no le llega (y quien invita no se entera)
+        const check = await this.accounts().tradeInviteCheck(meta.userId, om.userId);
+        if (check.ok) this.send(this.byId(msg.to), { t: 'trade', op: 'invite', from: me, name: meta.name, userId: meta.userId });
         break;
       }
       case 'accept': {
@@ -974,7 +997,7 @@ export class Room extends DurableObject {
     this.broadcast({ t: 'dj', on: false, id, name });
   }
 
-  async leave(ws) {
+  async leave(ws, { keepConn = false } = {}) {
     const meta = ws.deserializeAttachment();
     if (!meta) return;
     if (!meta.joined) {
@@ -1011,7 +1034,11 @@ export class Room extends DurableObject {
       const present = new Set(this.joined().filter((w) => w !== ws).map((w) => w.deserializeAttachment().userId));
       if (!this.groups[gid].members.some((u) => present.has(u))) { delete this.groups[gid]; await this.saveGroups(); }
     }
-    if (meta.userId) await this.accounts().presenceLeave(await this.roomName(), meta.userId);
+    if (meta.userId && !keepConn) {
+      await this.accounts().releaseConn(meta.userId, meta.id);
+      // Si la cuenta ya está en otra sala, la presencia es de esa
+      await this.accounts().presenceLeave(await this.roomName(), meta.userId);
+    }
   }
 
   async webSocketClose(ws, code) {

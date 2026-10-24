@@ -123,15 +123,17 @@ async function api(request, env, path) {
     return Response.redirect(`${back}/#${hash}`, 302);
   }
 
+  // IP de quien pide (para los frenos de ingreso y de cuentas nuevas; en local no hay: va vacía)
+  const ip = request.headers.get('CF-Connecting-IP') ?? '';
   let body = {};
   if (request.method !== 'GET') {
     try { body = await request.json(); } catch { body = {}; }
   }
   let result;
   switch (`${request.method} ${path}`) {
-    case 'POST guest': result = await accounts.guest(body.name, body.look, !!body.terms); break;
-    case 'POST register': result = await accounts.register(token, { email: body.email, nick: body.nick, password: body.password, look: body.look, terms: !!body.terms }); break;
-    case 'POST login': result = await accounts.login(body.login ?? body.username, body.password); break;
+    case 'POST guest': result = await accounts.guest(body.name, body.look, !!body.terms, ip); break;
+    case 'POST register': result = await accounts.register(token, { email: body.email, nick: body.nick, password: body.password, look: body.look, terms: !!body.terms }, ip); break;
+    case 'POST login': result = await accounts.login(body.login ?? body.username, body.password, ip); break;
     case 'GET blocks': result = await accounts.blocks(token); break;
     case 'POST block': result = await accounts.setBlock(token, String(body.id ?? ''), !!body.on); break;
     case 'POST oauthstart': {

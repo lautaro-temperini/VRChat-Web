@@ -21,7 +21,9 @@ if (process.env.TEST_BASE) process.exit(await run({}));
 const port = process.env.TEST_PORT || '8790';
 mkdirSync('dist', { recursive: true });
 const state = mkdtempSync(join(tmpdir(), 'galeria-test-'));
-const server = spawn('npx', ['wrangler', 'dev', '--port', port, '--ip', '127.0.0.1', '--inspector-port', '0', '--persist-to', state, '--show-interactive-dev-session=false'],
+const server = spawn('npx', ['wrangler', 'dev', '--port', port, '--ip', '127.0.0.1', '--inspector-port', '0', '--persist-to', state, '--show-interactive-dev-session=false',
+  // Las pruebas crean muchas cuentas seguidas desde la misma PC: se sube ese freno
+  '--var', 'CREATE_PER_HOUR:100000'],
   { stdio: ['ignore', 'pipe', 'pipe'], shell: process.platform === 'win32', detached: process.platform !== 'win32' });
 let log = '';
 const ready = new Promise((resolve, reject) => {
