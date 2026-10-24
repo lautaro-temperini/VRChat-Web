@@ -10,7 +10,7 @@
 // Todo entra por progressTrack(userId, acción, ref): lo llaman los enganches de accounts.js,
 // works.js y room.js. Nunca tira error (si algo falla, la acción original sigue igual).
 
-import { ITEMS, ITEM_RARITY, RARITIES, FURNITURE } from './shared.js';
+import { ITEMS, ITEM_RARITY, RARITIES, FURNITURE, CONSUMABLES } from './shared.js';
 
 const randomHex = (n) => [...crypto.getRandomValues(new Uint8Array(n))].map((b) => b.toString(16).padStart(2, '0')).join('');
 const pick = (list) => list[Math.floor(Math.random() * list.length)];
@@ -120,10 +120,10 @@ export const progressMethods = {
   // Un objeto al azar de esa rareza → inventario: accesorio o mueble especial, todo junto y con
   // repetidos (decisión del 24/10). Devuelve "Nombre (Rareza)"
   progressReward(userId, rarity) {
-    const pool = Object.keys(ITEM_RARITY).filter((t) => ITEM_RARITY[t] === rarity && (ITEMS[t] || FURNITURE[t]?.special));
+    const pool = Object.keys(ITEM_RARITY).filter((t) => ITEM_RARITY[t] === rarity && (ITEMS[t] || FURNITURE[t]?.special || CONSUMABLES[t]));
     if (!pool.length) return '';
     const type = pick(pool);
-    const def = ITEMS[type] ?? FURNITURE[type];
+    const def = ITEMS[type] ?? FURNITURE[type] ?? CONSUMABLES[type];
     this.addItem(userId, type, ITEMS[type] ? pick(ITEMS[type].colors) : def.color);
     return `${def.name} (${RARITIES[rarity].name.toLowerCase()})`;
   },

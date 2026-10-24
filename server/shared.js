@@ -118,7 +118,18 @@ export const ITEM_RARITY = {
   crown: 'exotico',
   // Muebles especiales (rareza provisoria del 24/10, para probar los porcentajes)
   esculturaNeon: 'basico', espejos: 'raro', sillonNeon: 'raro', trono: 'exotico',
+  barraTragos: 'raro', minibar: 'raro', cafetera: 'raro',
+  // Consumibles (también salen como premio)
+  trago: 'basico', cafe: 'basico',
 };
+// Consumibles: se toman y durante BOOST_TIME la stamina no se gasta (no se puede tomar otro mientras dura)
+export const CONSUMABLES = {
+  trago: { name: 'Trago', color: '#ff7a3d' },
+  cafe: { name: 'Café', color: '#6b4226' },
+};
+export const BOOST_TIME = 120_000;
+// Beso: hay que estar a menos de esta distancia (la sala deja un margen por el atraso de las posiciones)
+export const KISS_RANGE = 1.5;
 export const rarityOf = (type) => ITEM_RARITY[type] ?? 'basico';
 
 // ---------- Editor de salas ----------
@@ -148,6 +159,10 @@ export const FURNITURE = {
   silla: { name: 'Silla', cat: 'comedor', mount: 'floor', color: '#1d1d22', size: [0.5, 0.5] },
   banqueta: { name: 'Banqueta alta', cat: 'comedor', mount: 'floor', color: '#8a1c1c', size: [0.45, 0.45] },
   barra: { name: 'Barra chica', cat: 'comedor', mount: 'floor', color: '#4a2c1b', size: [2.4, 0.7] },
+  // Muebles especiales que reparten consumibles a los visitantes (gives: qué dan; se toma en el momento)
+  barraTragos: { name: 'Barra de tragos', cat: 'especial', mount: 'floor', color: '#2b2b33', size: [2, 0.7], special: true, gives: 'trago' },
+  minibar: { name: 'Minibar', cat: 'especial', mount: 'floor', color: '#c9c9cf', size: [0.6, 0.6], special: true, gives: 'trago' },
+  cafetera: { name: 'Cafetera', cat: 'especial', mount: 'floor', color: '#1d1d22', size: [0.6, 0.5], special: true, gives: 'cafe' },
   cuadro: { name: 'Cuadro', cat: 'arte', mount: 'wall', color: '#141414', size: [1.2, 0.1] },
   pedestal: { name: 'Pedestal', cat: 'arte', mount: 'floor', color: '#f2f0ec', size: [0.6, 0.6] },
   atril: { name: 'Atril', cat: 'arte', mount: 'floor', color: '#4a2c1b', size: [0.7, 0.7], max: 1 },

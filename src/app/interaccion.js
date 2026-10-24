@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { api, workFileUrl } from '../net/api.js';
 import { guestGate, lock } from '../ui/guest.js';
 import { renderGallery } from '../ui/gallery.js';
+import { toast } from '../ui/toast.js';
 import { G, $, body } from './state.js';
 
 const { ctrl, camera, world, remotes, renderer, scene, me, fpArms, isTouch, net, rtc, ground, social, progress, notes, works, roomOwner, roomEditor, roomPanel, parts } = G;
@@ -47,6 +48,15 @@ function interact() {
   else if (t.kind === 'dj') G.openDJPanel();
   else if (t.kind === 'artists') G.openArtists();
   else if (t.kind === 'pickup') net.send({ t: 'pickup', iid: t.ground.iid });
+  // Barra del hall: elegís trago o café y te lo tomás ahí
+  else if (t.kind === 'bar') {
+    toast('¿Qué te servís?', { actions: [
+      { label: 'Trago', yes: true, onClick: () => net.send({ t: 'consume', from: 'bar', kind: 'trago' }) },
+      { label: 'Café', yes: true, onClick: () => net.send({ t: 'consume', from: 'bar', kind: 'cafe' }) },
+    ] });
+  }
+  // Barra de tragos, minibar o cafetera de una sala
+  else if (t.kind === 'dispense') net.send({ t: 'consume', from: 'piece', piece: t.piece });
   else openInspect(t);
 }
 

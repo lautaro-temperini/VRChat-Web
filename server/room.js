@@ -1,5 +1,5 @@
 import { DurableObject } from 'cloudflare:workers';
-import { cleanName, cleanLook, cleanEquip, EMOTES, ITEM_REACH } from './shared.js';
+import { cleanName, cleanLook, cleanEquip, EMOTES, ITEM_REACH, CONSUMABLES, FURNITURE, BOOST_TIME, KISS_RANGE } from './shared.js';
 import { roomTrack, roomEventTick } from './progress.js';
 import { roomEditorMethods, ROOM_SPAWN } from './editor.js';
 
@@ -81,6 +81,8 @@ export class Room extends DurableObject {
     this.tradeOf = new Map();  // jugador -> id del intercambio
     this.pulls = new Map();    // conexión -> Map("id:tipo" -> mid) de lo que está escuchando
     this.ginvites = new Map(); // "deUsuario>paraUsuario" -> hora de la invitación al grupo
+    this.boosts = new Map();   // usuario -> hasta cuándo le dura el efecto de un consumible o un beso
+    this.kisses = new Map();   // "deUsuario>paraUsuario" -> hora del pedido de beso
     this.rates = new Map();    // conexión -> baldes del antiflood (ver allow)
   }
 
@@ -384,6 +386,12 @@ export class Room extends DurableObject {
         break;
       case 'group':
         await this.groupMessage(ws, meta, msg);
+        break;
+      case 'consume':
+        await this.consumeMessage(ws, meta, msg);
+        break;
+      case 'kiss':
+        await this.kissMessage(ws, meta, msg);
         break;
       case 'dj': {
         // Cabina del DJ: una persona a la vez (sin cola); cualquiera puede, salvo que la sala lo deshabilite
@@ -810,6 +818,87 @@ export class Room extends DurableObject {
     if (g.leader === userId) g.leader = g.members[0] ?? null;
     if (g.members.length < 2) delete this.groups[gid];
     return gid;
+  }
+
+  // ---------- Consumibles y beso ----------
+  // Tomar algo: en la barra del hall (Museo), en un mueble que reparte (barra de tragos, minibar,
+  // cafetera) o de la mochila. Durante BOOST_TIME la stamina no se gasta y no se puede tomar otro.
+  // Todos ven al personaje con el vaso o la taza.
+
+  near(meta, x, z, max) {
+    const s = this.states.get(meta.id);
+    return !!s && Math.hypot(s[0] - x, s[2] - z) <= max;
+  }
+
+  startBoost(ws, meta, kind) {
+    this.boosts.set(meta.userId, Date.now() + BOOST_TIME);
+    this.broadcast({ t: 'consume', id: meta.id, kind });
+  }
+
+  async consumeMessage(ws, meta, msg) {
+    if ((this.boosts.get(meta.userId) ?? 0) > Date.now()) return this.notice(ws, 'Todavía te dura el efecto de lo que tomaste.');
+    if (msg.from === 'bar') {
+      // Barra del hall del Museo (sur del hall, de x -24 a -15)
+      if ((await this.roomName()) !== 'museo' || !CONSUMABLES[msg.kind]) return;
+      const s = this.states.get(meta.id);
+      if (!s || s[0] < -26 || s[0] > -13 || Math.abs(s[2] - 9.7) > 3) return this.notice(ws, 'Acercate a la barra.');
+      return this.startBoost(ws, meta, msg.kind);
+    }
+    if (msg.from === 'piece') {
+      const layout = await this.layout();
+      const piece = layout?.pieces.find((p) => p.id === msg.piece);
+      const kind = piece && FURNITURE[piece.type]?.gives;
+      if (!kind) return;
+      if (!this.near(meta, piece.x, piece.z, 3.5)) return this.notice(ws, 'Acercate un poco más.');
+      return this.startBoost(ws, meta, kind);
+    }
+    if (msg.from === 'item') {
+      const r = await this.accounts().useConsumable(meta.userId, String(msg.iid ?? ''));
+      if (!r.ok) return this.notice(ws, r.error);
+      this.send(ws, { t: 'inventory-changed' });
+      return this.startBoost(ws, meta, r.kind);
+    }
+  }
+
+  // Beso: se pide con E (perfil) y el otro acepta o rechaza. Hay que estar cerca. Rechazar usa el
+  // mismo bloqueo creciente que los grupos (sin avisar); ignorados y restringidos no pueden pedirlo.
+  async kissMessage(ws, meta, msg) {
+    const now = Date.now();
+    for (const [k, at] of this.kisses) if (now - at > 60_000) this.kisses.delete(k);
+    const closeTo = (a, b) => {
+      const sa = this.states.get(a.id), sb = this.states.get(b.id);
+      return !!sa && !!sb && Math.hypot(sa[0] - sb[0], sa[2] - sb[2]) <= KISS_RANGE + 0.6; // margen por el atraso
+    };
+    if (msg.op === 'ask') {
+      const target = this.byId(String(msg.to ?? ''));
+      const tm = target?.deserializeAttachment();
+      if (!tm?.joined || tm.id === meta.id) return;
+      if (!closeTo(meta, tm)) return this.notice(ws, 'Acercate más para dar un beso.');
+      const key = `${meta.userId}>${tm.userId}`;
+      const sent = () => this.send(ws, { t: 'kiss', op: 'sent', name: tm.name });
+      if (this.kisses.has(key)) return sent();
+      const check = await this.accounts().groupInviteCheck(meta.userId, tm.userId, 'kiss');
+      if (check.ok) {
+        this.kisses.set(key, now);
+        this.send(target, { t: 'kiss', op: 'ask', from: meta.id, name: meta.name });
+      }
+      return sent();
+    }
+    if (msg.op === 'respond') {
+      const from = this.byId(String(msg.from ?? ''));
+      const fm = from?.deserializeAttachment();
+      if (!fm?.joined) return;
+      if (!this.kisses.delete(`${fm.userId}>${meta.userId}`)) return this.notice(ws, 'Ese pedido ya venció.');
+      if (!msg.accept) {
+        await this.accounts().groupRejected(fm.userId, meta.userId, 'kiss');
+        return;
+      }
+      if (!closeTo(meta, fm)) return this.notice(ws, 'Se alejaron: acercate y que te lo pida de nuevo.');
+      // Los dos se dan el beso y los dos reciben el efecto (aunque ya tuvieran uno, se renueva)
+      this.boosts.set(meta.userId, now + BOOST_TIME);
+      this.boosts.set(fm.userId, now + BOOST_TIME);
+      this.broadcast({ t: 'kiss', op: 'do', a: fm.id, b: meta.id });
+    }
   }
 
   async groupMessage(ws, meta, msg) {

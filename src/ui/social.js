@@ -1,5 +1,5 @@
 import { api } from '../net/api.js';
-import { ITEMS, FURNITURE, rarityOf } from '../../server/shared.js';
+import { ITEMS, FURNITURE, CONSUMABLES, rarityOf } from '../../server/shared.js';
 import { itemIcon } from './icons.js';
 import { toast } from './toast.js';
 import { guestGate } from './guest.js';
@@ -26,7 +26,7 @@ export function createSocial({ net, ui, me, room, onEquip, onDrop }) {
   }
 
   function card(it, { onClick, extraClass = '' } = {}) {
-    const def = ITEMS[it.type] ?? FURNITURE[it.type]; // prendas o muebles especiales
+    const def = ITEMS[it.type] ?? FURNITURE[it.type] ?? CONSUMABLES[it.type]; // prendas, muebles especiales o consumibles
     const b = document.createElement('button');
     b.className = `item ${it.equipped ? 'equipped' : ''} ${def?.rare || def?.special ? 'rare' : ''} r-${rarityOf(it.type)} ${extraClass}`;
     b.innerHTML = `${itemIcon(it.type, it.color)}<span></span>`;
@@ -44,7 +44,7 @@ export function createSocial({ net, ui, me, room, onEquip, onDrop }) {
       renderInventory();
     };
   }
-  const isFurniture = (it) => !ITEMS[it.type] && !!FURNITURE[it.type];
+  const isFurniture = (it) => !ITEMS[it.type] && !CONSUMABLES[it.type] && !!FURNITURE[it.type];
 
   function renderInventory() {
     const grid = $('inv-grid');
@@ -58,7 +58,9 @@ export function createSocial({ net, ui, me, room, onEquip, onDrop }) {
     for (const it of shown) {
       const c = card(it, {
         onClick: async () => {
-          if (!ITEMS[it.type]) return toast('Los muebles se ponen en tu sala, con "Editar sala".');
+          // Consumible: se toma (la sala controla que no tengas otro efecto activo)
+          if (CONSUMABLES[it.type]) { net.send({ t: 'consume', from: 'item', iid: it.iid }); ui.closeOverlays(); return; }
+          if (!ITEMS[it.type]) return toast('Los muebles se ponen en tu sala, con "Editar sala" (G).');
           const r = await api('equip', { method: 'POST', body: { iid: it.iid, on: !it.equipped } });
           if (!r.ok) return toast(r.error);
           items = r.items;
@@ -254,6 +256,11 @@ export function createSocial({ net, ui, me, room, onEquip, onDrop }) {
       if (me()?.guest) return guestGate('invitar a grupos de voz');
       if (player.guest) return toast(`${player.name} entró como invitado: los invitados no usan la voz.`);
       net.send({ t: 'group', op: 'invite', to: player.id });
+      ui.closeOverlays();
+    };
+    // Beso: le llega el pedido y acepta o rechaza (hay que estar cerca; la sala lo controla)
+    $('act-kiss').onclick = () => {
+      net.send({ t: 'kiss', op: 'ask', to: player.id });
       ui.closeOverlays();
     };
   }

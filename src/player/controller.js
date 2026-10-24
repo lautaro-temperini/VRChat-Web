@@ -323,7 +323,8 @@ export class PlayerController {
     } else {
       const wantsRun = this.keys.has('ShiftLeft') || this.keys.has('ShiftRight') || this.stick.length() > 0.92;
       const running = wantsRun && len > 0.3 && !this.exhausted && !this.crouched && this.stamina > 0;
-      if (running && this.grounded && this.vel.length() > WALK * 1.2) {
+      // Con el efecto de un consumible o un beso (boostUntil) la stamina no se gasta
+      if (running && this.grounded && this.vel.length() > WALK * 1.2 && performance.now() >= (this.boostUntil ?? 0)) {
         this.stamina = Math.max(0, this.stamina - dt / SPRINT_TIME);
         this.restDelay = REST_DELAY;
         if (this.stamina === 0) this.exhausted = true;

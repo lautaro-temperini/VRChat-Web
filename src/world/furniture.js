@@ -342,6 +342,36 @@ export function buildFurniture(piece, env = {}) {
       collide(0.6, 0.6, 0.8, { climb: false, noStand: true });
       break;
     }
+    // Muebles que reparten consumibles: E y te lo tomás en el momento
+    case 'barraTragos': {
+      rbox(2, 1.05, 0.7, mat({ roughness: 0.4 }), 0, 0.525, 0, 0.03);
+      rbox(2.2, 0.06, 0.85, new THREE.MeshStandardMaterial({ color: 0x111114, roughness: 0.1, metalness: 0.4 }), 0, 1.08, 0, 0.02);
+      cbox(2, 0.04, 0.04, neonMat(0xff4fd8), 0, 0.12, 0.36).castShadow = false;
+      // Botellas arriba de la barra
+      const glass = [0x2e7d32, 0xffb74d, 0x90caf9, 0xd81b60].map((c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.1, transparent: true, opacity: 0.85 }));
+      for (let i = 0; i < 4; i++) cyl(0.04, 0.045, 0.3, glass[i], -0.7 + i * 0.18, 1.26, -0.2, 12);
+      collide(2, 0.7, 1.1, { climb: false, noStand: true });
+      interact = { kind: 'dispense', gives: 'trago', prompt: 'Servirte un trago' };
+      break;
+    }
+    case 'minibar': {
+      rbox(0.6, 0.85, 0.6, mat({ roughness: 0.35, metalness: 0.3 }), 0, 0.425, 0, 0.04);
+      cbox(0.03, 0.4, 0.03, shared.steel, 0.24, 0.55, 0.31);
+      cbox(0.5, 0.01, 0.01, neonMat(0x19d3ff), 0, 0.82, 0.305).castShadow = false;
+      collide(0.6, 0.6, 0.85, { climb: false, noStand: true });
+      interact = { kind: 'dispense', gives: 'trago', prompt: 'Servirte un trago' };
+      break;
+    }
+    case 'cafetera': {
+      // Mesita con la cafetera arriba
+      rbox(0.6, 0.75, 0.5, tint(1.6, { roughness: 0.7 }), 0, 0.375, 0, 0.02);
+      rbox(0.3, 0.38, 0.28, mat({ roughness: 0.3, metalness: 0.6 }), 0, 0.94, -0.03, 0.03);
+      cyl(0.05, 0.045, 0.08, new THREE.MeshStandardMaterial({ color: 0xf4f4f4, roughness: 0.4 }), 0, 0.79, 0.08, 16);
+      cbox(0.22, 0.02, 0.02, neonMat(0xffb36b), 0, 1.1, 0.12).castShadow = false;
+      collide(0.6, 0.5, 0.75, { climb: false, noStand: true });
+      interact = { kind: 'dispense', gives: 'cafe', prompt: 'Servirte un café' };
+      break;
+    }
     default:
       cbox(0.5, 0.5, 0.5, mat(), 0, 0.25, 0);
   }

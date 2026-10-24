@@ -3,6 +3,8 @@
 // Muebles (editor de salas): un sillón
 const FURNITURE_PATH = '<path d="M5 10V7a3 3 0 013-3h8a3 3 0 013 3v3a2 2 0 00-2 2v1H7v-1a2 2 0 00-2-2z"/><path d="M3 12a2 2 0 014 0v3h10v-3a2 2 0 014 0v6h-2v2h-2v-2H7v2H5v-2H3z"/>';
 const ITEM_PATHS = {
+  trago: '<path d="M5 4h14l-6 8v6h3v2H8v-2h3v-6z"/><circle cx="16.5" cy="5.5" r="1.6"/>',
+  cafe: '<path d="M4 8h12v6a5 5 0 01-5 5H9a5 5 0 01-5-5z"/><path d="M16 9.5h1.5a2.5 2.5 0 010 5H16" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8 3c0 1.5 1 1.5 1 3M11 3c0 1.5 1 1.5 1 3" fill="none" stroke="currentColor" stroke-width="1.5"/>',
   cap: '<path d="M4 15c0-5 3.6-9 8-9s8 4 8 9z"/><path d="M12 15h9.5c.8 0 .8 2-1 2H12z"/>',
   beanie: '<path d="M5 15c0-5 3-9 7-9s7 4 7 9z"/><rect x="4" y="14" width="16" height="4" rx="2"/><circle cx="12" cy="4.5" r="2"/>',
   crown: '<path d="M3 18l1.5-10 4.5 4 3-6 3 6 4.5-4L21 18z"/>',

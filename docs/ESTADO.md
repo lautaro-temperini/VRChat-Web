@@ -94,15 +94,19 @@ Para volver a subir: `npm run deploy` desde la carpeta del proyecto.
   Museo o a salas `u-<id>` (las salas de prueba con otros nombres dan 404).
 
 ### Para programar, en este orden
-1. **Peinados de Hair 01** (necesita la PC del usuario con Blender): instalar el pack, mostrarle los 24 y sumar
+1. ✅ **Peinados de Hair 01** (necesita la PC del usuario con Blender): instalar el pack, mostrarle los 24 y sumar
    los elegidos a `HAIRS` en `build.py`, a `HAIR_STYLES` (shared.js) y `LOOK_OPTIONS` (avatar.js).
 2. ✅ **Accesorios** ajustados al cuerpo nuevo (`BODIES` en avatar.js; página de prueba local `devtest/avatar.html?body=fem&equip=cap,chain`, no se sube).
 3. ✅ **Recompensas con muebles**: accesorios y muebles especiales juntos, con repetidos.
-4. **Consumibles y beso** (decididos en ROADMAP, sin programar).
-5. **Diseños de artistas como objetos** y más mapas públicos (paso 5).
-6. **Seguridad, lo que quedó para decidir** (ver `docs/ramas/seguridad.md`): teletransporte (posiciones falsas)
+4. ✅ **Consumibles y beso**: barra del hall (E → Trago/Café), muebles que reparten (barra de tragos, minibar,
+   cafetera), consumibles en la Mochila, beso con pedido y aceptar. Servidor: `consumeMessage`/`kissMessage` en
+   `room.js`; gestos `drink`/`kiss` en avatar.js. Falta probarlo con dos personas reales.
+5. **Sonido de la pista del museo**: line arrays colgados, subs de piso, tweeters/frontfill y surround atrás
+   (todos suenan; los de piso se trepan).
+6. **Diseños de artistas como objetos** y más mapas públicos (paso 5).
+7. **Seguridad, lo que quedó para decidir** (ver `docs/ramas/seguridad.md`): teletransporte (posiciones falsas)
    y vencimiento de sesiones.
-7. Achicar animaciones para celular. **Primera prueba con gente real** (inauguración con 5–10 artistas).
+8. Achicar animaciones para celular. **Primera prueba con gente real** (inauguración con 5–10 artistas).
 
 ### Pendientes sueltos (consultar antes)
 Reportar, nombre y marca definitivos, AR, ajustes de cara en el avanzado.

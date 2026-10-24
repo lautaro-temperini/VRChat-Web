@@ -3,6 +3,7 @@
 import { RemotePlayer } from '../net/remote.js';
 import { session } from '../net/api.js';
 import { toast } from '../ui/toast.js';
+import { BOOST_TIME } from '../../server/shared.js';
 import { G, $, body } from './state.js';
 
 const { scene, world, ctrl, me, isTouch, room, net, remotes, rtc, groups, applyGroups, roomPanel, social, phone, progress, ground, roomEditor } = G;
@@ -156,6 +157,39 @@ net
     else if (m.op === 'left') G.system('Saliste del grupo de voz: volvés a escuchar a los que tenés cerca.');
     else if (m.op === 'gone') G.system(`${m.name} salió de tu grupo de voz.`);
     else if (m.op === 'kicked') G.system('Te sacaron del grupo de voz.');
+  })
+  // Alguien tomó algo (trago o café): se le ve el vaso; si fui yo, 2 minutos sin gastar stamina
+  .on('consume', ({ id, kind }) => {
+    if (id === net.id) {
+      me.drink(kind);
+      ctrl.boostUntil = performance.now() + BOOST_TIME;
+      toast(`${kind === 'cafe' ? '☕ Café' : '🍹 Trago'}: por 2 minutos no te cansás.`);
+    } else remotes.get(id)?.avatar.drink(kind);
+  })
+  .on('inventory-changed', () => social.loadInventory())
+  // Beso: pedido (aceptar / rechazar), aviso de enviado y el beso en sí (los dos se inclinan)
+  .on('kiss', (m) => {
+    if (m.op === 'sent') toast(`Le pediste un beso a ${m.name}.`);
+    else if (m.op === 'ask') {
+      toast(`${m.name} te quiere dar un beso.`, { actions: [
+        { label: 'Aceptar', yes: true, onClick: () => net.send({ t: 'kiss', op: 'respond', from: m.from, accept: true }) },
+        { label: 'Rechazar', onClick: () => net.send({ t: 'kiss', op: 'respond', from: m.from, accept: false }) },
+      ], time: 60_000 });
+    } else if (m.op === 'do') {
+      const mine = m.a === net.id ? m.b : m.b === net.id ? m.a : null;
+      for (const id of [m.a, m.b]) (id === net.id ? me : remotes.get(id)?.avatar)?.kiss();
+      if (mine) {
+        // Me giro hacia el otro y recibo el efecto
+        const other = remotes.get(mine);
+        if (other) {
+          const d = other.avatar.root.position.clone().sub(ctrl.pos);
+          ctrl.yaw = Math.atan2(-d.x, -d.z);
+          ctrl.bodyYaw = ctrl.yaw + Math.PI; // el cuerpo también (en 3ª persona no sigue a la cámara)
+        }
+        ctrl.boostUntil = performance.now() + BOOST_TIME;
+        toast('💋 Por 2 minutos no te cansás.');
+      }
+    }
   })
   .on('screen', (m) => {
     if (m.busy) return toast(`Ya está compartiendo ${remotes.get(m.id)?.name ?? 'otra persona'}. Esperá a que termine.`);

@@ -1,5 +1,5 @@
 import { DurableObject } from 'cloudflare:workers';
-import { cleanName, cleanLook, isImage, ITEMS, STARTER_ITEMS, FURNITURE, SPECIAL_FURNITURE } from './shared.js';
+import { cleanName, cleanLook, isImage, ITEMS, STARTER_ITEMS, FURNITURE, SPECIAL_FURNITURE, CONSUMABLES } from './shared.js';
 import { setupWorks, worksMethods } from './works.js';
 import { setupMessages, messagesMethods } from './messages.js';
 import { setupProgress, progressMethods } from './progress.js';
@@ -990,20 +990,31 @@ export class Accounts extends DurableObject {
     return { ok: !this.shields(toId, fromId) };
   }
 
-  async groupInviteCheck(fromId, toId) {
+  // kind: '' = invitación a grupo, 'kiss' = pedido de beso (cada uno lleva su propia cuenta de rechazos)
+  async groupInviteCheck(fromId, toId, kind = '') {
     if (this.shields(toId, fromId)) return { ok: false };
-    const r = this.sql.exec('SELECT until FROM group_rejects WHERE from_id = ? AND to_id = ?', fromId, toId).toArray()[0];
+    const key = kind ? `${kind}:${toId}` : toId;
+    const r = this.sql.exec('SELECT until FROM group_rejects WHERE from_id = ? AND to_id = ?', fromId, key).toArray()[0];
     return { ok: !r || r.until <= Date.now() };
   }
 
-  async groupRejected(fromId, toId) {
+  async groupRejected(fromId, toId, kind = '') {
     const now = Date.now();
     const day = argDay(now);
-    const r = this.sql.exec('SELECT day, count FROM group_rejects WHERE from_id = ? AND to_id = ?', fromId, toId).toArray()[0];
+    const key = kind ? `${kind}:${toId}` : toId;
+    const r = this.sql.exec('SELECT day, count FROM group_rejects WHERE from_id = ? AND to_id = ?', fromId, key).toArray()[0];
     const count = r && r.day === day ? r.count + 1 : 1;
     const until = count === 1 ? now + 60_000 : count === 2 ? now + 10 * 60_000 : argMidnight(day);
-    this.sql.exec('INSERT OR REPLACE INTO group_rejects (from_id, to_id, day, count, until) VALUES (?, ?, ?, ?, ?)', fromId, toId, day, count, until);
+    this.sql.exec('INSERT OR REPLACE INTO group_rejects (from_id, to_id, day, count, until) VALUES (?, ?, ?, ?, ?)', fromId, key, day, count, until);
     return { ok: true };
+  }
+
+  // Tomar un consumible de la mochila: se gasta. Devuelve qué era (trago / cafe)
+  async useConsumable(userId, iid) {
+    const item = this.sql.exec('SELECT * FROM items WHERE iid = ? AND owner_id = ?', String(iid ?? ''), userId).toArray()[0];
+    if (!item || !CONSUMABLES[item.type]) return { ok: false, error: 'Eso no se puede tomar.' };
+    this.sql.exec('DELETE FROM items WHERE iid = ?', item.iid);
+    return { ok: true, kind: item.type };
   }
 
   // ---------- Reportes: llegan a los admins (contenido ilegal, robo de obras, acoso…) ----------

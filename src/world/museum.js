@@ -563,7 +563,8 @@ export function buildMuseum(scene, renderer, quality) {
   // ---------- Barra (sur del hall) con banquetas ----------
   {
     const x0 = -24, x1 = -15, cx = (x0 + x1) / 2, w = x1 - x0;
-    box(w, 1.05, 0.7, cx, 0.525, 9.7, woodMat, { collide: true, block: true, climb: false, round: 0.03 });
+    const counter = box(w, 1.05, 0.7, cx, 0.525, 9.7, woodMat, { collide: true, block: true, climb: false, round: 0.03 });
+    interactive(counter, { kind: 'bar', prompt: 'Pedir algo' }); // E → trago o café
     box(w + 0.2, 0.06, 0.9, cx, 1.08, 9.65, new THREE.MeshStandardMaterial({ color: 0x1a1a1c, roughness: 0.15, metalness: 0.3 }), { round: 0.02 });
     box(w, 0.04, 0.04, cx, 0.12, 9.33, neon(0xff9a3d), { cast: false });
     // Estantes con botellas contra la pared

@@ -201,6 +201,26 @@ function phoneMesh() {
   return g;
 }
 
+// Vaso (trago) o taza (café) en la mano derecha; como el celular, el largo va a lo largo de Z en pose T,
+// así al doblar el brazo queda parado frente a la boca
+function cupMesh() {
+  const g = new THREE.Group();
+  const glass = new THREE.Group();
+  const liquid = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.024, 0.09, 16), new THREE.MeshStandardMaterial({ color: 0xff7a3d, roughness: 0.2, transparent: true, opacity: 0.9 }));
+  const rim = new THREE.Mesh(new THREE.CylinderGeometry(0.034, 0.027, 0.11, 16, 1, true), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.05, transparent: true, opacity: 0.3 }));
+  glass.add(liquid, rim);
+  const mug = new THREE.Group();
+  const white = new THREE.MeshStandardMaterial({ color: 0xf4f4f4, roughness: 0.4 });
+  mug.add(new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.032, 0.08, 18), white));
+  const handle = new THREE.Mesh(new THREE.TorusGeometry(0.02, 0.006, 8, 16), white);
+  handle.position.x = 0.038;
+  mug.add(handle);
+  for (const c of [glass, mug]) c.rotation.x = Math.PI / 2;
+  g.add(glass, mug);
+  g.userData = { glass, mug };
+  return g;
+}
+
 // Gestos hechos por código: aplaudir (no hay animación) y los demás mientras cargan las animaciones.
 // Devuelven ángulos de los brazos [derecho, izquierdo] y del cuerpo, con la misma convención de update().
 const GESTURES = {
@@ -342,6 +362,13 @@ export class Avatar {
     model.phone = rig.holder('hand_r', [hand.x - 0.06, hand.y - 0.035, hand.z]);
     model.phone.add(phoneMesh());
     model.phone.visible = false;
+    model.cup = rig.holder('hand_r', [hand.x - 0.06, hand.y - 0.02, hand.z + 0.02]);
+    // Medido con la pose de tomar (applyDrink): así el vaso queda parado frente a la boca
+    const cup = cupMesh();
+    cup.position.set(0.043, 0.111, -0.121);
+    cup.rotation.set(-1.953, -0.839, -1.167);
+    model.cup.add(cup);
+    model.cup.visible = false;
     this.model = model;
     // Animaciones: hasta que cargan, el personaje se mueve con la animación hecha por código
     locomotionClips(type, rig).then((clips) => {
@@ -536,9 +563,51 @@ export class Avatar {
     else this.applyPose(J, am);
     // Celular: pisa el brazo derecho y baja un poco la cabeza (también caminando)
     this.phoneW = damp(this.phoneW, this.phone ? 1 : 0, 8, dt);
+    // Tomando algo (unos segundos, con sorbos) y beso (inclinarse hacia el otro)
+    this.drinkT = Math.max(0, (this.drinkT ?? 0) - dt);
+    this.kissT = Math.max(0, (this.kissT ?? 0) - dt);
+    this.drinkW = damp(this.drinkW ?? 0, this.drinkT > 0 ? 1 : 0, 8, dt);
+    this.kissW = damp(this.kissW ?? 0, this.kissT > 0 ? 1 : 0, 6, dt);
     if (this.model) {
-      this.model.phone.visible = this.phoneW > 0.35;
-      if (this.phoneW > 0.001) this.applyPhone(this.phoneW);
+      this.model.phone.visible = this.phoneW > 0.35 && this.drinkW < 0.35;
+      if (this.phoneW > 0.001 && this.drinkW < 0.5) this.applyPhone(this.phoneW);
+      this.model.cup.visible = this.drinkW > 0.35;
+      if (this.drinkW > 0.001) this.applyDrink(this.drinkW, 0.5 + 0.5 * Math.sin(this.time * 2.4));
+      if (this.kissW > 0.001) this.applyKiss(this.kissW);
+    }
+  }
+
+  // Tomar un trago ('trago') o un café ('cafe'): el vaso o la taza en la mano unos segundos
+  drink(kind) {
+    this.drinkT = 4;
+    const cup = this.model?.cup.children[0];
+    if (cup) { cup.userData.glass.visible = kind !== 'cafe'; cup.userData.mug.visible = kind === 'cafe'; }
+    this.drinkKind = kind;
+  }
+
+  // Beso corto (el que llama gira al personaje hacia el otro)
+  kiss() { this.kissT = 2.2; }
+
+  // Brazo derecho llevando el vaso a la boca; sip 0..1 = cuánto lo levanta
+  applyDrink(w, sip) {
+    const R = this.model.rig;
+    const names = ['upperarm_r', 'lowerarm_r', 'neck_01'];
+    const saved = names.map((n) => R.bones[n].bone.quaternion.clone());
+    const side = -1; // derecho
+    R.set('upperarm_r', _q2.setFromEuler(_e.set(-1.05 - 0.2 * sip, 0.95, 0.32)).multiply(ARM_DOWN[side]));
+    R.set('lowerarm_r', _q3.copy(ARM_DOWN_INV[side]).multiply(qx(-2.45 - 0.2 * sip)).multiply(ARM_DOWN[side]));
+    R.euler('neck_01', -0.12 * sip, 0, 0);
+    names.forEach((n, k) => { const b = R.bones[n].bone; b.quaternion.copy(saved[k].slerp(b.quaternion, w)); });
+  }
+
+  // Inclinarse hacia adelante y estirar el cuello (el beso)
+  applyKiss(w) {
+    const R = this.model.rig;
+    for (const [n, a] of [['spine_02', 0.18], ['spine_03', 0.12], ['neck_01', 0.22]]) {
+      const b = R.bones[n].bone;
+      const saved = b.quaternion.clone();
+      R.euler(n, a, 0, 0);
+      b.quaternion.copy(saved.slerp(b.quaternion, w));
     }
   }
 

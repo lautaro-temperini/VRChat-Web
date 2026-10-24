@@ -147,7 +147,7 @@ export function buildPersonalRoom(scene, renderer, quality) {
     e.blockers = [];
     if (built.parts.block) holder.traverse((o) => { if (o.isMesh) e.blockers.push(o); });
     const seats = built.seats.map((st) => { const p = toWorld(e, st.x, st.z); return { x: p.x, y: st.y, z: p.z, yaw: st.yaw + piece.r }; });
-    e.item = built.interact ? { object: holder, ...built.interact, seats } : (e.photoItem ?? null);
+    e.item = built.interact ? { object: holder, ...built.interact, seats, piece: piece.id } : (e.photoItem ?? null);
     if (piece.type === 'cuadro') applyPhoto(e);
     if (piece.type === 'cabina') applyBooth(e);
     if (piece.type === 'consola') applyArtists(e);
