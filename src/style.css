@@ -432,12 +432,14 @@ body.roompanel #roompanel, body.mundi #mundi, body.kicked #kicked, body.controls
 .item { padding-bottom: 22px; }
 /* ---------- Celular (red social) ---------- */
 .phone {
-  position: fixed; right: 18px; bottom: 18px; z-index: 10; display: none; flex-direction: column;
-  width: min(360px, calc(100vw - 24px)); height: min(680px, calc(100vh - 90px));
+  /* Arriba de los botones de abajo a la derecha (Inventario, Amigos, Mapa), así no los tapa */
+  position: fixed; right: 18px; bottom: 64px; z-index: 10; display: none; flex-direction: column;
+  width: min(360px, calc(100vw - 24px)); height: min(680px, calc(100vh - 136px));
   border-radius: 38px; padding: 12px 10px 10px; background: #0c0a14;
   border: 3px solid #2b2840; box-shadow: 0 0 0 2px #05040a, 0 30px 70px rgba(0, 0, 0, 0.6);
   animation: phone-up .28s cubic-bezier(.2, .9, .3, 1.2);
 }
+body.touch .phone { bottom: 18px; height: min(680px, calc(100vh - 90px)); } /* en táctil esos botones van arriba */
 @keyframes phone-up { from { transform: translateY(40px) rotate(4deg); opacity: 0; } }
 .phone-status { display: flex; justify-content: space-between; align-items: center; padding: 2px 16px 8px; font: 800 12px var(--font); color: #fff; }
 .phone-notch { width: 86px; height: 20px; border-radius: 12px; background: #000; }
