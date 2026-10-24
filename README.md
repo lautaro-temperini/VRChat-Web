@@ -29,7 +29,7 @@ npm run dev
 | Museo | Hall con barra, baño y esculturas; pista con balcón en U, escenario, cabina de DJ, consola de artistas y una pantalla gigante |
 | DJ y artistas | El DJ pasa el audio de su PC por los parlantes del escenario; las luces laten con los graves. Artistas: luces por OSC (TouchDesigner, Ableton…) y visuales en la pantalla |
 | Día y noche | Según la hora de Argentina (GMT-3) |
-| Personaje | Modelo Quaternius con editor (piel, ojos, pelo, ropa, altura, contextura), animaciones de Mixamo y gestos/bailes |
+| Personaje | Modelo MakeHuman con editor (piel, ojos, 8 peinados, barbas, ropa, altura, peso y músculo), animaciones de Mixamo y gestos/bailes |
 | Movimiento | Caminar, trotar (gasta stamina), saltar, trepar, agacharse, sentarse; 1ª/3ª persona con la rueda; manos en 1ª persona |
 | Cuentas | Registro con mail + nickname único (PBKDF2), o con Google o Discord. Invitados (sin cuenta) solo para probar: miran, chatean por texto y escuchan voces públicas; lo demás aparece con candado 🔒 |
 | Red social | Celular del personaje: amigos y buscador, muro (notas y fotos de amigos + destacados, me gusta), galería y avisos. Atril con notas y corazones en cada sala personal |
@@ -122,7 +122,8 @@ arranca vacía: creá tu cuenta ahí, poné su ID en `ADMIN_IDS` y volvé a corr
 
 ## Créditos
 
-- Personajes base, peinados y animaciones básicas: [Quaternius](https://quaternius.itch.io/), licencia CC0.
+- Personajes (cuerpos, peinados, barbas): [MakeHuman](https://static.makehumancommunity.org/) (assets CC0), armados con MPFB 2 en Blender.
+- Animaciones básicas: [Quaternius](https://quaternius.itch.io/), licencia CC0.
 - Animaciones de movimiento, gestos y bailes: [Mixamo](https://www.mixamo.com/) (Adobe).
 - Three.js, Vite, Cloudflare Workers.
 
