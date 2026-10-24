@@ -685,7 +685,7 @@ const social = createSocial({
 $('btn-inv').onclick = () => (body.classList.contains('inventory') ? closeOverlays() : social.openInventory());
 
 // Celular (la red social): inicio = amigos. Mientras está abierto, el personaje lo tiene en la mano.
-const phone = createPhone({ social, me: () => account, go: (target) => social.go(target) });
+const phone = createPhone({ social, me: () => account, go: (target) => social.go(target), room });
 sendPhone = (v) => { if (net.ready) net.send({ t: 'phone', v }); };
 async function openPhone() {
   await social.openFriends();
@@ -875,6 +875,7 @@ net
   .on('sfu-cut', ({ mids }) => rtc.cut(mids))
   .on('pub', ({ id, kind }) => { const r = remotes.get(id); if (r && kind === 'voice') r.hasVoice = true; })
   .on('groups', ({ groups: g }) => { groups.all = g ?? {}; applyGroups(); })
+  .on('dm', (m) => phone.onDM(m))
   .on('group', (m) => {
     if (m.op === 'sent') toast(`Invitaste a ${m.name} a tu grupo de voz.`);
     else if (m.op === 'invite') {

@@ -614,7 +614,8 @@ export class Avatar {
     }
     // Inclinarse en las curvas y el golpe al aterrizar (la raíz no la mueven las animaciones)
     const root = R.bones.root;
-    root.bone.position.copy(root.restPos).add(_v.set(0, Math.min(J.y, 0) * 0.5, 0).applyQuaternion(root.parentInv));
+    // (la animación de sentarse ya trae su altura: no se resta la bajada de la pose hecha por código)
+    root.bone.position.copy(root.restPos).add(_v.set(0, Math.min(J.y + 0.42 * w.sit, 0) * 0.5, 0).applyQuaternion(root.parentInv));
     R.euler('root', 0, 0, J.tilt);
 
     // Agachado y en el aire: la pose hecha por código, mezclada encima según cuánto pesa

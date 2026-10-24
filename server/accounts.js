@@ -1,6 +1,7 @@
 import { DurableObject } from 'cloudflare:workers';
 import { cleanName, cleanLook, ITEMS, STARTER_ITEMS, FURNITURE, SPECIAL_FURNITURE } from './shared.js';
 import { setupWorks, worksMethods } from './works.js';
+import { setupMessages, messagesMethods } from './messages.js';
 import { setupProgress, progressMethods } from './progress.js';
 import { accountsEditorMethods } from './editor.js';
 
@@ -152,6 +153,7 @@ export class Accounts extends DurableObject {
       );
     `);
     setupWorks(this.sql); // Museo rotativo (works.js)
+    setupMessages(this.sql); // Mensajes entre amigos (messages.js)
     setupProgress(this.sql); // Progresión (progress.js)
   }
 
@@ -950,6 +952,8 @@ export class Accounts extends DurableObject {
 
 // Museo rotativo: postular, revisar, rotar (server/works.js)
 Object.assign(Accounts.prototype, worksMethods);
+// Mensajes entre amigos (server/messages.js)
+Object.assign(Accounts.prototype, messagesMethods);
 // Progresión: puntos, niveles, insignias y misiones (server/progress.js)
 Object.assign(Accounts.prototype, progressMethods);
 

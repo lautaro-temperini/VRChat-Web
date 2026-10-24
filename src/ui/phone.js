@@ -2,6 +2,7 @@ import { api, photoUrl } from '../net/api.js';
 import { renderGallery, openPhoto } from './gallery.js';
 import { toast } from './toast.js';
 import { guestGate, lock } from './guest.js';
+import { createMessages } from './messages.js';
 
 // El celular del jugador: la red social. Inicio = Amigos (conectados + buscador).
 // Apps: Muro (tipo Facebook: lo tuyo y de amigos, después "Destacados"; tus notas también
@@ -29,11 +30,11 @@ function ago(ts) {
   return new Date(ts).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' });
 }
 
-export function createPhone({ social, me, go }) {
+export function createPhone({ social, me, go, room }) {
   let app = 'amigos';
 
   // ---------- Apps ----------
-  function show(name) {
+  function show(name, { keep = false } = {}) {
     app = name;
     for (const s of document.querySelectorAll('#friends .app')) s.hidden = s.dataset.app !== name;
     for (const b of document.querySelectorAll('.phone-dock [data-app]')) b.classList.toggle('on', b.dataset.app === name);
@@ -47,6 +48,7 @@ export function createPhone({ social, me, go }) {
     }
     if (name === 'avisos') renderNotifications(true);
     if (name === 'amigos') social.refreshFriends();
+    if (name === 'mensajes' && !keep) messages.renderList();
   }
   for (const b of document.querySelectorAll('.phone-dock [data-app]')) b.onclick = () => show(b.dataset.app);
 
@@ -201,15 +203,28 @@ export function createPhone({ social, me, go }) {
   };
   $('mynotes-input').oninput = (e) => { $('mynotes-count').textContent = `${e.target.value.length}/${e.target.maxLength}`; };
 
+  // ---------- Mensajes entre amigos (ui/messages.js) ----------
+  const isOpen = () => document.body.classList.contains('friends');
+  const messages = createMessages({
+    me, room, go, isOpen, roomLabel: (r) => social.roomLabel(r),
+    // Abre el celular si estaba guardado y muestra la app (sin recargar la lista)
+    showApp: (name) => { if (!isOpen()) social.openFriends(); show(name, { keep: true }); },
+    onCount: (n) => { counts.dm = n; paintBadges(); },
+  });
+  social.setWriter((id) => messages.openChat(id));
+
   // ---------- Avisos ----------
-  function setBadge(n) {
-    for (const id of ['notif-count', 'friends-count']) {
+  // El botón Amigos suma avisos sin ver + mensajes sin leer
+  const counts = { notif: 0, dm: 0 };
+  function paintBadges() {
+    for (const [id, n] of [['notif-count', counts.notif], ['friends-count', counts.notif + counts.dm]]) {
       const el = $(id);
       if (!el) continue;
       el.hidden = !n;
       el.textContent = n;
     }
   }
+  function setBadge(n) { counts.notif = n; paintBadges(); }
   async function renderNotifications(markSeen = false) {
     const r = await api('notifications');
     if (!r.ok) return;
@@ -233,6 +248,7 @@ export function createPhone({ social, me, go }) {
 
   return {
     open() { show(app); },
-    refreshBadge: () => renderNotifications(false),
+    refreshBadge: () => { renderNotifications(false); if (me() && !me().guest) messages.refreshCount(); },
+    onDM: (m) => messages.onMessage(m),
   };
 }

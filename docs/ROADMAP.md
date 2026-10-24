@@ -211,6 +211,8 @@ La música del DJ y el puente OSC ya están hechos. Falta:
 | Museo rotativo: escasez | Sin cambios por ahora (todavía no hay tanta gente). Que una persona ocupe varios lugares el mismo día está bien: da coherencia temática |
 | Balcón: barandas | El vidrio del balcón se salta: pegado al vidrio y mirándolo, Espacio. Animación hecha por código (salto de costado apoyando una mano); al caer, aterrizaje normal. El salto común ya no lo pasa |
 | Objetos del piso: alcance | Se sueltan y se juntan hasta 3 m (como la E). Si se arrastra más lejos, cae a 3 m en esa dirección. El servidor lo controla |
+| Mensajes entre amigos | Chat 1 a 1 en la app **Mensajes** del celular, con historial (los últimos 50 por conversación). Si el amigo está desconectado, le queda guardado. Aviso en pantalla con "Responder" y contador en el botón Amigos. En el chat se ve dónde está y un botón **Ir allá** |
+| Mensajes: límites | Solo entre amigos; hasta 200 caracteres; mismo antiflood que el chat de la sala. Si te ignoró o te restringió, no le llega (y no se entera) |
 | Escaleras: costados | El vidrio de la escalera es barrera: no se atraviesa ni se salta |
 | Progresión | Niveles por puntos (**privados**, solo los ve uno) + insignias por logros (**públicas**, se ven en el perfil) |
 | Progresión: qué suma | Descubrir (ver obras, visitar salas), exponer (obras aceptadas), curar (verificar/denegar) y asistir a eventos (sets de DJ, inauguraciones, pasar música o luces). Cada cosa da puntos **una sola vez** (la misma obra o sala no suma dos veces) |

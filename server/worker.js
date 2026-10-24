@@ -151,6 +151,9 @@ async function api(request, env, path) {
     case 'POST favorite': result = await accounts.setFavorite(token, body.room, !!body.on); break;
     case 'GET search': result = await accounts.search(token, q.get('q')); break;
     case 'GET notifications': result = await accounts.notifications(token); break;
+    case 'GET dms': result = await accounts.dmList(token); break;
+    case 'GET dm': result = await accounts.dmThread(token, q.get('id')); break;
+    case 'POST dm': result = await accounts.dmSend(token, body.to, body.text); break;
     case 'POST notificationsseen': result = await accounts.notificationsSeen(token); break;
     case 'GET museum': result = await accounts.museumNow(); break;
     case 'GET myworks': result = await accounts.myWorks(token); break;

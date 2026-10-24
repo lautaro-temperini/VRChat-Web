@@ -705,6 +705,13 @@ export class Room extends DurableObject {
   // Anti-acoso (en la cuenta): si rechazás, esa persona no te puede reinvitar por un tiempo
   // que crece, y quien está ignorado o restringido no te puede invitar (no se entera).
 
+  // Mensaje para alguien de esta sala que manda Accounts (p. ej. un mensaje privado de un amigo)
+  async pushToUser(userId, data) {
+    const ws = this.connOfUser(String(userId));
+    if (ws) this.send(ws, data);
+    return !!ws;
+  }
+
   connOfUser(userId) {
     return this.joined().find((ws) => ws.deserializeAttachment().userId === userId) ?? null;
   }
