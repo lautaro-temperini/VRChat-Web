@@ -122,9 +122,19 @@ function renderAccount() {
   el.append(text, btn);
 }
 
-// ---------- Editor de personaje (capa 1) ----------
-const GROUPS = [
-  ['body', 'Cuerpo'], ['skin', 'Piel'], ['eyes', 'Ojos'], ['hairStyle', 'Peinado'], ['beard', 'Barba'], ['hair', 'Color de pelo'],
+// ---------- Editor de personaje ----------
+// Básico (para los que recién empiezan): una sola fila por cosa; los colores son unas pocas muestras y el
+// último botón abre el selector RGB. Avanzado: todos los tipos que existan (cada modelo nuevo de peinado,
+// barba o prenda que se sume a LOOK_OPTIONS aparece solo acá), color de ojos, paleta completa y deslizadores.
+const BASIC_HAIR = ['corto', 'largo', 'rapado', 'rulos', 'coleta', 'trenza']; // peinados principales
+const BASIC_COLORS = 5; // muestras por fila de color en el básico (más el RGB)
+const BASIC = [
+  ['body', 'Cuerpo'], ['bodyType', 'Tipo de cuerpo'], ['skin', 'Piel'], ['hairStyle', 'Peinado'], ['hair', 'Color de pelo'],
+  ['beard', 'Barba'], ['top', 'Arriba'], ['shirt', 'Color de arriba'], ['bottom', 'Abajo'], ['pants', 'Color de abajo'],
+  ['feet', 'Calzado'], ['shoes', 'Color del calzado'],
+];
+const ADVANCED = [
+  ['hairStyle', 'Peinado'], ['hair', 'Color de pelo'], ['beardStyle', 'Tipo de barba'], ['eyes', 'Color de ojos'], ['skin', 'Piel'],
   ['top', 'Arriba'], ['shirt', 'Color de arriba'], ['bottom', 'Abajo'], ['pants', 'Color de abajo'],
   ['feet', 'Calzado'], ['shoes', 'Color del calzado'],
 ];
@@ -135,7 +145,8 @@ const CHIP_LABELS = {
 };
 // Tipo de cuerpo del básico: el que coincide con los deslizadores del avanzado (si no, ninguno)
 const bodyTypeOf = (L) => Object.keys(BODY_TYPES).find((k) => Math.abs(BODY_TYPES[k].weight - L.weight) < 0.005 && Math.abs(BODY_TYPES[k].muscle - L.muscle) < 0.005);
-function swatchGroup(title, values, isSel, label, pick) {
+// Una fila: título + botones (chips de texto o muestras de color). rerender: cómo redibujar al elegir.
+function swatchGroup(title, values, isSel, label, pick, rerender = renderSwatches) {
   const group = document.createElement('div');
   group.className = 'group';
   group.innerHTML = `<h2>${title}</h2>`;
@@ -146,51 +157,63 @@ function swatchGroup(title, values, isSel, label, pick) {
     if (String(value).startsWith('#')) { b.className = 'swatch'; b.style.background = value; b.title = value; }
     else { b.className = 'chip'; b.textContent = label(value); }
     if (isSel(value)) b.classList.add('sel');
-    b.onclick = () => { pick(value); renderSwatches(); };
+    b.onclick = () => { pick(value); rerender(); };
     row.append(b);
   }
   group.append(row);
   return group;
 }
+// Fila de color: las muestras y, al final, un botón que abre el selector RGB debajo (uno abierto a la vez)
+let openRgb = null;
+function colorGroup(key, title, palette, rerender) {
+  const cur = look[key];
+  const values = palette.includes(cur) ? palette : [cur, ...palette]; // un color propio se ve primero, marcado
+  const group = swatchGroup(title, values, (v) => v === cur, String, (v) => setLook({ ...look, [key]: v }), rerender);
+  const rgb = document.createElement('button');
+  rgb.className = `swatch rgb-btn${openRgb === key ? ' sel' : ''}`;
+  rgb.title = 'Elegir cualquier color';
+  rgb.textContent = '+';
+  rgb.onclick = () => { openRgb = openRgb === key ? null : key; rerender(); };
+  group.querySelector('.swatches').append(rgb);
+  if (openRgb === key) group.append(colorPicker(cur, (hex) => { setLook({ ...look, [key]: hex }); group.querySelector('.swatch.sel').style.background = hex; }));
+  return group;
+}
+const selected = (key) => (v) => (key in outfitOf(look) ? outfitOf(look)[key] : look[key]) === v;
+const labelOf = (v) => CHIP_LABELS[v] ?? v;
+const pickKey = (key) => (v) => setLook({ ...look, [key]: v });
+
 function renderSwatches() {
   const root = $('swatches');
   root.innerHTML = '';
-  for (const [key, title] of GROUPS) {
-    // Un color elegido en el avanzado que no está entre las muestras se ve primero, marcado
-    const values = String(look[key]).startsWith('#') && !LOOK_OPTIONS[key].includes(look[key]) ? [look[key], ...LOOK_OPTIONS[key]] : LOOK_OPTIONS[key];
-    root.append(swatchGroup(title, values, (v) => (key in outfitOf(look) ? outfitOf(look)[key] : look[key]) === v, (v) => CHIP_LABELS[v] ?? v, (v) => setLook({ ...look, [key]: v })));
-    // Con barba: aparece el tipo (por defecto, completa corta)
-    if (key === 'beard' && look.beard) {
-      root.append(swatchGroup('Tipo de barba', LOOK_OPTIONS.beardStyle, (v) => (look.beardStyle ?? 'completa') === v, (v) => CHIP_LABELS[v] ?? v,
-        (v) => setLook({ ...look, beardStyle: v })));
-    }
-    if (key === 'body') {
+  for (const [key, title] of BASIC) {
+    if (key === 'bodyType') {
       const type = bodyTypeOf(look);
-      root.append(swatchGroup('Tipo de cuerpo', Object.keys(BODY_TYPES), (v) => v === type, (v) => BODY_TYPES[v].name,
+      root.append(swatchGroup(title, Object.keys(BODY_TYPES), (v) => v === type, (v) => BODY_TYPES[v].name,
         (v) => setLook({ ...look, weight: BODY_TYPES[v].weight, muscle: BODY_TYPES[v].muscle })));
+    } else if (String(DEFAULT_LOOK[key]).startsWith('#')) {
+      root.append(colorGroup(key, title, LOOK_OPTIONS[key].slice(0, BASIC_COLORS), renderSwatches));
+    } else {
+      // Peinado: los principales (y el elegido en el avanzado, si es otro)
+      const values = key === 'hairStyle' && !BASIC_HAIR.includes(look.hairStyle) && LOOK_OPTIONS.hairStyle.includes(look.hairStyle)
+        ? [...BASIC_HAIR, look.hairStyle] : key === 'hairStyle' ? BASIC_HAIR : LOOK_OPTIONS[key];
+      root.append(swatchGroup(title, values, selected(key), labelOf, pickKey(key)));
     }
   }
 }
-// Avanzado: selector RGB completo por color (uno abierto a la vez)
-let openRgb = null;
 function renderAdvanced() {
   $('weight').value = look.weight;
   $('muscle').value = look.muscle;
   const root = $('rgb-colors');
   root.innerHTML = '';
-  for (const [key, title] of GROUPS) {
-    if (!String(look[key]).startsWith('#')) continue;
-    const row = document.createElement('button');
-    row.className = 'rgb-row';
-    row.innerHTML = `<span class="swatch" style="background:${look[key]}"></span>${title}<code>${look[key]}</code>`;
-    row.onclick = () => { openRgb = openRgb === key ? null : key; renderAdvanced(); };
-    root.append(row);
-    if (openRgb === key) {
-      root.append(colorPicker(look[key], (hex) => {
-        setLook({ ...look, [key]: hex });
-        row.firstElementChild.style.background = hex;
-        row.lastElementChild.textContent = hex;
-      }));
+  for (const [key, title] of ADVANCED) {
+    if (key === 'beardStyle') {
+      // Barba: sin barba o cualquiera de los tipos
+      root.append(swatchGroup('Barba', [false, ...LOOK_OPTIONS.beardStyle], (v) => (v === false ? !look.beard : look.beard && (look.beardStyle ?? 'completa') === v),
+        (v) => (v === false ? CHIP_LABELS.false : labelOf(v)), (v) => setLook(v === false ? { ...look, beard: false } : { ...look, beard: true, beardStyle: v }), renderAdvanced));
+    } else if (String(DEFAULT_LOOK[key]).startsWith('#')) {
+      root.append(colorGroup(key, title, LOOK_OPTIONS[key], renderAdvanced));
+    } else {
+      root.append(swatchGroup(title, LOOK_OPTIONS[key], selected(key), labelOf, pickKey(key), renderAdvanced));
     }
   }
 }

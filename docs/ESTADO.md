@@ -78,30 +78,32 @@ Para volver a subir: `npm run deploy` desde la carpeta del proyecto.
 - ✅ **Personaje MakeHuman** (online): cuerpos masc/fem con 8 formas de peso y músculo (bilineal, como
   MakeHuman), 8 peinados (corto, flequillo, largo, rapado, rulos, coleta, trenza, bob; rodete → trenza) y
   barba con tipo (completa corta, tupida, candado, bigote). Quaternius borrado del repo.
-- ✅ **Ropa con volumen** (en `main`, **todavía sin `npm run deploy`**): 11 prendas (arriba: remera, manga
+- ✅ **Ropa con volumen** (online): 11 prendas (arriba: remera, manga
   larga, camisa, campera; abajo: jean, short, calza, pollera; pies: zapatillas, botas, zapatos), teñidas
   conservando el dibujo, piel tapada escondida (`_cover`/`uHide`), medias siempre blancas.
 - Todo se genera en Blender con `assets-src/makehuman/build.py` + `export.py` (`GENDER = 'masc'|'fem'`); los
   `.blend` de trabajo también están ahí. **Solo se puede regenerar en la PC del usuario** (Blender + MPFB 2 +
   MCP de Blender; `.mcp.json` local, fuera de git). Packs instalados en MPFB: sistema, Bodyparts 05, Shoes 01.
-- **Hair 01** (217 MB, CC0) se estaba bajando a `Descargas\makehuman\hair01_cc0.zip`: falta instalarlo en MPFB
-  (`Install pack from zip`) y elegir con el usuario cuáles de sus 24 peinados se suman.
+- **Hair 01** (228 MB, CC0) ya está bajado en `Descargas\makehuman\hair01_cc0.zip`: falta instalarlo en MPFB
+  (`Install pack from zip`) y elegir con el usuario cuáles de sus 25 peinados se suman.
+- ✅ **Manos de primera persona reales** (online): antebrazo y mano del propio cuerpo + la manga (`src/player/fpArms.js`).
+- ✅ **Editor Básico / Avanzado** (online, `src/app/cuenta.js`): Básico = una fila por cosa (6 peinados principales
+  en `BASIC_HAIR`, 5 colores + botón "+" que abre el RGB); Avanzado = todo lo de `LOOK_OPTIONS` (lo nuevo aparece
+  solo), barba con tipo, color de ojos, paletas completas + RGB, peso, músculo y altura.
+- ✅ **Seguridad** (rama `agente/seguridad` juntada en `main` y online): 22 arreglos, `npm test` (54 pruebas),
+  `scripts/humo.mjs`, `main.js` partido en `src/app/`. Ver `docs/ramas/seguridad.md`. Ojo: solo se entra al
+  Museo o a salas `u-<id>` (las salas de prueba con otros nombres dan 404).
 
 ### Para programar, en este orden
-1. **Editor de personaje Básico / Avanzado** (decidido 24/10, ver ROADMAP): Básico = cuerpo, tipo de cuerpo,
-   piel, 6 peinados principales, color de pelo y **estilos de ropa armados**; Avanzado = prendas por separado,
-   todos los peinados y barbas, deslizadores y RGB. **Consultar**: qué estilos (nombre y prendas de cada uno)
-   y cuáles son los 6 peinados del básico. Se puede hacer en la nube (es código, `src/main.js` + `avatar.js`).
-2. **Peinados de Hair 01** (necesita la PC del usuario con Blender): instalar el pack, mostrarle los 24 y sumar
+1. **Peinados de Hair 01** (necesita la PC del usuario con Blender): instalar el pack, mostrarle los 24 y sumar
    los elegidos a `HAIRS` en `build.py`, a `HAIR_STYLES` (shared.js) y `LOOK_OPTIONS` (avatar.js).
-3. **Accesorios** (gorros, anteojos, cadena): revisar cómo quedan en el cuerpo nuevo (`BODIES` en avatar.js).
-4. **Conectar recompensas con muebles** (rareza provisoria decidida; ver `docs/ramas/progresion.md`).
-5. **Consumibles y beso** (decididos en ROADMAP, sin programar).
-6. **Diseños de artistas como objetos** y más mapas públicos (paso 5).
-7. **Seguridad y pruebas**: hay un agente en la rama `agente/seguridad` (tests en `test/`, cambios en
-   `server/worker.js`, `works.js`, `main.js`, `net.js`…). Juntarla a `main` con cuidado; no pisarla.
-   También hay una rama `claude/master-2410` (mensajes entre amigos, grupos fantasma) sin juntar.
-8. Achicar animaciones para celular. **Primera prueba con gente real** (inauguración con 5–10 artistas).
+2. **Accesorios** (gorros, anteojos, cadena): revisar cómo quedan en el cuerpo nuevo (`BODIES` en avatar.js).
+3. **Conectar recompensas con muebles** (rareza provisoria decidida; ver `docs/ramas/progresion.md`).
+4. **Consumibles y beso** (decididos en ROADMAP, sin programar).
+5. **Diseños de artistas como objetos** y más mapas públicos (paso 5).
+6. **Seguridad, lo que quedó para decidir** (ver `docs/ramas/seguridad.md`): teletransporte (posiciones falsas)
+   y vencimiento de sesiones.
+7. Achicar animaciones para celular. **Primera prueba con gente real** (inauguración con 5–10 artistas).
 
 ### Pendientes sueltos (consultar antes)
 Reportar, nombre y marca definitivos, AR, ajustes de cara en el avanzado.
