@@ -62,13 +62,14 @@ privacidad, favoritas, personaje Quaternius con animaciones de Mixamo, inventari
 
 ## Qué falta
 
+### Online ✅ (24/10)
+Publicado en **https://galeria-online.latta-romero.workers.dev**: R2 y bucket creados, las 3 claves
+cargadas, ingreso con Google y Discord probado por el usuario (mismo mail = misma cuenta), app de Google
+publicada (páginas `/privacidad` y `/condiciones`), y xvvave admin online (`22b06bd4aaf200c7` en `ADMIN_IDS`).
+Para volver a subir: `npm run deploy` desde la carpeta del proyecto.
+
 ### Para el usuario
-- **Probar el ingreso con Google y con Discord** con una cuenta real (no se pudo probar sin iniciar sesión).
 - **Probar la voz con personas reales** (se probó con un tono generado) y la pantalla del escenario (VJ).
-- **Registrar la cuenta xvvave** si todavía es de invitado (Personaje → Crear cuenta): conserva id y admin.
-- **Para subirlo online:** cargar las 3 claves con `wrangler secret put` (ver README → "Subirlo online")
-  y agregar la dirección de vuelta online en Google Cloud y en Discord. Para el Museo rotativo: activar
-  R2 en Cloudflare (pide tarjeta, tiene capa gratis) y `npx wrangler r2 bucket create galeria-obras`.
 - **TURN (opcional, voz en redes cerradas):** `npx wrangler secret put TURN_KEY_ID` y `TURN_KEY_API_TOKEN`
   (Cloudflare → Realtime → TURN). Revisar antes cómo se cobra.
 - **Nombrar curadores fundadores** con `/curador nick` en el chat (mientras tanto verifican los admins).
