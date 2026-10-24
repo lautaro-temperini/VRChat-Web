@@ -44,8 +44,8 @@ const BASE = `${import.meta.env.BASE_URL}models/makehuman/`;
 // head = gorros y auriculares, face = anteojos, chest = cadena y mochila.
 // Los accesorios se diseñaron para el personaje anterior (1,81 m): la escala los acomoda.
 const BODIES = {
-  masc: { file: 'body/masc.gltf', height: 1.728, head: [0, 1.645, 0.03, 0.95], face: [0, 1.619, 0.03, 0.95], chest: [0, 0, -0.01, 1.0] },
-  fem: { file: 'body/fem.gltf', height: 1.591, head: [0, 1.512, 0.025, 0.88], face: [0, 1.487, 0.025, 0.88], chest: [0, 0, 0, 0.86] },
+  masc: { file: 'body/masc.gltf', height: 1.728, head: [0, 1.632, 0.045, 0.82], face: [0, 1.585, 0.025, 0.85], chest: [0, 0.09, 0.045, 0.9] },
+  fem: { file: 'body/fem.gltf', height: 1.591, head: [0, 1.495, 0.04, 0.76], face: [0, 1.453, 0.022, 0.79], chest: [0, 0.08, 0.04, 0.83] },
 };
 const hairFile = (type, style) => `hair/${type}/${style}.gltf`;
 const beardFile = (type, style) => `hair/${type}/barba_${style}.gltf`;

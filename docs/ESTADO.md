@@ -96,7 +96,7 @@ Para volver a subir: `npm run deploy` desde la carpeta del proyecto.
 ### Para programar, en este orden
 1. **Peinados de Hair 01** (necesita la PC del usuario con Blender): instalar el pack, mostrarle los 24 y sumar
    los elegidos a `HAIRS` en `build.py`, a `HAIR_STYLES` (shared.js) y `LOOK_OPTIONS` (avatar.js).
-2. **Accesorios** (gorros, anteojos, cadena): revisar cómo quedan en el cuerpo nuevo (`BODIES` en avatar.js).
+2. ✅ **Accesorios** ajustados al cuerpo nuevo (`BODIES` en avatar.js; página de prueba local `devtest/avatar.html?body=fem&equip=cap,chain`, no se sube).
 3. **Conectar recompensas con muebles** (rareza provisoria decidida; ver `docs/ramas/progresion.md`).
 4. **Consumibles y beso** (decididos en ROADMAP, sin programar).
 5. **Diseños de artistas como objetos** y más mapas públicos (paso 5).
