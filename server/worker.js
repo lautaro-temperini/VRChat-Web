@@ -8,25 +8,45 @@ const json = (data, status = 200) => new Response(JSON.stringify(data), {
   status, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
 });
 
+// Archivos que suben los usuarios (fotos, obras): el navegador no tiene que adivinar el tipo ni
+// ejecutar nada aunque alguien suba un HTML disfrazado de imagen
+const FILE_HEADERS = { 'x-content-type-options': 'nosniff', 'content-security-policy': "default-src 'none'; sandbox" };
+
+// Salas que existen: el Museo y las personales (u-<id de cuenta>)
+const ROOM_NAME = /^(museo|u-[0-9a-f]{16})$/;
+
+// Direcciones a las que la vista previa no entra (la red propia, la del proveedor, etc.)
+const PRIVATE_HOST = /^(localhost|.*\.localhost|.*\.local|.*\.internal|0\.|127\.|10\.|192\.168\.|169\.254\.|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.|172\.(1[6-9]|2\d|3[01])\.|\[)/i;
+const PREVIEW_MAX = 2_000_000; // bytes de HTML que se leen como mucho
+
 function bearer(request) {
   const h = request.headers.get('Authorization') ?? '';
   return h.startsWith('Bearer ') ? h.slice(7) : null;
 }
 
 // Vista previa de un sitio web: lee las etiquetas Open Graph (título, descripción, imagen)
+// Las redirecciones se siguen a mano (hasta 3) para revisar cada destino: si no, un sitio
+// público podría mandar al servidor a una dirección interna.
 async function linkPreview(raw) {
+  const safe = (u) => ['http:', 'https:'].includes(u.protocol) && !PRIVATE_HOST.test(u.hostname) && !/^\d+$/.test(u.hostname) && (!u.port || ['80', '443'].includes(u.port));
   let url;
-  try { url = new URL(raw); } catch { return { ok: false, error: 'Link inválido.' }; }
-  if (!['http:', 'https:'].includes(url.protocol)) return { ok: false, error: 'Link inválido.' };
-  if (/^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|\[)/.test(url.hostname)) return { ok: false, error: 'Link inválido.' };
+  try { url = new URL(String(raw ?? '').slice(0, 2000)); } catch { return { ok: false, error: 'Link inválido.' }; }
+  if (!safe(url)) return { ok: false, error: 'Link inválido.' };
 
   let res;
   try {
-    res = await fetch(url, { redirect: 'follow', signal: AbortSignal.timeout(6000), headers: { 'User-Agent': 'GaleriaOnline/0.1 (vista previa de links)' } });
+    for (let hop = 0; ; hop++) {
+      res = await fetch(url, { redirect: 'manual', signal: AbortSignal.timeout(6000), headers: { 'User-Agent': 'GaleriaOnline/0.1 (vista previa de links)' } });
+      const loc = res.status >= 300 && res.status < 400 && res.headers.get('location');
+      if (!loc) break;
+      url = new URL(loc, url);
+      if (hop >= 3 || !safe(url)) return { ok: false, error: 'No se pudo abrir el sitio.' };
+    }
   } catch {
     return { ok: false, error: 'No se pudo abrir el sitio.' };
   }
   if (!res.ok || !(res.headers.get('content-type') ?? '').includes('text/html')) return { ok: false, error: 'No se pudo abrir el sitio.' };
+  if (Number(res.headers.get('content-length') ?? 0) > PREVIEW_MAX) return { ok: false, error: 'No se pudo abrir el sitio.' };
 
   const meta = {};
   let title = '';
@@ -45,11 +65,11 @@ async function linkPreview(raw) {
   const image = meta['og:image'] ?? meta['twitter:image'];
   return {
     ok: true,
-    url: res.url,
-    site: meta['og:site_name'] ?? new URL(res.url).hostname.replace(/^www\./, ''),
+    url: url.href,
+    site: meta['og:site_name'] ?? url.hostname.replace(/^www\./, ''),
     title: (meta['og:title'] ?? meta['twitter:title'] ?? title).trim().slice(0, 200),
     description: (meta['og:description'] ?? meta['twitter:description'] ?? meta.description ?? '').trim().slice(0, 400),
-    image: image ? new URL(image, res.url).href : null,
+    image: (() => { try { const u = image && new URL(image, url); return u && ['http:', 'https:'].includes(u.protocol) ? u.href : null; } catch { return null; } })(),
   };
 }
 
@@ -62,10 +82,11 @@ async function api(request, env, path) {
   if (path === 'photo' && request.method === 'GET') {
     const p = await accounts.photoGet(token, q.get('id'));
     if (!p) return new Response('No encontrada', { status: 404 });
-    return new Response(p.data, { headers: { 'content-type': p.mime, 'cache-control': 'private, max-age=86400' } });
+    return new Response(p.data, { headers: { 'content-type': p.mime, 'cache-control': 'private, max-age=86400', ...FILE_HEADERS } });
   }
   if (path === 'photo' && request.method === 'POST') {
     const mime = (request.headers.get('content-type') ?? '').split(';')[0].trim();
+    if (Number(request.headers.get('content-length') ?? 0) > 1_000_000) return json({ ok: false, error: 'La foto es demasiado pesada.' }, 400);
     const data = await request.arrayBuffer();
     const result = await accounts.photoAdd(token, mime, data, Number(q.get('w')), Number(q.get('h')));
     return json(result, result.ok ? 200 : 400);
@@ -73,13 +94,14 @@ async function api(request, env, path) {
 
   // Museo rotativo: postular (formulario con archivos) y bajar los archivos de una obra (de R2)
   if (path === 'work' && request.method === 'POST') {
+    if (Number(request.headers.get('content-length') ?? 0) > 6_000_000) return json({ ok: false, error: 'Los archivos son demasiado pesados.' }, 400);
     let fd;
     try { fd = await request.formData(); } catch { return json({ ok: false, error: 'Formulario inválido.' }, 400); }
     const file = async (name) => {
       const f = fd.get(name);
       return f && typeof f === 'object' ? { mime: f.type, data: await f.arrayBuffer() } : null;
     };
-    const f = Object.fromEntries(['kind', 'title', 'description', 'technique', 'year', 'link', 'w', 'h'].map((k) => [k, fd.get(k) ?? '']));
+    const f = Object.fromEntries(['kind', 'title', 'description', 'technique', 'year', 'link', 'w', 'h'].map((k) => { const v = fd.get(k); return [k, typeof v === 'string' ? v : '']; }));
     Object.assign(f, { hd: await file('hd'), wall: await file('wall'), model: await file('model') });
     const result = await accounts.workSubmit(token, f);
     return json(result, result.ok ? 200 : 400);
@@ -88,7 +110,7 @@ async function api(request, env, path) {
     const key = await accounts.workFile(token, q.get('id'), q.get('f'));
     const obj = key && env.ART ? await env.ART.get(key) : null;
     if (!obj) return new Response('No encontrada', { status: 404 });
-    return new Response(obj.body, { headers: { 'content-type': obj.httpMetadata?.contentType ?? 'application/octet-stream', 'cache-control': 'private, max-age=3600' } });
+    return new Response(obj.body, { headers: { 'content-type': obj.httpMetadata?.contentType ?? 'application/octet-stream', 'cache-control': 'private, max-age=3600', ...FILE_HEADERS } });
   }
 
   // Vuelta de Google / Discord: se canjea el código y se vuelve al juego con un código de un solo uso
@@ -112,7 +134,13 @@ async function api(request, env, path) {
     case 'POST login': result = await accounts.login(body.login ?? body.username, body.password); break;
     case 'GET blocks': result = await accounts.blocks(token); break;
     case 'POST block': result = await accounts.setBlock(token, String(body.id ?? ''), !!body.on); break;
-    case 'POST oauthstart': result = await accounts.oauthStart(token, String(body.provider ?? ''), String(body.origin ?? '')); break;
+    case 'POST oauthstart': {
+      // Solo se vuelve al mismo sitio desde el que se pidió (el navegador manda Origin y no se puede falsear)
+      const origin = String(body.origin ?? '');
+      if (origin !== request.headers.get('Origin')) { result = { ok: false, error: 'Origen no válido.' }; break; }
+      result = await accounts.oauthStart(token, String(body.provider ?? ''), origin);
+      break;
+    }
     case 'POST oauthfinish': result = await accounts.oauthFinish(String(body.code ?? '')); break;
     case 'POST oauthnick': result = await accounts.oauthNick(token, { nick: body.nick, terms: !!body.terms }); break;
     case 'GET ignores': result = await accounts.ignores(token); break;
@@ -133,7 +161,11 @@ async function api(request, env, path) {
     case 'POST friendrequest': result = await accounts.friendRequest(token, String(body.id ?? '')); break;
     case 'POST friendrespond': result = await accounts.friendRespond(token, String(body.id ?? ''), !!body.accept); break;
     case 'POST friendremove': result = await accounts.friendRemove(token, String(body.id ?? '')); break;
-    case 'GET preview': result = await linkPreview(new URL(request.url).searchParams.get('url')); break;
+    case 'GET preview':
+      // Solo con sesión: si no, cualquiera usaría el servidor para bajar páginas de afuera
+      if (!(await accounts.auth(token))) { result = { ok: false, error: 'Sesión vencida.' }; break; }
+      result = await linkPreview(q.get('url'));
+      break;
     // Red social
     case 'GET photos': result = await accounts.photoList(token, q.get('id')); break;
     case 'POST photodelete': result = await accounts.photoDelete(token, body.id); break;
@@ -175,7 +207,7 @@ export default {
     if (apiMatch) return api(request, env, apiMatch[1]);
 
     const wsMatch = url.pathname.match(/^\/ws\/([a-z0-9-]{1,32})$/i);
-    if (wsMatch && request.headers.get('Upgrade') === 'websocket') {
+    if (wsMatch && request.headers.get('Upgrade') === 'websocket' && ROOM_NAME.test(wsMatch[1].toLowerCase())) {
       const room = wsMatch[1].toLowerCase();
       const stub = env.ROOMS.get(env.ROOMS.idFromName(room));
       // La sala no conoce su propio nombre: se lo pasamos (lo usa para avisar presencia)

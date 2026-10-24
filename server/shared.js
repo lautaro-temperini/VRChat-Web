@@ -20,7 +20,7 @@ export function cleanEquip(list) {
   const used = new Set();
   const out = [];
   for (const it of list.slice(0, 8)) {
-    const def = ITEMS[it?.type];
+    const def = typeof it?.type === 'string' && Object.hasOwn(ITEMS, it.type) ? ITEMS[it.type] : null;
     if (!def || used.has(def.slot) || !def.colors.includes(it.color)) continue;
     used.add(def.slot);
     out.push({ type: it.type, color: it.color });
@@ -78,6 +78,16 @@ export function cleanLook(look) {
   if (weight !== undefined) out.weight = weight;
   if (muscle !== undefined) out.muscle = muscle;
   return out;
+}
+
+// ¿Los bytes son de verdad una imagen del tipo que dice? (JPG, PNG o WebP). Lo usa el servidor
+// con lo que se sube (fotos y obras)
+export function isImage(mime, data) {
+  const b = new Uint8Array(data, 0, Math.min(12, data.byteLength));
+  if (mime === 'image/jpeg') return b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff;
+  if (mime === 'image/png') return b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47;
+  if (mime === 'image/webp') return String.fromCharCode(...b.slice(0, 4)) === 'RIFF' && String.fromCharCode(...b.slice(8, 12)) === 'WEBP';
+  return false;
 }
 
 // Alcance para soltar y juntar objetos del piso (m). El servidor deja un margen por el retraso.
@@ -166,8 +176,9 @@ export const TEMPLATE_PIECES = {
 // Valida un mueble que manda el cliente. Devuelve el mueble limpio o null.
 // { id, type, x, y, z, r (radianes), c (color), iid? (especial), photo? (cuadro), w? y m? (pantalla) }
 export function cleanPiece(p, template) {
-  const def = FURNITURE[p?.type];
-  const t = ROOM_TEMPLATES[template];
+  const own = (obj, k) => typeof k === 'string' && Object.hasOwn(obj, k);
+  const def = own(FURNITURE, p?.type) ? FURNITURE[p.type] : null;
+  const t = own(ROOM_TEMPLATES, template) ? ROOM_TEMPLATES[template] : null;
   if (!def || !t) return null;
   const num = (v, d = 0) => (Number.isFinite(Number(v)) ? Number(v) : d);
   const out = { id: String(p.id ?? '').replace(/[^a-z0-9]/gi, '').slice(0, 12), type: p.type };

@@ -1,3 +1,5 @@
+import { isImage } from './shared.js';
+
 // Museo rotativo: obras del público que se postulan en el atril de la entrada del Museo.
 // Se suman a la clase Accounts (comparten la base SQLite); los archivos van a R2 (binding ART).
 //
@@ -24,6 +26,8 @@ const DAILY_LIMIT = 5;              // postulaciones por persona en las últimas
 const CREATOR_STREAK = 3;           // obras aceptadas seguidas para ser Creador
 const LIMITS = { hd: 2_000_000, wall: 700_000, model: 2 * 1024 * 1024 }; // bytes
 const IMAGE_MIMES = ['image/jpeg', 'image/webp', 'image/png'];
+const has = (obj, key) => typeof key === 'string' && Object.hasOwn(obj, key);
+const dim = (v) => Math.min(10_000, Math.max(0, Math.round(Number(v)) || 0));
 const clip = (s, n) => String(s ?? '').replace(/[\u0000-\u001f<>]/g, ' ').trim().slice(0, n);
 
 export function setupWorks(sql) {
@@ -88,7 +92,7 @@ export const worksMethods = {
     if (this.isGuest(me)) return this.guestError();
     if (!this.env.ART) return { ok: false, error: 'Falta configurar el almacenamiento de obras (R2).' };
     const kind = f.kind;
-    if (!WORK_KINDS[kind]) return { ok: false, error: 'Elegí si es un cuadro o una escultura.' };
+    if (!has(WORK_KINDS, kind)) return { ok: false, error: 'Elegí si es un cuadro o una escultura.' };
     const title = clip(f.title, 80);
     if (!title) return { ok: false, error: 'La obra necesita un título.' };
     let link = clip(f.link, 300);
@@ -106,12 +110,14 @@ export const worksMethods = {
         const file = f[name];
         if (!file || !IMAGE_MIMES.includes(file.mime) || !(file.data instanceof ArrayBuffer) || !file.data.byteLength) return { ok: false, error: 'Falta la imagen (JPG, PNG o WebP).' };
         if (file.data.byteLength > max) return { ok: false, error: 'La imagen es demasiado pesada.' };
+        if (!isImage(file.mime, file.data)) return { ok: false, error: 'El archivo no es una imagen JPG, PNG o WebP.' };
         files.push([name, file]);
       }
     } else {
       const file = f.model;
       if (!file || !(file.data instanceof ArrayBuffer)) return { ok: false, error: 'Falta el modelo 3D (GLB).' };
       if (file.data.byteLength > LIMITS.model) return { ok: false, error: 'El modelo pesa más de 2 MB.' };
+      if (file.data.byteLength < 12) return { ok: false, error: 'El modelo tiene que ser un archivo .glb.' };
       const magic = new TextDecoder().decode(new Uint8Array(file.data, 0, 4));
       if (magic !== 'glTF') return { ok: false, error: 'El modelo tiene que ser un archivo .glb.' };
       files.push(['model', { mime: 'model/gltf-binary', data: file.data }]);
@@ -124,7 +130,7 @@ export const worksMethods = {
     this.sql.exec(`INSERT INTO works (id, author, kind, title, description, technique, year, link, w, h, status, created)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       id, me.id, kind, title, clip(f.description, 600), clip(f.technique, 80), clip(f.year, 12), link,
-      Math.round(Number(f.w)) || 0, Math.round(Number(f.h)) || 0, creator ? 'verificada' : 'pendiente', Date.now());
+      dim(f.w), dim(f.h), creator ? 'verificada' : 'pendiente', Date.now());
     if (creator) this.rotate();
     this.progressTrack(me.id, 'postular');
     return { ok: true, id, verified: creator };
@@ -158,7 +164,7 @@ export const worksMethods = {
   // ¿Quién puede ver los archivos? Expuestas: todos. Si no: el autor, curadores y admins.
   async workFile(token, id, name) {
     const w = this.sql.exec('SELECT * FROM works WHERE id = ?', String(id ?? '')).toArray()[0];
-    if (!w || !['hd', 'wall', 'model'].includes(name)) return null;
+    if (!w || !['hd', 'wall', 'model'].includes(name) || (name === 'model') !== (w.kind === 'escultura')) return null;
     if (!['expuesta', 'expuesta_antes'].includes(w.status)) {
       const me = await this.userFromToken(token);
       if (!me || (me.id !== w.author && !this.isCurator(me.id))) return null;
@@ -181,7 +187,7 @@ export const worksMethods = {
         AND (? OR NOT EXISTS (SELECT 1 FROM friends f WHERE f.status = 'accepted'
              AND ((f.a = ? AND f.b = w.author) OR (f.b = ? AND f.a = w.author))))`,
     me.id, admin ? 1 : 0, me.id, admin ? 1 : 0, me.id, me.id).toArray();
-    const pool = rows.filter((w) => w.id !== skip);
+    const pool = rows.filter((w) => w.id !== String(skip ?? ''));
     const list = pool.length ? pool : rows;
     if (!list.length) return { ok: true, work: null };
     const w = list[Math.floor(Math.random() * list.length)];
@@ -198,8 +204,9 @@ export const worksMethods = {
     if (w.status === 'en_disputa' && !admin) return { ok: false, error: 'Esa obra la decide un admin.' };
     if (!admin && w.author === me.id) return { ok: false, error: 'No podés revisar tus propias obras.' };
     if (!admin && this.relation(me.id, w.author) === 'friends') return { ok: false, error: 'No podés revisar obras de amigos.' };
-    if (vote === 'no' && !DENY_REASONS[reason]) return { ok: false, error: 'Elegí un motivo.' };
+    if (vote === 'no' && !has(DENY_REASONS, reason)) return { ok: false, error: 'Elegí un motivo.' };
     if (vote !== 'ok' && vote !== 'no') return { ok: false, error: 'Voto inválido.' };
+    if (vote === 'ok') reason = null;
     const detail = reason === 'otro' ? clip(text, 200) : '';
     if (reason === 'otro' && !detail) return { ok: false, error: 'Contá el motivo.' };
     this.sql.exec('INSERT OR REPLACE INTO work_votes (work_id, user_id, vote, reason, text, created) VALUES (?, ?, ?, ?, ?, ?)',

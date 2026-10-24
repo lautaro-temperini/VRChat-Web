@@ -1,5 +1,5 @@
 import { DurableObject } from 'cloudflare:workers';
-import { cleanName, cleanLook, ITEMS, STARTER_ITEMS, FURNITURE, SPECIAL_FURNITURE } from './shared.js';
+import { cleanName, cleanLook, isImage, ITEMS, STARTER_ITEMS, FURNITURE, SPECIAL_FURNITURE } from './shared.js';
 import { setupWorks, worksMethods } from './works.js';
 import { setupProgress, progressMethods } from './progress.js';
 import { accountsEditorMethods } from './editor.js';
@@ -54,7 +54,10 @@ const OAUTH = {
     read: (p) => ({ sub: p.id && String(p.id), email: p.email, verified: p.verified === true, name: p.global_name || p.username }),
   },
 };
-const REPORT_REASONS =['acoso', 'ilegal', 'plagio', 'spam', 'suplantacion', 'otro'];
+const REPORT_REASONS = ['acoso', 'ilegal', 'plagio', 'spam', 'suplantacion', 'otro'];
+const FAVORITES_MAX = 100;        // tope técnico (nadie llega jugando): que la base no crezca sin fin
+const TRADE_MAX = 12;             // objetos por lado en un intercambio (lo mismo que muestra la sala)
+const dim = (v) => Math.min(10_000, Math.max(0, Math.round(Number(v)) || 0)); // ancho/alto que manda el cliente
 
 export class Accounts extends DurableObject {
   constructor(ctx, env) {
@@ -220,6 +223,8 @@ export class Accounts extends DurableObject {
     const salt = randomHex(16);
     const pass = await pbkdf2(password, salt);
     const current = await this.userFromToken(token);
+    // Mientras se calculaba la contraseña otro pudo registrar el mismo nickname o mail
+    if (this.sql.exec('SELECT 1 FROM users WHERE username = ? OR email = ?', username, email).toArray().length) return { ok: false, error: 'Ese nickname o mail ya está en uso.' };
     let id;
     if (current && this.isGuest(current)) {
       id = current.id;
@@ -460,12 +465,14 @@ export class Accounts extends DurableObject {
   async ownedItems(userId, iids) {
     if (!Array.isArray(iids)) return [];
     const mine = new Map(this.items(userId).map((i) => [i.iid, i]));
-    return [...new Set(iids)].filter((iid) => mine.has(iid)).slice(0, 12).map((iid) => mine.get(iid));
+    return [...new Set(iids)].filter((iid) => typeof iid === 'string' && mine.has(iid)).slice(0, TRADE_MAX).map((iid) => mine.get(iid));
   }
 
   // Intercambio: todo o nada. Si algún objeto ya no es de quien lo ofrece, se cancela.
   async trade(aId, aIids, bId, bIids) {
-    if (this.isGuest(this.row(aId)) || this.isGuest(this.row(bId))) return this.guestError();
+    if (aId === bId || this.isGuest(this.row(aId)) || this.isGuest(this.row(bId))) return this.guestError();
+    const ok = (l) => Array.isArray(l) && l.length <= TRADE_MAX && l.every((x) => typeof x === 'string') && new Set(l).size === l.length;
+    if (!ok(aIids) || !ok(bIids)) return { ok: false, error: 'Intercambio no válido.' };
     const owns = (uid, list) => list.every((iid) => this.sql.exec('SELECT 1 FROM items WHERE iid = ? AND owner_id = ?', iid, uid).toArray().length);
     if (!owns(aId, aIids) || !owns(bId, bIids)) return { ok: false, error: 'Algún objeto ya no está disponible.' };
     this.ctx.storage.transactionSync(() => {
@@ -576,7 +583,7 @@ export class Accounts extends DurableObject {
   // ¿Puede este usuario entrar a la sala personal de ownerId? (la usa la sala al entrar)
   async canEnter(ownerId, userId) {
     const owner = this.row(ownerId);
-    if (!owner) return true; // sala de una cuenta que no existe: sin dueño, abierta
+    if (!owner) return false; // no existe esa cuenta: no hay sala (si no, cualquiera crearía salas sin fin)
     if (this.isGuest(owner)) return userId === ownerId; // los invitados no tienen sala propia para recibir gente
     return this.allowed(userId, ownerId, owner.room_privacy);
   }
@@ -609,11 +616,12 @@ export class Accounts extends DurableObject {
     if (this.isGuest(me)) return this.guestError();
     if (!['image/jpeg', 'image/webp', 'image/png'].includes(mime)) return { ok: false, error: 'Formato no permitido (JPG, PNG o WebP).' };
     if (!(data instanceof ArrayBuffer) || data.byteLength === 0 || data.byteLength > PHOTO_BYTES) return { ok: false, error: 'La foto es demasiado pesada.' };
+    if (!isImage(mime, data)) return { ok: false, error: 'El archivo no es una imagen JPG, PNG o WebP.' };
     const count = this.sql.exec('SELECT COUNT(*) AS n FROM photos WHERE owner = ?', me.id).one().n;
     if (count >= PHOTO_LIMIT) return { ok: false, error: `Llegaste al máximo de ${PHOTO_LIMIT} fotos. Borrá alguna para subir otra.` };
     const id = randomHex(8);
     this.sql.exec('INSERT INTO photos (id, owner, mime, data, w, h, created) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      id, me.id, mime, data, Math.round(w) || 0, Math.round(h) || 0, Date.now());
+      id, me.id, mime, data, dim(w), dim(h), Date.now());
     return { ok: true, id };
   }
 
@@ -736,8 +744,11 @@ export class Accounts extends DurableObject {
     const me = await this.userFromToken(token);
     if (!me) return { ok: false, error: 'Sesión vencida.' };
     if (this.isGuest(me)) return this.guestError();
-    if (!this.row(ownerId)) return { ok: false, error: 'No existe esa sala.' };
+    const owner = this.row(ownerId);
+    if (!owner || this.isGuest(owner)) return { ok: false, error: 'No existe esa sala.' };
     if (me.id === ownerId) return { ok: false, error: 'No podés dejarte un corazón a vos mismo.' };
+    // Se deja en el atril de la sala: hay que estar ahí (lo sabe la sala, no el cliente)
+    if (this.where(me.id) !== `u-${ownerId}`) return { ok: false, error: 'Para dejar un corazón tenés que estar en esa sala.' };
     this.sql.exec('INSERT OR IGNORE INTO hearts (owner, from_user, created) VALUES (?, ?, ?)', ownerId, me.id, Date.now());
     this.progressTrack(me.id, 'corazon', ownerId);
     return { ok: true, count: this.heartCount(ownerId), given: true };
@@ -794,6 +805,7 @@ export class Accounts extends DurableObject {
     if (!me) return { ok: false, error: 'Sesión vencida.' };
     room = String(room ?? '').toLowerCase();
     if (!/^[a-z0-9-]{1,32}$/.test(room)) return { ok: false, error: 'Sala no válida.' };
+    if (on && this.sql.exec('SELECT COUNT(*) AS n FROM favorites WHERE user_id = ?', me.id).one().n >= FAVORITES_MAX) return { ok: false, error: `Podés guardar hasta ${FAVORITES_MAX} salas favoritas.` };
     if (on) this.sql.exec('INSERT OR IGNORE INTO favorites (user_id, room, created) VALUES (?, ?, ?)', me.id, room, Date.now());
     else this.sql.exec('DELETE FROM favorites WHERE user_id = ? AND room = ?', me.id, room);
     return this.favorites(token);
@@ -811,7 +823,14 @@ export class Accounts extends DurableObject {
       'SELECT id, name, username FROM users WHERE id != ? AND (LOWER(name) LIKE ? OR username LIKE ?) ORDER BY username IS NULL, name LIMIT 20',
       me.id, like, like,
     ).toArray();
-    return { ok: true, results: rows.map((r) => ({ id: r.id, name: r.name, username: r.username ?? null, relation: this.relation(me.id, r.id), room: this.where(r.id) })) };
+    // Conectado sí/no lo ve cualquiera; en qué sala está, solo sus amigos (como en la lista de amigos)
+    return {
+      ok: true,
+      results: rows.map((r) => {
+        const relation = this.relation(me.id, r.id), room = this.where(r.id);
+        return { id: r.id, name: r.name, username: r.username ?? null, relation, online: !!room, room: relation === 'friends' ? room : null };
+      }),
+    };
   }
 
   // ---------- Avisos (por ahora: solicitudes de amistad enviadas y aceptadas) ----------
@@ -859,7 +878,7 @@ export class Accounts extends DurableObject {
   async setBlock(token, otherId, on) {
     const me = await this.userFromToken(token);
     if (!me) return { ok: false, error: 'Sesión vencida.' };
-    if (!otherId || otherId === me.id) return { ok: false, error: 'No válido.' };
+    if (!otherId || otherId === me.id || (on && !this.row(otherId))) return { ok: false, error: 'No válido.' };
     if (on) this.sql.exec('INSERT OR IGNORE INTO blocks (user_id, blocked_id, created) VALUES (?, ?, ?)', me.id, otherId, Date.now());
     else this.sql.exec('DELETE FROM blocks WHERE user_id = ? AND blocked_id = ?', me.id, otherId);
     return this.blocks(token);
@@ -877,7 +896,7 @@ export class Accounts extends DurableObject {
   async setIgnore(token, otherId, on) {
     const me = await this.userFromToken(token);
     if (!me) return { ok: false, error: 'Sesión vencida.' };
-    if (!otherId || otherId === me.id) return { ok: false, error: 'No válido.' };
+    if (!otherId || otherId === me.id || (on && !this.row(otherId))) return { ok: false, error: 'No válido.' };
     if (on) this.sql.exec('INSERT OR IGNORE INTO ignores (user_id, ignored_id, created) VALUES (?, ?, ?)', me.id, otherId, Date.now());
     else this.sql.exec('DELETE FROM ignores WHERE user_id = ? AND ignored_id = ?', me.id, otherId);
     return this.ignores(token);
@@ -910,7 +929,7 @@ export class Accounts extends DurableObject {
   async report(token, { target, reason, detail, room } = {}) {
     const me = await this.userFromToken(token);
     if (!me) return { ok: false, error: 'Sesión vencida.' };
-    if (!this.row(target) || target === me.id) return { ok: false, error: 'No válido.' };
+    if (typeof target !== 'string' || !this.row(target) || target === me.id) return { ok: false, error: 'No válido.' };
     if (!REPORT_REASONS.includes(reason)) return { ok: false, error: 'Elegí un motivo.' };
     const today = this.sql.exec('SELECT COUNT(*) AS n FROM reports WHERE reporter = ? AND created > ?', me.id, Date.now() - 86_400_000).one().n;
     if (today >= 10) return { ok: false, error: 'Mandaste muchos reportes hoy. Probá mañana.' };
