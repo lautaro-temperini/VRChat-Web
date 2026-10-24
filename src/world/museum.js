@@ -921,6 +921,8 @@ export function buildMuseum(scene, renderer, quality) {
     colliders,
     blockers,
     interactables,
+    // Puertas que dan afuera: meterse en la zona de enfrente abre el Mapa
+    exits: [{ x0: X0 - 1, x1: X0 + 0.7, z0: -1.4, z1: 1.4 }],
     // Una sola pantalla (la pared este): la usan el VJ (consola) y "ver en grande"
     screen: screenApi,
     stage: screenApi,

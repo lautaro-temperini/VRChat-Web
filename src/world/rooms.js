@@ -111,6 +111,7 @@ export function buildPersonalRoom(scene, renderer, quality) {
       shell.setTime(hours);
       world.bounds = shell.bounds;
       world.spawn = shell.spawn;
+      world.exits = shell.exits;
       scene.background = new THREE.Color(next.template === 'terraza' ? 0x87b3e8 : 0x0d0d0f);
     }
     for (const id of [...pieces.keys()]) dropPiece(id);

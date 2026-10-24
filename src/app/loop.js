@@ -11,7 +11,7 @@ const { quality, renderer, labels, scene, camera, world, me, ctrl, fpArms, net, 
 const clock = new THREE.Clock();
 const staminaEl = $('stamina');
 const staminaFill = staminaEl.querySelector('.fill');
-let sendTimer = 0, lastSent = '', lastSentAt = 0, frame = 0, voiceTimer = 0;
+let sendTimer = 0, lastSent = '', lastSentAt = 0, frame = 0, voiceTimer = 0, inExit = false;
 // Si anda lento: se apaga el post-procesado y se baja la resolución ya mismo (y la próxima vez arranca más abajo)
 const fpsWatch = new FpsWatch(quality, () => {
   G.composer = null;
@@ -49,6 +49,11 @@ renderer.setAnimationLoop(() => {
     G.updateTarget();
     // Quién está hablando
     for (const r of remotes.values()) r.setSpeaking(r.mic === 'on' && rtc.level(r.id) > 0.035);
+    // Puertas que dan afuera: meterse en la zona de enfrente abre el Mapa (de nuevo recién al salir y volver)
+    const p = ctrl.pos;
+    const exit = !!world.exits?.some((e) => p.x > e.x0 && p.x < e.x1 && p.z > e.z0 && p.z < e.z1);
+    if (exit && !inExit && ctrl.enabled && G.joined) G.openMundi();
+    inExit = exit;
   }
 
   // Posición a la sala: 10 veces por segundo si cambió, o cada 2 s igual

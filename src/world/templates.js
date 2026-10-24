@@ -20,7 +20,7 @@ export function buildShell(id, { high }) {
   const def = ROOM_TEMPLATES[id] ?? ROOM_TEMPLATES.loft;
   const W = def.w / 2, D = def.d / 2, H = def.h || 3.2;
   const group = new THREE.Group();
-  const colliders = [], blockers = [], walls = [], cutaway = [], animated = [];
+  const colliders = [], blockers = [], walls = [], cutaway = [], animated = [], exits = [];
   let timeFn = () => {};
 
   function mesh(geo, mat, x, y, z) {
@@ -92,6 +92,7 @@ export function buildShell(id, { high }) {
     add(0.86, 2.3, 0.05, leafMat, 0.43, 1.15, T * 0.8);
     group.add(g);
     cutaway.push({ object: g, normal: new THREE.Vector3(0, 0, 1) });
+    exits.push({ x0: -0.9, x1: 0.9, z0: D - 0.6, z1: D + 1 }); // al meterse en la puerta se abre el Mapa
   }
   // Zócalo alrededor (se oculta junto con su pared)
   function baseboard(mat) {
@@ -331,7 +332,7 @@ export function buildShell(id, { high }) {
   }
 
   return {
-    id, def, group, colliders, blockers, walls, cutaway,
+    id, def, group, colliders, blockers, walls, cutaway, exits,
     bounds: { minY: 0.2, maxY: def.h ? def.h - 0.2 : 30 },
     spawn: { x: 0, z: D - 1, yaw: 0 }, // en la puerta, mirando hacia adentro
     setTime(hours) {

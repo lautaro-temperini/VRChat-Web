@@ -197,4 +197,4 @@ $('btn-friends').onclick = togglePhone;
 for (const b of document.querySelectorAll('[data-close-panel]')) b.onclick = G.closeOverlays;
 
 
-Object.assign(G, { ground, social, phone, progress, gesture, toggleMundi, toggleGestures, togglePhone });
+Object.assign(G, { ground, social, phone, progress, gesture, openMundi, toggleMundi, toggleGestures, togglePhone });
