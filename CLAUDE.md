@@ -90,6 +90,14 @@ Cada agujero de seguridad que se cierre lleva su prueba en `test/` (clientes Web
   Las fotos se guardan en SQLite del Durable Object de cuentas (no R2, para no necesitar tarjeta).
 - **PowerShell 5.1** lee UTF-8 sin BOM como ANSI y rompe los acentos: para editar archivos con
   scripts usar `[IO.File]::ReadAllText/WriteAllText` con UTF-8, o las herramientas de edición.
+- **Cliente (`src/main.js` → `src/app/`):** main.js solo importa las partes en orden y arranca. Cada módulo
+  corre al importarse y comparte lo suyo en `G` (`src/app/state.js`, con `$`, `body`, `pref`, `loading`):
+  `escena.js` (render, mundo, jugador local, botones) · `overlays.js` (un panel a la vez, `refreshState`) ·
+  `cuenta.js` (ingreso, Google/Discord, editor de personaje) · `menu.js` (Esc, audio) · `red.js` (Net, voz,
+  grupos, panel Tab) · `social.js` (suelo, Mapa, gestos, inventario, celular, progreso) · `museo.js` (atril del
+  Museo, obras expuestas, notas, editor de sala) · `sala.js` (join y `net.on`) · `chat.js` (chat y comandos) ·
+  `escenario.js` (DJ, consola, pantalla) · `interaccion.js` (E, fichas, perfiles, teclado) · `loop.js` (bucle,
+  día/noche, `window.__game`). Un módulo solo puede usar al cargarse lo de los anteriores.
 - **Pruebas:** en desarrollo existe `window.__game` (ctrl, world, remotes, rtc, social, net,
   ground, roomPanel, `setHour(h)` para probar día/noche…). Si el panel del navegador está oculto,
   el juego corre a muy pocos cuadros: para probar física llamar a `ctrl.update(1/60)` en un bucle.
