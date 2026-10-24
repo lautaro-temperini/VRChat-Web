@@ -1,0 +1,12 @@
+Personaje del juego: modelos exportados con MakeHuman (MPFB 2 para Blender).
+
+Todo lo que hay en esta carpeta es CC0 (dominio público):
+- Cuerpos, deformaciones (peso y músculo), esqueleto "game engine", ojos, cejas y pestañas:
+  MakeHuman system assets (makehuman_system_assets_cc0.zip), CC0.
+  https://static.makehumancommunity.org/assets/assetpacks/makehuman_system_assets.html
+- Peinados: short01, short03, short04, long01, afro01, ponytail01, braid01 y bob02 del mismo pack (CC0).
+- Barbas y bigote: Bodyparts 05 (bodyparts05_cc0.zip), CC0.
+  https://static.makehumancommunity.org/assets/assetpacks/bodyparts05.html
+
+MPFB 2 (GPL) se usó solo como herramienta; lo que exporta es CC0.
+Los archivos de trabajo y los scripts que los generan están en assets-src/makehuman/ (build.py y export.py).

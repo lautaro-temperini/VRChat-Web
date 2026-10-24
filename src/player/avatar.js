@@ -6,14 +6,16 @@ import { buildAccessory } from './accessories.js';
 import { ITEMS, EMOTES } from '../../server/shared.js';
 import { LOCO, locomotionClips, gestureClip } from './anims.js';
 
-// Personaje realista estilizado (modelos de Quaternius, CC0), mira hacia +Z.
+// Personaje MakeHuman (CC0, armado en Blender con assets-src/makehuman/build.py), mira hacia +Z.
+// Esqueleto con los nombres de Quaternius, en pose T. Cuerpo, pelo y barba traen 8 formas
+// (morph targets w{0,5,10}_m{0,5,10}) que se mezclan según peso y músculo.
 // El cuerpo y el pelo se cargan en segundo plano; mientras tanto el personaje
 // no se ve, pero la interfaz (setLook / setEquip / update) funciona igual.
 // La ropa no es un modelo aparte: el sombreador pinta cada parte del cuerpo
 // (torso, brazos, piernas, pies) con el color elegido, según qué hueso la mueve.
 
 export const DEFAULT_LOOK = {
-  body: 'masc', skin: '#d9a07a', hair: '#3b2416', hairStyle: 'corto', beard: false, eyes: '#4a3020',
+  body: 'masc', skin: '#d9a07a', hair: '#3b2416', hairStyle: 'corto', beard: false, beardStyle: 'completa', eyes: '#4a3020',
   top: 'buzo', shirt: '#ff7a3d', pants: '#2b3445', shoes: '#f4f4f4',
   height: 1.75, weight: 0.5, muscle: 0.5,
 };
@@ -22,8 +24,9 @@ export const LOOK_OPTIONS = {
   body: ['masc', 'fem'],
   skin: ['#ffe0c7', '#f1c09b', '#d9a07a', '#b97a52', '#8d5534', '#5c3520'],
   hair: ['#151010', '#3b2416', '#7a4a26', '#c98d4a', '#f2d48a', '#e8e8e8', '#d63a3a', '#3a7bd5', '#ff6fb5', '#5ad17a'],
-  hairStyle: ['corto', 'largo', 'rapado', 'rodete'],
+  hairStyle: ['corto', 'flequillo', 'largo', 'rapado', 'rulos', 'coleta', 'trenza', 'bob'],
   beard: [false, true],
+  beardStyle: ['completa', 'tupida', 'candado', 'bigote'],
   eyes: ['#4a3020', '#2e6b8a', '#3d7a3d', '#8a6a2a', '#1d1d1d', '#8a4be2'],
   top: ['remera', 'buzo'],
   shirt: ['#f4f4f4', '#1d1d22', '#ff7a3d', '#3a7bd5', '#e63946', '#2a9d8f', '#ffd23f', '#8a4be2', '#ff6fb5', '#5ad17a'],
@@ -31,21 +34,19 @@ export const LOOK_OPTIONS = {
   shoes: ['#f4f4f4', '#1d1d22', '#ff7a3d', '#3a7bd5', '#e63946', '#ffd23f'],
 };
 
-// Peinados del personaje viejo que no existen en el pack: se muestran como el más
-// parecido, pero el dato guardado no se toca (así se pueden recuperar más adelante).
-const LEGACY_HAIR = { rulos: 'corto', coleta: 'rodete' };
+// Peinados viejos que ya no se ofrecen: se muestran como otro, pero el dato guardado no se toca
+const LEGACY_HAIR = { rodete: 'trenza' };
 
-const BASE = `${import.meta.env.BASE_URL}models/quaternius/`;
+const BASE = `${import.meta.env.BASE_URL}models/makehuman/`;
 // Dónde van los objetos equipados (en metros del modelo, en pose de reposo):
-// head = gorros y auriculares, face = anteojos, chest = cadena y mochila
+// head = gorros y auriculares, face = anteojos, chest = cadena y mochila.
+// Los accesorios se diseñaron para el personaje anterior (1,81 m): la escala los acomoda.
 const BODIES = {
-  masc: { file: 'body/Superhero_Male_FullBody.gltf', height: 1.81, head: [0, 1.71, 0.012, 1.04], face: [0, 1.685, 0.012, 1.04], chest: [0, 0, -0.01, 1.05] },
-  fem: { file: 'body/Superhero_Female_FullBody.gltf', height: 1.767, head: [0, 1.665, 0.02, 1], face: [0, 1.63, 0.012, 0.92], chest: [0, 0, 0, 0.95] },
+  masc: { file: 'body/masc.gltf', height: 1.728, head: [0, 1.645, 0.03, 0.95], face: [0, 1.619, 0.03, 0.95], chest: [0, 0, -0.01, 1.0] },
+  fem: { file: 'body/fem.gltf', height: 1.591, head: [0, 1.512, 0.025, 0.88], face: [0, 1.487, 0.025, 0.88], chest: [0, 0, 0, 0.86] },
 };
-const HAIR_FILES = {
-  corto: 'Hair_SimpleParted', largo: 'Hair_Long', rodete: 'Hair_Buns',
-  rapado: { masc: 'Hair_Buzzed', fem: 'Hair_BuzzedFemale' },
-};
+const hairFile = (type, style) => `hair/${type}/${style}.gltf`;
+const beardFile = (type, style) => `hair/${type}/barba_${style}.gltf`;
 
 // ---------- Carga de modelos (una sola vez por archivo) ----------
 const manager = new THREE.LoadingManager();
@@ -69,13 +70,15 @@ function partOf(bone) {
   return 4;
 }
 
+const isBodyMaterial = (name) => /^Body/.test(name);
+
 // Se ejecuta una vez por archivo: guarda en la geometría a qué parte pertenece cada vértice
 function prepare(gltf) {
   gltf.scene.updateMatrixWorld(true);
   gltf.scene.traverse((o) => {
     if (!o.isSkinnedMesh) return;
     o.material.vertexColors = false; // los colores de vértice del pack vienen en blanco
-    if (!/Superhero/i.test(o.material.name)) return;
+    if (!isBodyMaterial(o.material.name)) return;
     const { skinIndex, skinWeight, position } = o.geometry.attributes;
     const bones = o.skeleton.bones;
     const arm = { x0: bones.find((b) => b.name === 'upperarm_l'), x1: bones.find((b) => b.name === 'hand_l') };
@@ -100,8 +103,8 @@ function prepare(gltf) {
 
 // ---------- Materiales ----------
 const toLinear = (hex) => new THREE.Color(hex);
-// Tono medio de piel de las texturas del pack: se usa para recolorear la piel
-const REF_SKIN = { masc: toLinear('#a97350'), fem: toLinear('#aa7752') };
+// Tono medio de piel de las texturas (medido en Blender): se usa para recolorear la piel
+const REF_SKIN = { masc: toLinear('#f3d6c1'), fem: toLinear('#e5cebe') };
 
 function bodyMaterial(base, uniforms) {
   const m = base.clone();
@@ -150,7 +153,7 @@ function eyeMaterial(base, uniforms) {
         vec4 texel = texture2D(map, vMapUv);
         // El iris está en el centro de la textura; la pupila (oscura) no se tiñe
         float l = dot(texel.rgb, vec3(0.333));
-        float iris = (1.0 - smoothstep(0.062, 0.075, distance(vMapUv, vec2(0.5, 0.53)))) * smoothstep(0.02, 0.05, l);
+        float iris = (1.0 - smoothstep(0.15, 0.175, distance(vMapUv, vec2(0.496, 0.495)))) * smoothstep(0.02, 0.05, l);
         diffuseColor.rgb *= mix(texel.rgb, uEye * clamp(l * 6.0, 0.4, 1.6), iris);`);
   };
   m.customProgramCacheKey = () => 'avatar-eyes';
@@ -244,6 +247,19 @@ const GESTURES = {
     };
   },
 };
+// Cuánto pesa cada forma w{0,5,10}_m{0,5,10} para un peso y músculo (0..1). La del promedio
+// (w5_m5) es la base del modelo y no lleva forma.
+function shapeInfluences(weight, muscle) {
+  const cell = (v) => {
+    const x = Math.min(1, Math.max(0, v ?? 0.5));
+    return x <= 0.5 ? [[0, 1 - x * 2], [5, x * 2]] : [[5, 2 - x * 2], [10, x * 2 - 1]];
+  };
+  const out = {};
+  for (const [w, a] of cell(weight)) for (const [m, b] of cell(muscle)) {
+    if ((w !== 5 || m !== 5) && a * b > 0) out[`w${w}_m${m}`] = (out[`w${w}_m${m}`] ?? 0) + a * b;
+  }
+  return out;
+}
 const damp = (cur, target, k, dt) => cur + (target - cur) * (1 - Math.exp(-k * dt));
 const mix = (a, b, t) => a + (b - a) * t;
 
@@ -341,7 +357,7 @@ export class Avatar {
       o.frustumCulled = false; // la caja de la malla es la de reposo: al animarse puede cortarse
       o.raycast = noRaycast;
       const name = o.material.name;
-      if (/Superhero/i.test(name)) { o.material = bodyMaterial(o.material, this.uniforms); body = o; }
+      if (isBodyMaterial(name)) { o.material = bodyMaterial(o.material, this.uniforms); body = o; }
       else if (/Eyes/i.test(name)) o.material = eyeMaterial(o.material, this.uniforms);
       else { o.material = o.material.clone(); o.material.color = this.mats.hair.color; o.userData.hair = true; } // cejas
       meshes.push(o);
@@ -380,14 +396,13 @@ export class Avatar {
     if (!m) return;
     const L = this.look;
     const style = LEGACY_HAIR[L.hairStyle] ?? L.hairStyle;
-    let file = HAIR_FILES[style] ?? HAIR_FILES.corto;
-    if (typeof file === 'object') file = file[m.type];
-    const files = [file, L.beard ? 'Hair_Beard' : null].filter(Boolean);
+    const files = [hairFile(m.type, LOOK_OPTIONS.hairStyle.includes(style) ? style : 'corto'),
+      L.beard ? beardFile(m.type, LOOK_OPTIONS.beardStyle.includes(L.beardStyle) ? L.beardStyle : 'completa') : null].filter(Boolean);
     const key = files.join('+');
     this.updateHairVisibility();
     if (m.hairKey === key) return;
     m.hairKey = key;
-    const parts = await Promise.all(files.map((f) => load(`hair/${f}.gltf`)));
+    const parts = await Promise.all(files.map((f) => load(f)));
     if (this.disposed || this.model !== m || m.hairKey !== key) return;
     for (const h of this.hairMeshes) { h.removeFromParent(); h.material.dispose(); }
     this.hairMeshes = [];
@@ -416,28 +431,19 @@ export class Avatar {
     for (const h of this.hairMeshes) h.visible = !(hat && h.userData.style === 'corto');
   }
 
-  // Tipo de cuerpo (peso y músculo, 0..1; 0,5 = promedio). Si el modelo trae deformaciones
-  // (morph targets peso_bajo/peso_alto/musculo_bajo/musculo_alto, también en pelo y ropa)
-  // se usan esas; si no, se aproxima ensanchando huesos (personaje viejo, sin deformaciones).
+  // Tipo de cuerpo (peso y músculo, 0..1; 0,5 = promedio), como los macros de MakeHuman: hay una forma
+  // en cada combinación de peso y músculo en 0, 0,5 y 1 (w{0,5,10}_m{0,5,10}, relativas al promedio)
+  // y se mezclan las 4 de alrededor (interpolación bilineal). Vale para cuerpo, ojos, cejas, pelo y barba.
   applyShape() {
     const m = this.model;
     if (!m) return;
-    const { weight, muscle } = this.look;
-    const infl = {
-      peso_bajo: Math.max(0, 0.5 - weight) * 2, peso_alto: Math.max(0, weight - 0.5) * 2,
-      musculo_bajo: Math.max(0, 0.5 - muscle) * 2, musculo_alto: Math.max(0, muscle - 0.5) * 2,
-    };
-    let morphs = false;
+    const infl = shapeInfluences(this.look.weight, this.look.muscle);
     for (const o of [...m.meshes, ...this.hairMeshes]) {
       const dict = o.morphTargetDictionary;
       if (!dict) continue;
-      for (const [k, v] of Object.entries(infl)) if (dict[k] !== undefined) { o.morphTargetInfluences[dict[k]] = v; morphs = true; }
+      o.morphTargetInfluences.fill(0);
+      for (const [k, v] of Object.entries(infl)) if (dict[k] !== undefined) o.morphTargetInfluences[dict[k]] = v;
     }
-    if (morphs) return;
-    const R = m.rig, w = weight - 0.5, mu = muscle - 0.5;
-    R.widen('spine_01', 1 + w * 0.6 + mu * 0.15, ['clavicle_l', 'clavicle_r', 'neck_01']);
-    const limb = 1 + w * 0.3 + mu * 0.25;
-    for (const n of ['upperarm_l', 'upperarm_r', 'thigh_l', 'thigh_r']) R.bones[n].bone.scale.set(limb, 1, limb);
   }
 
   dropModel() {

@@ -100,7 +100,11 @@ npm run deploy   # build + wrangler deploy
   admins entran también a salas cerradas.
 - La interfaz de avatar (`setLook`, `setEquip`, `gesture(nombre)`, `update(dt, {speed, pose, turn, landing})`,
   `root`, `scale`, `phase`, `mats.skin/shirt`) la usan el controlador, los jugadores remotos y los brazos
-  de 1ª persona. El modelo (Quaternius) se carga en segundo plano: `avatar.model` es `null` hasta entonces.
+  de 1ª persona. El modelo se carga en segundo plano: `avatar.model` es `null` hasta entonces.
+- **Personaje MakeHuman** (`public/models/makehuman/`): se genera en Blender (MPFB 2 + MCP de Blender, solo en
+  la PC del usuario) con `assets-src/makehuman/build.py` y `export.py` (`GENDER = 'masc'|'fem'`). Esqueleto con
+  nombres de Quaternius en pose T; cada malla trae las formas `w{0,5,10}_m{0,5,10}` que `applyShape` mezcla
+  (bilineal) según peso y músculo. Pelo y barba en gris: el juego los tiñe. Material del cuerpo: `Body`.
 - **Animaciones** en `src/player/anims.js`: se adaptan al esqueleto de Quaternius comparando con la pose
   de reposo (todas en pose T). Para sumar una de Mixamo: FBX Binary, Without Skin, 30 fps, en
   `public/models/anims/mixamo/` y agregarla en `GESTURE_CLIPS`.

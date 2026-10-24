@@ -286,7 +286,10 @@ const GROUPS = [
   ['body', 'Cuerpo'], ['skin', 'Piel'], ['eyes', 'Ojos'], ['hairStyle', 'Peinado'], ['beard', 'Barba'], ['hair', 'Color de pelo'],
   ['top', 'Arriba'], ['shirt', 'Color de remera / buzo'], ['pants', 'Pantalón'], ['shoes', 'Zapatillas'],
 ];
-const CHIP_LABELS = { masc: 'masculino', fem: 'femenino', false: 'sin barba', true: 'con barba' };
+const CHIP_LABELS = {
+  masc: 'masculino', fem: 'femenino', false: 'sin barba', true: 'con barba', flequillo: 'corto con flequillo',
+  completa: 'completa corta', tupida: 'tupida', candado: 'candado', bigote: 'bigote',
+};
 // Tipo de cuerpo del básico: el que coincide con los deslizadores del avanzado (si no, ninguno)
 const bodyTypeOf = (L) => Object.keys(BODY_TYPES).find((k) => Math.abs(BODY_TYPES[k].weight - L.weight) < 0.005 && Math.abs(BODY_TYPES[k].muscle - L.muscle) < 0.005);
 function swatchGroup(title, values, isSel, label, pick) {
@@ -313,6 +316,11 @@ function renderSwatches() {
     // Un color elegido en el avanzado que no está entre las muestras se ve primero, marcado
     const values = String(look[key]).startsWith('#') && !LOOK_OPTIONS[key].includes(look[key]) ? [look[key], ...LOOK_OPTIONS[key]] : LOOK_OPTIONS[key];
     root.append(swatchGroup(title, values, (v) => look[key] === v, (v) => CHIP_LABELS[v] ?? v, (v) => setLook({ ...look, [key]: v })));
+    // Con barba: aparece el tipo (por defecto, completa corta)
+    if (key === 'beard' && look.beard) {
+      root.append(swatchGroup('Tipo de barba', LOOK_OPTIONS.beardStyle, (v) => (look.beardStyle ?? 'completa') === v, (v) => CHIP_LABELS[v] ?? v,
+        (v) => setLook({ ...look, beardStyle: v })));
+    }
     if (key === 'body') {
       const type = bodyTypeOf(look);
       root.append(swatchGroup('Tipo de cuerpo', Object.keys(BODY_TYPES), (v) => v === type, (v) => BODY_TYPES[v].name,
