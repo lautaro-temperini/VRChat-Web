@@ -29,7 +29,7 @@ npm run dev
 | Museo | Hall con barra, baño y esculturas; pista con balcón en U, escenario, cabina de DJ, consola de artistas y una pantalla gigante |
 | DJ y artistas | El DJ pasa el audio de su PC por los parlantes del escenario; las luces laten con los graves. Artistas: luces por OSC (TouchDesigner, Ableton…) y visuales en la pantalla |
 | Día y noche | Según la hora de Argentina (GMT-3) |
-| Personaje | Modelo MakeHuman con editor (piel, ojos, 8 peinados, barbas, ropa, altura, peso y músculo), animaciones de Mixamo y gestos/bailes |
+| Personaje | Modelo MakeHuman (CC0) con editor: cuerpo masc/fem, peso y músculo reales, 8 peinados, barbas, ropa con volumen (remera, manga larga, camisa, campera, jean, short, calza, pollera, zapatillas, botas, zapatos) teñida del color elegido; animaciones de Mixamo y gestos/bailes |
 | Movimiento | Caminar, trotar (gasta stamina), saltar, trepar, agacharse, sentarse; 1ª/3ª persona con la rueda; manos en 1ª persona |
 | Cuentas | Registro con mail + nickname único (PBKDF2), o con Google o Discord. Invitados (sin cuenta) solo para probar: miran, chatean por texto y escuchan voces públicas; lo demás aparece con candado 🔒 |
 | Red social | Celular del personaje: amigos y buscador, muro (notas y fotos de amigos + destacados, me gusta), galería y avisos. Atril con notas y corazones en cada sala personal |

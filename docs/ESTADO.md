@@ -1,4 +1,4 @@
-# Estado del proyecto (23/10/2026)
+# Estado del proyecto (24/10/2026)
 
 Resumen para retomar el trabajo en otra sesión. Leé antes [CLAUDE.md](../CLAUDE.md) (reglas de trabajo,
 stack, cómo probar) y [ROADMAP.md](ROADMAP.md) (todas las decisiones de diseño, una por fila).
@@ -12,7 +12,7 @@ stack, cómo probar) y [ROADMAP.md](ROADMAP.md) (todas las decisiones de diseño
 artistas de 20 a 40 años (+18). Mundo 3D en el navegador (Three.js + Vite) con servidor en Cloudflare
 Workers + Durable Objects. Todo se trabaja sobre `main` (no hay otras ramas).
 
-## Qué se hizo (sesiones del 20 al 23/10)
+## Qué se hizo (sesiones del 20 al 24/10)
 
 ### Base para abrir al público (paso 1 del plan): ✅ terminado
 - **Cuentas:** registro con mail + nickname único (se entra con cualquiera de los dos), y ahora también
@@ -53,7 +53,7 @@ Cada rama dejó su nota en `docs/ramas/` (qué hizo, archivos, protocolo, migrac
 ### Antes de eso (ya estaba)
 Museo con DJ (música desde la PC), consola de artistas (luces por OSC y visuales), red social en el
 celular del personaje (amigos, muro, galería, avisos), atril con notas y corazones, salas personales con
-privacidad, favoritas, personaje Quaternius con animaciones de Mixamo, inventario e intercambios.
+privacidad, favoritas, personaje con animaciones de Mixamo, inventario e intercambios.
 
 ### Diseño definido (sin programar todavía)
 - **Diseños de artistas:** estampas, cuadros y modelos 3D; control automático (no de contenido);
@@ -74,25 +74,37 @@ Para volver a subir: `npm run deploy` desde la carpeta del proyecto.
   (Cloudflare → Realtime → TURN). Revisar antes cómo se cobra.
 - **Nombrar curadores fundadores** con `/curador nick` en el chat (mientras tanto verifican los admins).
 
+### Personaje y ropa (24/10, sesión en la PC del usuario con el MCP de Blender)
+- ✅ **Personaje MakeHuman** (online): cuerpos masc/fem con 8 formas de peso y músculo (bilineal, como
+  MakeHuman), 8 peinados (corto, flequillo, largo, rapado, rulos, coleta, trenza, bob; rodete → trenza) y
+  barba con tipo (completa corta, tupida, candado, bigote). Quaternius borrado del repo.
+- ✅ **Ropa con volumen** (en `main`, **todavía sin `npm run deploy`**): 11 prendas (arriba: remera, manga
+  larga, camisa, campera; abajo: jean, short, calza, pollera; pies: zapatillas, botas, zapatos), teñidas
+  conservando el dibujo, piel tapada escondida (`_cover`/`uHide`), medias siempre blancas.
+- Todo se genera en Blender con `assets-src/makehuman/build.py` + `export.py` (`GENDER = 'masc'|'fem'`); los
+  `.blend` de trabajo también están ahí. **Solo se puede regenerar en la PC del usuario** (Blender + MPFB 2 +
+  MCP de Blender; `.mcp.json` local, fuera de git). Packs instalados en MPFB: sistema, Bodyparts 05, Shoes 01.
+- **Hair 01** (217 MB, CC0) se estaba bajando a `Descargas\makehuman\hair01_cc0.zip`: falta instalarlo en MPFB
+  (`Install pack from zip`) y elegir con el usuario cuáles de sus 24 peinados se suman.
+
 ### Para programar, en este orden
-1. **Conectar recompensas con muebles:** que la progresión también dé muebles especiales (la rareza
-   provisoria ya está decidida en ROADMAP; ver `docs/ramas/progresion.md` → "Pendiente para conectar con el editor").
-2. **Personaje MakeHuman** ✅ (24/10): cuerpos masc/fem con 8 formas de peso y músculo, 8 peinados y 4 barbas
-   (`public/models/makehuman/`, generados con `assets-src/makehuman/build.py` + `export.py` desde Blender con
-   MPFB 2 y el MCP de Blender). Ropa con volumen ✅ (11 prendas, piel tapada escondida, medias blancas).
-   Falta: revisar cómo quedan los accesorios (gorros, anteojos, cadena), borrar
-   `public/models/quaternius/` (hecho) y achicar las
-   animaciones para celular. Consumibles y beso: decididos, sin programar.
-3. **Diseños de artistas como objetos** y más mapas públicos (paso 5).
-4. **Revisión de permisos del servidor y pruebas automáticas** (cuando se junten las ramas de los agentes):
-   revisar que cada acción (intercambios, moderación, Museo, grupos) valide quién, qué y dónde, como ya
-   se hizo con soltar/juntar objetos; pruebas con dos clientes, desconexión, reconexión y acciones a la
-   vez; y partir `src/main.js` en módulos.
-5. **Primera prueba con gente real:** inauguración con 5–10 artistas exponiendo.
+1. **Editor de personaje Básico / Avanzado** (decidido 24/10, ver ROADMAP): Básico = cuerpo, tipo de cuerpo,
+   piel, 6 peinados principales, color de pelo y **estilos de ropa armados**; Avanzado = prendas por separado,
+   todos los peinados y barbas, deslizadores y RGB. **Consultar**: qué estilos (nombre y prendas de cada uno)
+   y cuáles son los 6 peinados del básico. Se puede hacer en la nube (es código, `src/main.js` + `avatar.js`).
+2. **Peinados de Hair 01** (necesita la PC del usuario con Blender): instalar el pack, mostrarle los 24 y sumar
+   los elegidos a `HAIRS` en `build.py`, a `HAIR_STYLES` (shared.js) y `LOOK_OPTIONS` (avatar.js).
+3. **Accesorios** (gorros, anteojos, cadena): revisar cómo quedan en el cuerpo nuevo (`BODIES` en avatar.js).
+4. **Conectar recompensas con muebles** (rareza provisoria decidida; ver `docs/ramas/progresion.md`).
+5. **Consumibles y beso** (decididos en ROADMAP, sin programar).
+6. **Diseños de artistas como objetos** y más mapas públicos (paso 5).
+7. **Seguridad y pruebas**: hay un agente en la rama `agente/seguridad` (tests en `test/`, cambios en
+   `server/worker.js`, `works.js`, `main.js`, `net.js`…). Juntarla a `main` con cuidado; no pisarla.
+   También hay una rama `claude/master-2410` (mensajes entre amigos, grupos fantasma) sin juntar.
+8. Achicar animaciones para celular. **Primera prueba con gente real** (inauguración con 5–10 artistas).
 
 ### Pendientes sueltos (consultar antes)
-Más ropa/peinados/cejas, stamina con consumibles (falta cómo se consigue
-cada uno), reportar, nombre y marca definitivos, AR.
+Reportar, nombre y marca definitivos, AR, ajustes de cara en el avanzado.
 
 ## Cómo probar
 

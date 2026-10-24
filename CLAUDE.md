@@ -47,7 +47,10 @@ npm run deploy   # build + wrangler deploy
 
 ## Cosas a saber
 
-- **Ramas:** se trabaja sobre `main` (todas las ramas anteriores ya se juntaron ahí).
+- **Ramas:** se trabaja sobre `main`. Hay ramas de agentes sin juntar (por ejemplo `agente/seguridad`):
+  antes de tocar archivos que ellas cambian, mirar `git diff main...origin/<rama>` para no pisarlas.
+- **Nube vs. PC del usuario:** el código se puede tocar desde cualquier sesión, pero regenerar los modelos del
+  personaje (Blender + MPFB 2 + MCP de Blender) solo se puede en la PC del usuario.
 - **Cuentas:** registro con mail + nickname único; se entra con cualquiera de los dos, o con **Google / Discord**
   (`oauthStart` → `/api/oauth/<proveedor>/callback` → `#login=<código>` → `oauthFinish`; si es nueva, `oauthNick`).
   Client ID en `wrangler.jsonc`; `GOOGLE_CLIENT_SECRET` y `DISCORD_CLIENT_SECRET` en `.dev.vars` / `wrangler secret`. Invitado =
