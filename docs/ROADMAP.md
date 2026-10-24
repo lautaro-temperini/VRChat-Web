@@ -211,6 +211,8 @@ La música del DJ y el puente OSC ya están hechos. Falta:
 | Museo rotativo: escasez | Sin cambios por ahora (todavía no hay tanta gente). Que una persona ocupe varios lugares el mismo día está bien: da coherencia temática |
 | Balcón: barandas | El vidrio del balcón se salta: pegado al vidrio y mirándolo, Espacio. Animación hecha por código (salto de costado apoyando una mano); al caer, aterrizaje normal. El salto común ya no lo pasa |
 | Objetos del piso: alcance | Se sueltan y se juntan hasta 3 m (como la E). Si se arrastra más lejos, cae a 3 m en esa dirección. El servidor lo controla |
+| Mensajes entre amigos | Chat 1 a 1 en la app **Mensajes** del celular, con historial (los últimos 50 por conversación). Si el amigo está desconectado, le queda guardado. Aviso en pantalla con "Responder" y contador en el botón Amigos. En el chat se ve dónde está y un botón **Ir allá** |
+| Mensajes: límites | Solo entre amigos; hasta 200 caracteres; mismo antiflood que el chat de la sala. Si te ignoró o te restringió, no le llega (y no se entera) |
 | Escaleras: costados | El vidrio de la escalera es barrera: no se atraviesa ni se salta |
 | Progresión | Niveles por puntos (**privados**, solo los ve uno) + insignias por logros (**públicas**, se ven en el perfil) |
 | Progresión: qué suma | Descubrir (ver obras, visitar salas), exponer (obras aceptadas), curar (verificar/denegar) y asistir a eventos (sets de DJ, inauguraciones, pasar música o luces). Cada cosa da puntos **una sola vez** (la misma obra o sala no suma dos veces) |
@@ -280,3 +282,16 @@ La música del DJ y el puente OSC ya están hechos. Falta:
 | Muro: notas (24/10) | Hasta 20 notas por hora por persona |
 | Amistad rechazada (24/10) | No se le vuelve a mandar solicitud a esa persona por 24 h ("Ya le mandaste una solicitud hace poco. Probá de nuevo mañana."). El que rechazó sí puede mandarla |
 | Intercambios e ignorados (24/10) | Alguien ignorado o restringido no te puede invitar a intercambiar (no se entera, como con los grupos) |
+| Rareza de los muebles especiales | Provisoria, para probar los porcentajes: trono dorado = exótico; bola de espejos y sillón con neón = raro; escultura de neón = básico. Las prendas quedan como están (cadena raro, corona exótico, el resto básico) |
+| Modelos 3D de usuarios | Mismas reglas que los diseños de artistas: GLB, hasta 2 MB, 10.000 triángulos, texturas 1K, máximo 3 m, sin scripts; control automático, sin revisar el contenido |
+| Consumibles: cuáles | Para empezar: trago y café |
+| Consumibles: cómo se consiguen | En la barra del hall (E, sin límite), como recompensa de misiones y niveles (van al inventario), regalándolos o intercambiándolos, y con muebles especiales que el dueño pone en su sala y dan consumibles a los visitantes |
+| Consumibles: efecto | 2 minutos sin gastar stamina. Mientras el efecto está activo no se puede tomar otro |
+| Beso | E sobre alguien → "Beso": al otro le llega el pedido con Aceptar / Rechazar. Si acepta, los dos hacen el gesto y los dos reciben el efecto de stamina. Rechazar usa el mismo bloqueo creciente que las invitaciones a grupos |
+| Cuerpo: base MakeHuman (24/10) | Peso y músculo se combinan como en MakeHuman (mucho peso + poco músculo = gordo; mucho peso + mucho músculo = grande). Tipos del básico: **flaco** = peso 0 y músculo 0; **promedio** = 0,5 y 0,5; **gordo** = peso 1 y músculo 0; **musculoso** = peso 0,75 y músculo 1 |
+| Peinados MakeHuman (24/10) | corto = short01 (prolijo), largo = long01, rapado = short04, rulos = afro01, coleta = ponytail01. Nuevos: **trenza** (braid01), **bob** (bob02) y **corto con flequillo** (short03). El rodete sale: las cuentas que lo tenían se ven con trenza |
+| Barba (24/10) | Se mantiene el interruptor sí/no; al activarlo aparece un selector: **tupida, completa corta, candado o bigote** (por defecto completa corta). Las cuentas que ya tenían barba quedan con completa corta |
+| Ropa con volumen (24/10) | Prendas reales (MakeHuman, CC0) en vez de pintadas. **Arriba**: remera, manga larga, camisa, campera. **Abajo**: jean, short, calza, pollera. **Pies**: zapatillas (blancas), botas, zapatos. Se tiñen con el color elegido pero conservan su dibujo (logo, rayas, desgaste). Todo libre: cualquier cuerpo usa cualquier prenda |
+| Botas y medias (24/10) | Botas: las botas cortas del pack Shoes 01 (CC0). Las medias que traen zapatillas y zapatos quedan siempre blancas; el calzado toma el color elegido |
+| Editor de personaje: Básico y Avanzado (24/10) | **Básico** (para los que recién empiezan): cuerpo, tipo de cuerpo, piel, 6 peinados principales, color de pelo y un **estilo de ropa ya armado**. **Avanzado**: todas las prendas por separado, todos los peinados y barbas, deslizadores de peso/músculo/altura y color RGB de todo |
+| Más peinados (24/10) | Se suma el pack Hair 01 de MakeHuman (CC0) |

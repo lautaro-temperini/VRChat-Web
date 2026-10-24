@@ -283,6 +283,11 @@ export class Room extends DurableObject {
       ws.serializeAttachment(meta);
       const s = cleanState(msg.s);
       if (s) this.states.set(meta.id, s);
+      // Grupos viejos: si se cortó la conexión sin avisar (pestaña cerrada, deploy), el grupo quedaba
+      // guardado y al volver figuraba "En grupo". Se disuelven los que no tienen a nadie conectado.
+      const present = new Set(this.joined().filter((w) => w !== ws).map((w) => w.deserializeAttachment().userId));
+      const stale = Object.keys(this.groups).filter((gid) => !this.groups[gid].members.some((u) => present.has(u)));
+      if (stale.length) { for (const gid of stale) delete this.groups[gid]; await this.saveGroups(); }
       const chat = (await this.ctx.storage.get('chat')) ?? [];
       this.send(ws, {
         t: 'welcome', id: meta.id, players: this.players(ws), chat, screen: this.screen, dj: this.dj, parts: this.parts, lights: this.lights, groups: this.groups,
@@ -778,6 +783,13 @@ export class Room extends DurableObject {
   // y puede sacar a alguien; si se va, el líder pasa al siguiente. Solo dentro de esta sala.
   // Anti-acoso (en la cuenta): si rechazás, esa persona no te puede reinvitar por un tiempo
   // que crece, y quien está ignorado o restringido no te puede invitar (no se entera).
+
+  // Mensaje para alguien de esta sala que manda Accounts (p. ej. un mensaje privado de un amigo)
+  async pushToUser(userId, data) {
+    const ws = this.connOfUser(String(userId));
+    if (ws) this.send(ws, data);
+    return !!ws;
+  }
 
   connOfUser(userId) {
     return this.joined().find((ws) => ws.deserializeAttachment().userId === userId) ?? null;

@@ -52,7 +52,10 @@ Cada agujero de seguridad que se cierre lleva su prueba en `test/` (clientes Web
 
 ## Cosas a saber
 
-- **Ramas:** se trabaja sobre `main` (todas las ramas anteriores ya se juntaron ahí).
+- **Ramas:** se trabaja sobre `main`. Hay ramas de agentes sin juntar (por ejemplo `agente/seguridad`):
+  antes de tocar archivos que ellas cambian, mirar `git diff main...origin/<rama>` para no pisarlas.
+- **Nube vs. PC del usuario:** el código se puede tocar desde cualquier sesión, pero regenerar los modelos del
+  personaje (Blender + MPFB 2 + MCP de Blender) solo se puede en la PC del usuario.
 - **Cuentas:** registro con mail + nickname único; se entra con cualquiera de los dos, o con **Google / Discord**
   (`oauthStart` → `/api/oauth/<proveedor>/callback` → `#login=<código>` → `oauthFinish`; si es nueva, `oauthNick`).
   Client ID en `wrangler.jsonc`; `GOOGLE_CLIENT_SECRET` y `DISCORD_CLIENT_SECRET` en `.dev.vars` / `wrangler secret`. Invitado =
@@ -72,6 +75,8 @@ Cada agujero de seguridad que se cierre lleva su prueba en `test/` (clientes Web
 - **Salas personales y editor** (`src/world/rooms.js`, `templates.js`, `furniture.js`, `editor.js`; servidor
   `server/editor.js`): el diseño de cada sala vive en el storage de su Room (clave `layout`); catálogos
   `ROOM_TEMPLATES` y `FURNITURE` en `server/shared.js`. Muebles especiales puestos: `items.owner_id = 'room:<id>'`.
+- **Mensajes entre amigos** (`server/messages.js` mezclado en `Accounts`, `src/ui/messages.js` = app del celular):
+  rutas `dms` (conversaciones), `dm?id=` (una conversación, la marca leída) y `POST dm`.
 - **Progresión** (`server/progress.js` mezclado en `Accounts`, `src/ui/progress.js`): puntos una sola vez por
   cosa (`progress_log`), insignias, camino y diarias. Enganches con `progressTrack(...)` en works/accounts/room.
 - **Carga de modelos:** usar `loadGLTF` de `src/loaders.js` (Draco, meshopt, KTX2), no `new GLTFLoader()`.
@@ -103,7 +108,7 @@ Cada agujero de seguridad que se cierre lleva su prueba en `test/` (clientes Web
   el juego corre a muy pocos cuadros: para probar física llamar a `ctrl.update(1/60)` en un bucle.
 - **Protocolo de la sala** (mensajes `t`): `join`, `s` (estado `[x,y,z,yaw,vel,pose]`, pose 0–5: parado, agachado, sentado, trepando, aire, saltando baranda), `afk`,
   `mic`, `look`, `chat`, `sfu` (pedidos al servidor de audio: push/unpush/pull/unpull/answer), `sfu-cut`,
-  `pub` (alguien publicó su voz), `sfu` op `ice` (servidores TURN), `group` (invite/respond/leave/kick), `groups` (estado de los grupos), `screen`, `drop`, `pickup`, `mod`, `trade`, `emote` (gestos), `dj` (cabina: on/off, track), `part` (consola de artistas: luces / escenario), `luces` (estado de las luces por OSC), `edit` (editor: template/add/update/remove) → `layout`, `piece`, `piece-`, `edit-fail`, `progress` (avisos de progresión).
+  `pub` (alguien publicó su voz), `sfu` op `ice` (servidores TURN), `group` (invite/respond/leave/kick), `groups` (estado de los grupos), `screen`, `drop`, `pickup`, `mod`, `trade`, `emote` (gestos), `dj` (cabina: on/off, track), `part` (consola de artistas: luces / escenario), `luces` (estado de las luces por OSC), `edit` (editor: template/add/update/remove) → `layout`, `piece`, `piece-`, `edit-fail`, `progress` (avisos de progresión), `dm` (mensaje privado de un amigo: lo manda Accounts a la sala donde está con `pushToUser`).
 - **Puente OSC:** `npm run puente` (sin dependencias) recibe OSC en el puerto 9000 y lo pasa a la pestaña
   del juego por http://127.0.0.1:9001. Direcciones en `src/net/osc.js`.
 - El servidor nunca confía en el cliente para nombre, ropa ni objetos: los lee de `Accounts`.
@@ -117,7 +122,13 @@ Cada agujero de seguridad que se cierre lleva su prueba en `test/` (clientes Web
   admins entran también a salas cerradas.
 - La interfaz de avatar (`setLook`, `setEquip`, `gesture(nombre)`, `update(dt, {speed, pose, turn, landing})`,
   `root`, `scale`, `phase`, `mats.skin/shirt`) la usan el controlador, los jugadores remotos y los brazos
-  de 1ª persona. El modelo (Quaternius) se carga en segundo plano: `avatar.model` es `null` hasta entonces.
+  de 1ª persona. El modelo se carga en segundo plano: `avatar.model` es `null` hasta entonces.
+- **Personaje MakeHuman** (`public/models/makehuman/`): se genera en Blender (MPFB 2 + MCP de Blender, solo en
+  la PC del usuario) con `assets-src/makehuman/build.py` y `export.py` (`GENDER = 'masc'|'fem'`). Esqueleto con
+  nombres de Quaternius en pose T; cada malla trae las formas `w{0,5,10}_m{0,5,10}` que `applyShape` mezcla
+  (bilineal) según peso y músculo. Pelo, barba y ropa en gris: el juego los tiñe. Material del cuerpo: `Body`.
+  Ropa: `clothes/<cuerpo>/<prenda>.gltf` (arriba/abajo/calzado, `outfitOf(look)`); el cuerpo trae `_cover` (bits
+  en el orden de `GARMENT_BITS`) y el sombreador descarta la piel tapada por lo puesto (`uHide`). Medias: material `Socks*`, sin teñir.
 - **Animaciones** en `src/player/anims.js`: se adaptan al esqueleto de Quaternius comparando con la pose
   de reposo (todas en pose T). Para sumar una de Mixamo: FBX Binary, Without Skin, 30 fps, en
   `public/models/anims/mixamo/` y agregarla en `GESTURE_CLIPS`.

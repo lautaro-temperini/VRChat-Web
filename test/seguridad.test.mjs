@@ -384,3 +384,50 @@ test('amistad rechazada: no se vuelve a mandar en 24 h', async () => {
   // Al revés sí puede (el que rechazó cambia de idea)
   assert.ok((await api('friendrequest', { method: 'POST', token: b.token, body: { id: a.user.id } })).ok);
 });
+
+// ---------- Mensajes entre amigos (server/messages.js) ----------
+
+async function friends(a, b) {
+  await api('friendrequest', { method: 'POST', token: a.token, body: { id: b.user.id } });
+  await api('friendrespond', { method: 'POST', token: b.token, body: { id: a.user.id, accept: true } });
+}
+
+test('mensajes privados: solo entre amigos, ni invitados ni leer conversaciones ajenas', async () => {
+  const a = await account('dm'), b = await account('dm'), c = await account('dm'), g = await guest();
+  assert.equal((await api('dm', { method: 'POST', token: a.token, body: { to: b.user.id, text: 'hola' } })).ok, false);
+  assert.equal((await api('dm', { method: 'POST', token: g.token, body: { to: b.user.id, text: 'hola' } })).ok, false);
+  await friends(a, b);
+  assert.ok((await api('dm', { method: 'POST', token: a.token, body: { to: b.user.id, text: 'hola' } })).ok);
+  // c no es amigo de ninguno: no lee la conversación de a con b
+  assert.equal((await api(`dm?id=${a.user.id}`, { token: c.token })).ok, false);
+  assert.equal((await api(`dm?id=${b.user.id}`, { token: a.token })).messages.length, 1);
+});
+
+test('mensajes privados: hasta 200 caracteres, sin control, y con antiflood', async () => {
+  const a = await account('dm'), b = await account('dm');
+  await friends(a, b);
+  const r = await api('dm', { method: 'POST', token: a.token, body: { to: b.user.id, text: `\u0007${'x'.repeat(500)}` } });
+  assert.ok(r.ok);
+  assert.equal(r.message.text.length, 200);
+  assert.equal((await api('dm', { method: 'POST', token: a.token, body: { to: b.user.id, text: { a: 1 } } })).ok, true, 'un objeto se vuelve texto, no rompe');
+  let blocked = false;
+  for (let i = 0; i < 8; i++) if (!(await api('dm', { method: 'POST', token: a.token, body: { to: b.user.id, text: `m${i}` } })).ok) blocked = true;
+  assert.ok(blocked, 'muchos seguidos se frenan');
+});
+
+test('mensajes privados: si te ignoró no le llega (y no te enteras); si está conectado le llega al instante', async () => {
+  const a = await account('dm'), b = await account('dm');
+  await friends(a, b);
+  const cb = await joined(b.token);
+  assert.ok((await api('dm', { method: 'POST', token: a.token, body: { to: b.user.id, text: 'al toque' } })).ok);
+  const m = await cb.wait((x) => x.t === 'dm');
+  assert.equal(m.text, 'al toque');
+  assert.equal(m.from.id, a.user.id);
+  await api('ignore', { method: 'POST', token: b.token, body: { id: a.user.id, on: true } });
+  const r = await api('dm', { method: 'POST', token: a.token, body: { to: b.user.id, text: 'no llega' } });
+  assert.ok(r.ok);
+  assert.ok(await cb.none('dm'));
+  const th = await api(`dm?id=${a.user.id}`, { token: b.token });
+  assert.ok(!th.messages.some((x) => x.text === 'no llega'));
+  await cb.close();
+});

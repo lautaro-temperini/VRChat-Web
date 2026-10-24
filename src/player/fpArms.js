@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { POSE } from './avatar.js';
+import { POSE, outfitOf } from './avatar.js';
 
 // Brazos y manos que se ven en primera persona (estilo cámara GoPro).
 // Viven en una escena aparte que se dibuja encima del mundo, así nunca
@@ -59,9 +59,9 @@ export class FPArms {
     });
   }
 
-  // Llamar cuando cambia la ropa (remera = brazo descubierto, buzo = manga)
+  // Llamar cuando cambia la ropa (remera = brazo descubierto; manga larga, camisa y campera = manga)
   syncLook() {
-    for (const a of this.arms) a.cuff.visible = this.avatar.look.top === 'buzo';
+    for (const a of this.arms) a.cuff.visible = outfitOf(this.avatar.look).top !== 'remera';
   }
 
   // Estira la mano derecha al interactuar con algo

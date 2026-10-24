@@ -397,6 +397,10 @@
         <h1 class="display">Mi galería</h1>
         <div id="phone-gallery"></div>
       </section>
+      <section class="app" data-app="mensajes" hidden>
+        <h1 class="display">Mensajes</h1>
+        <div id="dm-box"></div>
+      </section>
       <section class="app" data-app="avisos" hidden>
         <h1 class="display">Avisos</h1>
         <div id="notif-list"></div>
@@ -404,6 +408,7 @@
     </div>
     <nav class="phone-dock">
       <button data-app="amigos" class="on" title="Amigos">👥<span>Amigos</span></button>
+      <button data-app="mensajes" title="Mensajes">💬<span>Mensajes</span><b class="count" id="dm-count" hidden></b></button>
       <button data-app="notas" title="Muro">📰<span>Muro</span></button>
       <button data-app="galeria" title="Mi galería">🖼️<span>Galería</span></button>
       <button data-app="avisos" title="Avisos">🔔<span>Avisos</span><b class="count" id="notif-count" hidden></b></button>

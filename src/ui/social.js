@@ -88,6 +88,7 @@ export function createSocial({ net, ui, me, room, onEquip, onDrop }) {
   // ---------- Amigos y salas ----------
 
   const roomOf = (userId) => `u-${userId}`;
+  let writeTo = null; // abrir el chat con un amigo (lo pone el celular)
   function go(target) {
     if (target === room) return toast('Ya estás en esa sala.');
     location.search = `?sala=${encodeURIComponent(target)}`;
@@ -174,6 +175,7 @@ export function createSocial({ net, ui, me, room, onEquip, onDrop }) {
       ]);
     }
     const friendButtons = (f) => [
+      ...(writeTo ? [['Escribir', () => writeTo(f.id)]] : []),
       ...(f.room && f.room !== room ? [['Ir', () => go(f.room), 'on']] : []),
       ['Su sala', () => go(roomOf(f.id))],
     ];
@@ -326,6 +328,7 @@ export function createSocial({ net, ui, me, room, onEquip, onDrop }) {
   }
 
   return {
+    setWriter: (fn) => { writeTo = fn; },
     openInventory, openFriends, refreshFriends, profileActions, onTrade, cancelTrade, loadInventory, go, roomLabel, dropByIid,
     get friends() { return friendsData; },
     get trading() { return !!trade; },

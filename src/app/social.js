@@ -184,7 +184,7 @@ const social = createSocial({
 $('btn-inv').onclick = () => (body.classList.contains('inventory') ? G.closeOverlays() : social.openInventory());
 
 // Celular (la red social): inicio = amigos. Mientras está abierto, el personaje lo tiene en la mano.
-const phone = createPhone({ social, me: () => G.account, go: (target) => social.go(target) });
+const phone = createPhone({ social, me: () => G.account, go: (target) => social.go(target), room });
 G.sendPhone = (v) => { if (net.ready) net.send({ t: 'phone', v }); };
 async function openPhone() {
   await social.openFriends();

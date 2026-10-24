@@ -144,6 +144,7 @@ net
   .on('sfu-cut', ({ mids }) => rtc.cut(mids))
   .on('pub', ({ id, kind }) => { const r = remotes.get(id); if (r && kind === 'voice') r.hasVoice = true; })
   .on('groups', ({ groups: g }) => { groups.all = g ?? {}; applyGroups(); })
+  .on('dm', (m) => phone.onDM(m))
   .on('group', (m) => {
     if (m.op === 'sent') toast(`Invitaste a ${m.name} a tu grupo de voz.`);
     else if (m.op === 'invite') {
