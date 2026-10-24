@@ -35,12 +35,27 @@ export function createSocial({ net, ui, me, room, onEquip, onDrop }) {
     return b;
   }
 
+  // Pestañas del inventario: Mochila (ropa, accesorios y consumibles) y Mobiliario (muebles especiales)
+  let invTab = 'mochila';
+  for (const b of document.querySelectorAll('#inv-tabs [data-inv]')) {
+    b.onclick = () => {
+      invTab = b.dataset.inv;
+      for (const x of document.querySelectorAll('#inv-tabs [data-inv]')) x.classList.toggle('active', x === b);
+      renderInventory();
+    };
+  }
+  const isFurniture = (it) => !ITEMS[it.type] && !!FURNITURE[it.type];
+
   function renderInventory() {
     const grid = $('inv-grid');
     grid.innerHTML = '';
+    $('inv-hint').textContent = invTab === 'mobiliario'
+      ? 'Tus muebles especiales: se ponen en tu sala con "Editar sala" (G). También podés soltarlos o intercambiarlos.'
+      : 'Tocá un objeto para ponértelo o sacártelo. Uno por lugar del cuerpo.';
     if (isGuest) { grid.innerHTML = '<div class="empty">Los invitados no tienen objetos. Creá tu cuenta (Personaje → Crear cuenta) y recibís tus primeros objetos.</div>'; return; }
-    if (!items.length) grid.innerHTML = '<div class="empty">No tenés objetos todavía.</div>';
-    for (const it of items) {
+    const shown = items.filter((it) => isFurniture(it) === (invTab === 'mobiliario'));
+    if (!shown.length) grid.innerHTML = `<div class="empty">${invTab === 'mobiliario' ? 'No tenés muebles todavía.' : 'No tenés objetos todavía.'}</div>`;
+    for (const it of shown) {
       const c = card(it, {
         onClick: async () => {
           if (!ITEMS[it.type]) return toast('Los muebles se ponen en tu sala, con "Editar sala".');

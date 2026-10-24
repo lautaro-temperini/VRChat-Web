@@ -215,6 +215,7 @@
         <dt>M</dt><dd>Silenciar música / pantalla de la sala</dd>
         <dt>Tab (mantener)</dt><dd>Jugadores e info de la sala</dd>
         <dt>Y</dt><dd>Mapa: salas</dd>
+        <dt>G</dt><dd>Editar tu sala (en tu sala)</dd>
         <dt>R</dt><dd>Gestos</dd>
         <dt>Esc</dt><dd>Este menú</dd>
         <dt>P · I · F</dt><dd>Personaje · Inventario · Amigos</dd>
@@ -370,7 +371,11 @@
   <!-- Inventario -->
   <aside id="inventory" class="panel">
     <h1 class="display">Inventario</h1>
-    <p class="meta">Tocá un objeto para ponértelo o sacártelo. Uno por lugar del cuerpo.</p>
+    <div class="tabs" id="inv-tabs">
+      <button class="tab active" data-inv="mochila">Mochila</button>
+      <button class="tab" data-inv="mobiliario">Mobiliario</button>
+    </div>
+    <p class="meta" id="inv-hint">Tocá un objeto para ponértelo o sacártelo. Uno por lugar del cuerpo.</p>
     <div id="inv-grid" class="items"></div>
     <button class="cta" data-close-panel>Listo</button>
   </aside>

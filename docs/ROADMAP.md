@@ -298,3 +298,5 @@ La música del DJ y el puente OSC ya están hechos. Falta:
 | Más peinados (24/10) | Se suma el pack Hair 01 de MakeHuman (CC0) |
 | Peinados de Hair 01 (24/10) | Se suman 24 (todos los del pack menos el corto rosa con volumen y el anime, por pesados) + short02 del sistema. Hay un rodete de verdad: las cuentas que tenían "rodete" lo vuelven a ver. Básico: los 6 principales; Avanzado: los 32 |
 | Recompensas con muebles (24/10) | Los premios de niveles y misiones salen al azar de la rareza que toca entre accesorios **y** muebles especiales, todo junto. Se pueden repetir (sirven para regalar o intercambiar) |
+| Inventario en pestañas (24/10) | **Mochila** (ropa, accesorios y, cuando existan, consumibles) y **Mobiliario** (muebles especiales: se pueden soltar e intercambiar como los demás) |
+| Tecla G (24/10) | Abre y cierra "Editar sala" (en tu sala) |

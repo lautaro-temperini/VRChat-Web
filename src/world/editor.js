@@ -42,10 +42,15 @@ export function createRoomEditor({ world, scene, camera, renderer, net, rtc, ctr
   const btn = document.createElement('button');
   btn.id = 'btn-roomedit';
   btn.className = 'pill';
-  btn.title = 'Editar tu sala';
+  btn.title = 'Editar tu sala (G)';
   btn.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M3 21h4L19 9l-4-4L3 17z"/><path d="M14 6l4 4"/></svg><span class="lbl">Editar sala</span>';
   btn.hidden = true;
   btn.onclick = () => (active ? close() : open());
+  // G: abre / cierra el editor (solo en tu sala, cuando el botón está visible, y no mientras escribís)
+  addEventListener('keydown', (e) => {
+    if (e.code !== 'KeyG' || e.repeat || btn.hidden || ['INPUT', 'TEXTAREA'].includes(e.target.tagName)) return;
+    btn.click();
+  });
   $('topbar').insertBefore(btn, $('btn-settings'));
   for (const s of btn.querySelectorAll(':scope > *')) s.style.transform = 'skewX(calc(var(--skew) * -1))';
 

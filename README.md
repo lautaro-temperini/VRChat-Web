@@ -52,7 +52,7 @@ npm run dev
 | V (mantener): hablar | Botón Hablar (mantener) |
 | M: silenciar música y pantalla de la sala | Botón Audio |
 | Tab (mantener): jugadores, info y moderación de la sala | Botón Sala |
-| F celular · Y Mapa · R gestos · P personaje · I inventario | Botones de arriba |
+| F celular · Y Mapa · R gestos · P personaje · I inventario · G editar tu sala | Botones de arriba |
 | Esc: menú (General, Audio, Controles) | Engranaje |
 | Enter: chat (`/ayuda`, `/salas`, `/ir …`, `/bailar`…) | Botón Chat |
 
