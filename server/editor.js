@@ -1,5 +1,7 @@
 import { FURNITURE, ROOM_TEMPLATES, ROOM_MAX_PIECES, TEMPLATE_PIECES, cleanPiece } from './shared.js';
 
+const has = (obj, key) => typeof key === 'string' && Object.hasOwn(obj, key);
+
 // Editor de salas: la plantilla y los muebles de cada sala personal (u-<id>).
 // - roomEditorMethods se mezcla en Room (room.js): guarda el diseño en el storage de la sala,
 //   valida los cambios (solo el dueño edita) y se los manda a todos.
@@ -35,26 +37,27 @@ export const roomEditorMethods = {
   // Mensaje { t: 'edit', op: 'template' | 'add' | 'update' | 'remove', ... }
   async editMessage(ws, meta, msg) {
     const owner = await this.ownerId();
-    if (!owner || meta.userId !== owner) return this.notice(ws, 'Solo el dueño puede editar esta sala.');
+    if (!owner || meta.userId !== owner || meta.guest) return this.notice(ws, 'Solo el dueño puede editar esta sala.');
     const layout = await this.layout();
     // Si falla, el cliente deshace lo que ya mostró (piece: cómo quedó el mueble en la sala)
     const fail = (text, piece) => { this.send(ws, { t: 'edit-fail', op: msg.op, id: msg.op === 'add' ? msg.piece?.id : msg.id, piece }); return this.notice(ws, text); };
 
     if (msg.op === 'template') {
-      if (!ROOM_TEMPLATES[msg.template]) return;
+      if (!has(ROOM_TEMPLATES, msg.template)) return;
       // Los especiales vuelven al inventario; los básicos se borran (la plantilla trae los suyos)
+      // (primero se cambia la sala y después se devuelven: así nada queda puesto y en el inventario a la vez)
       const iids = layout.pieces.filter((p) => p.iid).map((p) => p.iid);
-      if (iids.length) await this.accounts().furnitureReturn(owner, iids);
       this.roomLayout = templateLayout(msg.template);
       await this.saveLayout();
+      if (iids.length) await this.accounts().furnitureReturn(owner, iids);
       this.broadcast({ t: 'layout', layout: this.roomLayout, back: iids.length });
       return;
     }
     if (!layout.chosen) return fail('Primero elegí la plantilla de tu sala.');
 
     if (msg.op === 'add') {
-      const def = FURNITURE[msg.piece?.type];
-      if (!def) return;
+      if (!has(FURNITURE, msg.piece?.type)) return;
+      const def = FURNITURE[msg.piece.type];
       if (layout.pieces.length >= ROOM_MAX_PIECES) return fail(`Llegaste al máximo de ${ROOM_MAX_PIECES} objetos en la sala.`);
       if (def.max && layout.pieces.filter((p) => p.type === msg.piece.type).length >= def.max) {
         return fail(`"${def.name}": puede haber ${def.max === 1 ? 'uno solo' : `hasta ${def.max}`} por sala.`);
@@ -66,12 +69,20 @@ export const roomEditorMethods = {
         const r = await this.accounts().furnitureTake(owner, piece.iid, piece.type);
         if (!r.ok) return fail(r.error);
       }
+      // Mientras se esperaba a la cuenta pudo cambiar la sala (otra pestaña, otra plantilla): se vuelve a mirar
+      const full = this.roomLayout !== layout || layout.pieces.length >= ROOM_MAX_PIECES
+        || (def.max && layout.pieces.filter((p) => p.type === piece.type).length >= def.max);
+      if (full) {
+        if (def.special) await this.accounts().furnitureReturn(owner, [piece.iid]);
+        return fail(this.roomLayout !== layout ? 'La sala cambió: probá de nuevo.' : 'No entra: la sala ya está llena.');
+      }
       layout.pieces.push(piece);
       await this.saveLayout();
       this.broadcast({ t: 'piece', piece, tmp: String(msg.piece.id ?? '').slice(0, 12) });
       return;
     }
 
+    if (msg.op !== 'update' && msg.op !== 'remove') return;
     const i = layout.pieces.findIndex((p) => p.id === msg.id);
     if (i < 0) return fail('Ese objeto ya no está.');
     const cur = layout.pieces[i];
@@ -83,11 +94,15 @@ export const roomEditorMethods = {
       if (next.photo && next.photo !== cur.photo && !(await this.accounts().photoPublic(owner, next.photo))) {
         return fail('Esa foto no se puede colgar: tu galería tiene que estar visible para todos.', cur);
       }
-      layout.pieces[i] = next;
+      // Después de esperar a la cuenta el mueble puede haberse movido de lugar en la lista (o ya no estar)
+      const j = this.roomLayout === layout ? layout.pieces.indexOf(cur) : -1;
+      if (j < 0) return fail('Ese objeto ya no está.');
+      layout.pieces[j] = next;
       await this.saveLayout();
       this.broadcast({ t: 'piece', piece: next });
     } else if (msg.op === 'remove') {
       layout.pieces.splice(i, 1);
+      await this.saveLayout();
       if (cur.iid) await this.accounts().furnitureReturn(owner, [cur.iid]);
       await this.saveLayout();
       this.broadcast({ t: 'piece-', id: cur.id, back: !!cur.iid });

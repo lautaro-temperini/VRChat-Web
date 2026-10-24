@@ -3,7 +3,9 @@
 // parte en la sala ("escenario2") y su propia pista de video ("stage2"). Se toma con E sobre
 // la pantalla y se suelta igual; quien la toma no queda fijo en la consola.
 
-export function createStage2({ net, rtc, world, toast, ui }) {
+import { guestGate } from '../ui/guest.js';
+
+export function createStage2({ net, rtc, world, toast, ui, me }) {
   let holder = null; // { id, name, streamId }
   let video = null;
   const $ = (id) => document.getElementById(id);
@@ -17,6 +19,7 @@ export function createStage2({ net, rtc, world, toast, ui }) {
   }
 
   async function take() {
+    if (me?.()?.guest) return guestGate('pasar visuales');
     const r = await rtc.captureStage('stage2');
     if (!r.ok) return toast(r.error);
     net.send({ t: 'part', part: 'escenario2', on: true, streamId: r.streamId }); // la sala confirma (o dice que está ocupada)

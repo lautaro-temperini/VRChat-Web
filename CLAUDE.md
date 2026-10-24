@@ -43,7 +43,12 @@ npm run dev:alt  # segunda copia: servidor en el 8788 con sus propios datos
 npm run puente   # puente OSC para artistas
 npm run build    # compila el cliente en dist/
 npm run deploy   # build + wrangler deploy
+npm test         # pruebas automáticas (levanta su propio servidor en el 8790; ver docs/ramas/seguridad.md)
+TEST_BASE=http://127.0.0.1:8787 npm test   # las mismas, contra un npm run dev ya abierto
+node scripts/test.mjs test/sala.test.mjs  # un solo archivo de pruebas
 ```
+
+Cada agujero de seguridad que se cierre lleva su prueba en `test/` (clientes WebSocket reales, sin navegador).
 
 ## Cosas a saber
 
@@ -90,6 +95,14 @@ npm run deploy   # build + wrangler deploy
   Las fotos se guardan en SQLite del Durable Object de cuentas (no R2, para no necesitar tarjeta).
 - **PowerShell 5.1** lee UTF-8 sin BOM como ANSI y rompe los acentos: para editar archivos con
   scripts usar `[IO.File]::ReadAllText/WriteAllText` con UTF-8, o las herramientas de edición.
+- **Cliente (`src/main.js` → `src/app/`):** main.js solo importa las partes en orden y arranca. Cada módulo
+  corre al importarse y comparte lo suyo en `G` (`src/app/state.js`, con `$`, `body`, `pref`, `loading`):
+  `escena.js` (render, mundo, jugador local, botones) · `overlays.js` (un panel a la vez, `refreshState`) ·
+  `cuenta.js` (ingreso, Google/Discord, editor de personaje) · `menu.js` (Esc, audio) · `red.js` (Net, voz,
+  grupos, panel Tab) · `social.js` (suelo, Mapa, gestos, inventario, celular, progreso) · `museo.js` (atril del
+  Museo, obras expuestas, notas, editor de sala) · `sala.js` (join y `net.on`) · `chat.js` (chat y comandos) ·
+  `escenario.js` (DJ, consola, pantalla) · `interaccion.js` (E, fichas, perfiles, teclado) · `loop.js` (bucle,
+  día/noche, `window.__game`). Un módulo solo puede usar al cargarse lo de los anteriores.
 - **Pruebas:** en desarrollo existe `window.__game` (ctrl, world, remotes, rtc, social, net,
   ground, roomPanel, `setHour(h)` para probar día/noche…). Si el panel del navegador está oculto,
   el juego corre a muy pocos cuadros: para probar física llamar a `ctrl.update(1/60)` en un bucle.
@@ -99,6 +112,10 @@ npm run deploy   # build + wrangler deploy
 - **Puente OSC:** `npm run puente` (sin dependencias) recibe OSC en el puerto 9000 y lo pasa a la pestaña
   del juego por http://127.0.0.1:9001. Direcciones en `src/net/osc.js`.
 - El servidor nunca confía en el cliente para nombre, ropa ni objetos: los lee de `Accounts`.
+- **Seguridad** (ver `docs/ramas/seguridad.md`): catálogos con `Object.hasOwn` (nunca `CATALOGO[x]` con lo
+  que manda el cliente: `constructor` existe en todo objeto); antiflood general por conexión (`RATE`/`allow`
+  en room.js); una sola conexión por cuenta (`claimConn` → `takeover`, mensaje `elsewhere`); frenos por IP
+  en ingreso y cuentas nuevas (`limits`); salas válidas: `museo` y `u-<16 hex>`.
 - **Catálogos compartidos** (objetos, peinados, validaciones) en `server/shared.js`, importados
   también por el cliente.
 - **Admins:** `wrangler.jsonc` → `vars.ADMIN_IDS`. El dueño de una sala `u-<id>` es esa cuenta. Los

@@ -39,14 +39,28 @@ const KINDS = ['voice', 'dj', 'stage', 'stage2']; // pistas que se pueden public
 const VOICE_RANGE = 20;
 // Grupos de voz
 const GROUP_MAX = 4, GROUP_INVITE_LIFE = 60_000;
+const TRADE_INVITE_LIFE = 60_000; // la invitación a intercambiar vence al minuto
 const GUEST_VOICE = 'Creá una cuenta (es gratis) para usar la voz y los grupos. Los invitados chatean solo por texto.';
+const GUEST_STAGE = 'Creá una cuenta (es gratis) para pasar música o usar la consola de artistas.';
+// Antiflood de todo lo que no es chat (ver allow): mensajes por conexión, con un margen amplio
+// por encima de lo que manda el juego (posición 10/s, luces 15/s, voz unos pocos por segundo).
+// Lo que pasa del límite se descarta en silencio. HEAVY: lo que escribe en la base o le pide algo a
+// las cuentas; SFU: pedidos al servidor de audio (cada uno es una llamada a la API de Cloudflare).
+const RATE = { all: [120, 40], heavy: [30, 5], sfu: [40, 10] }; // [ráfaga, por segundo]
+const HEAVY = new Set(['look', 'emote', 'phone', 'afk', 'mic', 'group', 'trade', 'edit', 'drop', 'pickup', 'mod', 'dj', 'part']);
+// Conexiones que nunca mandan "join" (o con un token que no sirve) se cierran a los 15 s
+const JOIN_TIMEOUT = 15_000;
+// Posiciones: más allá de esto no hay nada en ninguna sala (el Museo mide 48 × 22 m)
+const WORLD_LIMIT = 500;
+const has = (obj, key) => typeof key === 'string' && Object.hasOwn(obj, key);
+const str = (v, n) => (typeof v === 'string' ? v : '').slice(0, n);
 
 // Estado de un jugador: [x, y, z, rotación, velocidad, pose]
 // pose: 0 parado, 1 agachado, 2 sentado, 3 trepando, 4 en el aire, 5 saltando una baranda
 function cleanState(s) {
   if (!Array.isArray(s) || s.length !== 6) return null;
   if (!s.every((v) => typeof v === 'number' && Number.isFinite(v))) return null;
-  const out = s.map((v) => Math.round(v * 100) / 100);
+  const out = s.map((v) => Math.round(Math.min(WORLD_LIMIT, Math.max(-WORLD_LIMIT, v)) * 100) / 100);
   out[5] = Math.min(5, Math.max(0, Math.round(s[5])));
   return out;
 }
@@ -67,6 +81,21 @@ export class Room extends DurableObject {
     this.tradeOf = new Map();  // jugador -> id del intercambio
     this.pulls = new Map();    // conexión -> Map("id:tipo" -> mid) de lo que está escuchando
     this.ginvites = new Map(); // "deUsuario>paraUsuario" -> hora de la invitación al grupo
+    this.rates = new Map();    // conexión -> baldes del antiflood (ver allow)
+  }
+
+  // Antiflood general: un "balde" por tipo que se vacía con cada mensaje y se llena solo con el tiempo
+  allow(id, kind) {
+    const now = Date.now();
+    let r = this.rates.get(id);
+    if (!r) { r = {}; this.rates.set(id, r); }
+    const [burst, perSec] = RATE[kind];
+    const b = r[kind] ?? (r[kind] = { n: burst, at: now });
+    b.n = Math.min(burst, b.n + ((now - b.at) / 1000) * perSec);
+    b.at = now;
+    if (b.n < 1) return false;
+    b.n -= 1;
+    return true;
   }
 
   accounts() {
@@ -97,7 +126,20 @@ export class Room extends DurableObject {
 
   async isMod(meta) {
     const admins = String(this.env.ADMIN_IDS ?? '').split(',').map((s) => s.trim()).filter(Boolean);
-    return admins.includes(meta.userId) || meta.userId === (await this.ownerId());
+    return admins.includes(meta.userId) || (!meta.guest && meta.userId === (await this.ownerId()));
+  }
+
+  // ¿La sala tiene con qué? El Museo tiene cabina, consola y pantalla; en una sala personal tienen
+  // que estar puestas como muebles (y la 2ª pantalla, con su propio VJ)
+  async hasGear(what) {
+    const layout = await this.layout();
+    if (!layout) return true;
+    const n = (type, pred = () => true) => layout.pieces.filter((p) => p.type === type && pred(p)).length;
+    if (what === 'dj') return n('cabina') > 0;
+    if (what === 'luces') return n('consola') > 0;
+    if (what === 'escenario') return n('consola') > 0 || n('pantalla') > 0;
+    if (what === 'escenario2') return n('pantalla') > 1 && n('pantalla', (p) => p.m === 'propia') > 0;
+    return false;
   }
 
   async fetch(request) {
@@ -106,7 +148,8 @@ export class Room extends DurableObject {
     const { 0: client, 1: server } = new WebSocketPair();
     // acceptWebSocket permite que la sala "hiberne" sin cortar las conexiones.
     this.ctx.acceptWebSocket(server);
-    server.serializeAttachment({ id: crypto.randomUUID().slice(0, 8), joined: false });
+    server.serializeAttachment({ id: crypto.randomUUID().slice(0, 8), joined: false, born: Date.now() });
+    await this.scheduleAlarm();
     return new Response(null, { status: 101, webSocket: client });
   }
 
@@ -150,6 +193,10 @@ export class Room extends DurableObject {
     const now = Date.now();
     let next = this.joined().length ? now + 30_000 : Infinity;
     for (const g of this.ground ?? []) next = Math.min(next, g.at + GROUND_LIFE);
+    for (const ws of this.ctx.getWebSockets()) {
+      const m = ws.deserializeAttachment();
+      if (m && !m.joined && !m.left) next = Math.min(next, (m.born ?? now) + JOIN_TIMEOUT);
+    }
     if (next === Infinity) return;
     const current = await this.ctx.storage.getAlarm();
     if (!current || current > next || current < now) await this.ctx.storage.setAlarm(Math.max(next, now + 200));
@@ -166,6 +213,14 @@ export class Room extends DurableObject {
       for (const g of expired) {
         await this.accounts().destroyGroundItem(g.iid);
         this.broadcast({ t: 'ground-', iid: g.iid, expired: true });
+      }
+    }
+    // Conexiones que nunca entraron: se cierran (no ocupan lugar para siempre)
+    for (const ws of this.ctx.getWebSockets()) {
+      const m = ws.deserializeAttachment();
+      if (m && !m.joined && !m.left && now - (m.born ?? 0) >= JOIN_TIMEOUT) {
+        m.left = true; // aunque tarde en cerrarse, ya no puede entrar
+        try { ws.serializeAttachment(m); ws.close(4001, 'sin entrar'); } catch { /* ya cerrada */ }
       }
     }
     const alive = [];
@@ -187,13 +242,24 @@ export class Room extends DurableObject {
     if (typeof raw !== 'string' || raw.length > 64_000) return;
     let msg;
     try { msg = JSON.parse(raw); } catch { return; }
+    if (!msg || typeof msg !== 'object' || typeof msg.t !== 'string') return;
     if (msg.t !== 'sfu' && raw.length > 4096) return;
-    await this.load();
     const meta = ws.deserializeAttachment();
+    if (!meta || meta.left) return;
+    // Antiflood de todo (el chat además tiene el suyo, con aviso)
+    if (!this.allow(meta.id, 'all')) return;
+    if ((HEAVY.has(msg.t) || msg.t === 'join') && !this.allow(meta.id, 'heavy')) return;
+    if (msg.t === 'sfu' && !this.allow(meta.id, 'sfu')) return;
+    await this.load();
     this.lastSeen.set(meta.id, Date.now());
 
     if (msg.t === 'join' && !meta.joined) {
+      if (meta.joining) return; // ya está entrando (dos "join" seguidos)
+      meta.joining = true;
+      ws.serializeAttachment(meta);
       const user = await this.accounts().auth(msg.token);
+      meta.joining = false;
+      ws.serializeAttachment(meta);
       if (!user) {
         this.send(ws, { t: 'error', code: 'auth' });
         ws.close(4001, 'sin sesión');
@@ -206,11 +272,12 @@ export class Room extends DurableObject {
       }
       // Sala personal: el dueño elige quién entra (todos, amigos o nadie más). Los admins siempre.
       const owner = await this.ownerId();
-      if (owner && !(await this.isMod({ userId: user.id })) && !(await this.accounts().canEnter(owner, user.id))) {
+      if (owner && !(await this.isMod({ userId: user.id, guest: !!user.guest })) && !(await this.accounts().canEnter(owner, user.id))) {
         this.send(ws, { t: 'error', code: 'private' });
         ws.close(4004, 'sala privada');
         return;
       }
+      if (ws.deserializeAttachment()?.left) return; // se fue mientras entraba
       Object.assign(meta, { joined: true, userId: user.id, name: user.name, look: user.look, equip: user.equip, guest: !!user.guest, afk: !!msg.afk, mic: 'off' });
       meta.mod = await this.isMod(meta);
       ws.serializeAttachment(meta);
@@ -229,6 +296,12 @@ export class Room extends DurableObject {
         layout: await this.layout(),
       });
       this.broadcast({ t: 'join', ...this.publicInfo(meta) }, ws);
+      // Una sola conexión por cuenta: la nueva manda y la anterior (acá o en otra sala) se desconecta
+      const prev = await this.accounts().claimConn(user.id, await this.roomName(), meta.id);
+      if (prev) {
+        if (prev.room === (await this.roomName())) await this.takeover(prev.conn);
+        else await this.env.ROOMS.get(this.env.ROOMS.idFromName(prev.room)).takeover(prev.conn).catch(() => {});
+      }
       await this.accounts().presence(await this.roomName(), [user.id]);
       await roomTrack(this, ws, user.id, 'sala'); // progresión: visitar salas de otros
       await this.scheduleAlarm();
@@ -261,7 +334,7 @@ export class Room extends DurableObject {
         break;
       }
       case 'emote': {
-        if (!EMOTES[msg.e]) return;
+        if (!has(EMOTES, msg.e)) return;
         this.broadcast({ t: 'emote', id: meta.id, e: msg.e }, ws);
         await roomTrack(this, ws, meta.userId, 'gesto');
         break;
@@ -283,17 +356,9 @@ export class Room extends DurableObject {
         this.broadcast({ t: 'mic', id: meta.id, v: meta.mic }, ws);
         break;
       }
-      case 'look': {
-        // El perfil y los objetos se leen de la cuenta (no se confía en lo que manda el cliente)
-        const pub = await this.accounts().publicLook(meta.userId);
-        if (!pub) return;
-        meta.name = cleanName(pub.name);
-        meta.look = cleanLook(pub.look);
-        meta.equip = cleanEquip(pub.equip);
-        ws.serializeAttachment(meta);
-        this.broadcast({ t: 'look', id: meta.id, name: meta.name, look: meta.look, equip: meta.equip }, ws);
+      case 'look':
+        await this.reloadLook(ws);
         break;
-      }
       case 'chat': {
         if (silenced) return this.notice(ws, 'Estás silenciado en esta sala.');
         if (!this.settings.chat && !meta.mod) return this.notice(ws, 'El chat está deshabilitado en esta sala.');
@@ -320,36 +385,21 @@ export class Room extends DurableObject {
       case 'group':
         await this.groupMessage(ws, meta, msg);
         break;
-      case 'screen': {
-        if (msg.on) {
-          if (silenced || (!this.settings.screen && !meta.mod)) {
-            this.send(ws, { t: 'screen', denied: true });
-            return this.notice(ws, silenced ? 'Estás silenciado en esta sala.' : 'Compartir pantalla está deshabilitado en esta sala.');
-          }
-          if (this.screen && this.screen.id !== meta.id && this.byId(this.screen.id)) {
-            this.send(ws, { t: 'screen', busy: true, id: this.screen.id });
-            return;
-          }
-          this.screen = { id: meta.id, streamId: String(msg.streamId ?? '').slice(0, 100) };
-          this.broadcast({ t: 'screen', on: true, ...this.screen });
-        } else if (this.screen?.id === meta.id) {
-          this.screen = null;
-          this.broadcast({ t: 'screen', on: false, id: meta.id });
-        }
-        break;
-      }
       case 'dj': {
         // Cabina del DJ: una persona a la vez (sin cola); cualquiera puede, salvo que la sala lo deshabilite
         if (msg.on) {
+          // Los invitados no pasan música (decisión del usuario, 24/10)
+          if (meta.guest) { this.send(ws, { t: 'dj', denied: true }); return this.notice(ws, GUEST_STAGE); }
           if (silenced || (!this.settings.dj && !meta.mod)) {
             this.send(ws, { t: 'dj', denied: true });
             return this.notice(ws, silenced ? 'Estás silenciado en esta sala.' : 'Pasar música está deshabilitado en esta sala.');
           }
+          if (!(await this.hasGear('dj'))) return this.send(ws, { t: 'dj', denied: true });
           if (this.dj && this.dj.id !== meta.id && this.byId(this.dj.id)) {
             this.send(ws, { t: 'dj', busy: true, name: this.dj.name });
             return;
           }
-          this.dj = { id: meta.id, name: meta.name, streamId: String(msg.streamId ?? '').slice(0, 100), track: '' };
+          this.dj = { id: meta.id, name: meta.name, streamId: str(msg.streamId, 100), track: '' };
           this.broadcast({ t: 'dj', on: true, ...this.dj });
         } else if (typeof msg.track === 'string' && this.dj?.id === meta.id) {
           const track = msg.track.replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 120);
@@ -367,12 +417,15 @@ export class Room extends DurableObject {
         if (!PARTS.includes(part)) return;
         const cur = this.parts[part];
         if (msg.on) {
+          // Ni toman las luces o las pantallas
+          if (meta.guest) { this.send(ws, { t: 'part', part, denied: true }); return this.notice(ws, GUEST_STAGE); }
           if (silenced || (!this.settings.artists && !meta.mod)) {
             this.send(ws, { t: 'part', part, denied: true });
             return this.notice(ws, silenced ? 'Estás silenciado en esta sala.' : 'La consola de artistas está deshabilitada en esta sala.');
           }
+          if (!(await this.hasGear(part))) return this.send(ws, { t: 'part', part, denied: true });
           if (cur && cur.id !== meta.id && this.byId(cur.id)) return this.send(ws, { t: 'part', part, busy: true, name: cur.name });
-          this.parts[part] = { id: meta.id, name: meta.name, ...(part !== 'luces' ? { streamId: String(msg.streamId ?? '').slice(0, 100) } : {}) };
+          this.parts[part] = { id: meta.id, name: meta.name, ...(part !== 'luces' ? { streamId: str(msg.streamId, 100) } : {}) };
           this.broadcast({ t: 'part', part, on: true, ...this.parts[part] });
         } else if (cur?.id === meta.id) this.releasePart(part);
         break;
@@ -402,6 +455,29 @@ export class Room extends DurableObject {
         await this.tradeMessage(ws, meta, msg);
         break;
     }
+  }
+
+  // La misma cuenta entró desde otra pestaña (o dispositivo): esta conexión se desconecta.
+  // La llama la sala donde entró (puede ser esta misma u otra).
+  async takeover(conn) {
+    const ws = this.ctx.getWebSockets().find((w) => w.deserializeAttachment()?.id === conn);
+    if (!ws) return;
+    this.send(ws, { t: 'elsewhere' });
+    await this.leave(ws, { keepConn: true });
+    try { ws.close(4005, 'otra pestaña'); } catch { /* ya cerrada */ }
+  }
+
+  // El perfil y los objetos se leen de la cuenta (no se confía en lo que manda el cliente)
+  async reloadLook(ws) {
+    const meta = ws.deserializeAttachment();
+    const pub = meta?.joined && await this.accounts().publicLook(meta.userId);
+    const now = ws.deserializeAttachment(); // pudo cambiar mientras se leía la cuenta
+    if (!pub || !now?.joined) return;
+    now.name = cleanName(pub.name);
+    now.look = cleanLook(pub.look);
+    now.equip = cleanEquip(pub.equip);
+    ws.serializeAttachment(now);
+    this.broadcast({ t: 'look', id: now.id, name: now.name, look: now.look, equip: now.equip }, ws);
   }
 
   // ---------- Objetos en el suelo ----------
@@ -452,11 +528,11 @@ export class Room extends DurableObject {
 
   async moderate(ws, meta, msg) {
     if (!meta.mod) return this.notice(ws, 'No tenés permisos de moderación en esta sala.');
-    const target = msg.target ? this.byId(msg.target) : null;
+    const target = typeof msg.target === 'string' ? this.byId(msg.target) : null;
     const tm = target?.deserializeAttachment();
-    if (msg.target && (!target || tm.mod && msg.op !== 'bring')) {
-      return this.notice(ws, tm?.mod ? 'No se puede moderar a otro moderador.' : 'Ese jugador ya no está.');
-    }
+    // Estas acciones son sobre alguien que está en la sala
+    if (['kick', 'ban', 'silence', 'bring', 'spawn'].includes(msg.op) && !target) return this.notice(ws, 'Ese jugador ya no está.');
+    if (target && tm.mod && msg.op !== 'bring') return this.notice(ws, 'No se puede moderar a otro moderador.');
 
     switch (msg.op) {
       case 'kick':
@@ -472,7 +548,8 @@ export class Room extends DurableObject {
         break;
       }
       case 'unban': {
-        delete this.bans[String(msg.userId ?? '')];
+        if (!has(this.bans, msg.userId)) return;
+        delete this.bans[msg.userId];
         await this.ctx.storage.put('bans', this.bans);
         this.send(ws, { t: 'bans', bans: this.bans });
         break;
@@ -505,7 +582,7 @@ export class Room extends DurableObject {
         break;
       }
       case 'setting': {
-        if (!(msg.key in DEFAULT_SETTINGS)) return;
+        if (!has(DEFAULT_SETTINGS, msg.key)) return;
         this.settings[msg.key] = !!msg.value;
         await this.ctx.storage.put('settings', this.settings);
         if (msg.key === 'screen' && !msg.value && this.screen && !this.byId(this.screen.id)?.deserializeAttachment().mod) {
@@ -612,7 +689,8 @@ export class Room extends DurableObject {
 
     if (msg.op === 'push') {
       // Publicar mis pistas: voz siempre; música y video solo si la cabina / la pantalla son mías
-      const tracks = (Array.isArray(msg.tracks) ? msg.tracks : []).slice(0, 3).filter((t) => KINDS.includes(t?.kind) && typeof t.mid === 'string');
+      const tracks = (Array.isArray(msg.tracks) ? msg.tracks : []).slice(0, 3)
+        .filter((t, i, all) => KINDS.includes(t?.kind) && typeof t.mid === 'string' && /^[\w-]{1,16}$/.test(t.mid) && all.findIndex((o) => o?.kind === t.kind) === i);
       const allowed = (k) => (k === 'voice' && !meta.guest) || (k === 'dj' && this.dj?.id === meta.id) || (k === 'stage' && this.parts.escenario?.id === meta.id) || (k === 'stage2' && this.parts.escenario2?.id === meta.id);
       if (!sdp || !tracks.length || !tracks.every((t) => allowed(t.kind))) return reply({ ok: false, error: 'denied' });
       const r = await this.sfuApi(`${base}/tracks/new`, 'POST', {
@@ -629,7 +707,7 @@ export class Room extends DurableObject {
     }
 
     if (msg.op === 'unpush') {
-      const kinds = (Array.isArray(msg.kinds) ? msg.kinds : []).filter((k) => meta.pubs?.[k]);
+      const kinds = (Array.isArray(msg.kinds) ? msg.kinds : []).filter((k, i, all) => KINDS.includes(k) && meta.pubs?.[k] && all.indexOf(k) === i);
       if (!kinds.length) return reply({ ok: true });
       await this.sfuApi(`${base}/tracks/close`, 'PUT', { tracks: kinds.map((k) => ({ mid: meta.pubs[k] })), force: true });
       for (const k of kinds) delete meta.pubs[k];
@@ -642,11 +720,12 @@ export class Room extends DurableObject {
       const items = (Array.isArray(msg.items) ? msg.items : []).slice(0, 8);
       const out = [], want = [];
       for (const it of items) {
-        const target = this.byId(String(it?.id ?? ''));
+        const id = str(it?.id, 16), kind = str(it?.kind, 8);
+        const target = this.byId(id);
         const tm = target?.deserializeAttachment();
-        const why = it?.id === meta.id ? 'denied' : this.pullBlocked(meta, tm, it?.kind);
-        if (why) out.push({ id: it?.id, kind: it?.kind, error: why });
-        else want.push({ it, tm });
+        const why = id === meta.id ? 'denied' : this.pullBlocked(meta, tm, kind);
+        if (why) out.push({ id, kind, error: why });
+        else want.push({ it: { id, kind }, tm });
       }
       if (!want.length) return reply({ ok: true, tracks: out });
       const r = await this.sfuApi(`${base}/tracks/new`, 'POST', {
@@ -831,70 +910,87 @@ export class Room extends DurableObject {
     const me = meta.id;
     const tradeId = this.tradeOf.get(me);
     const trade = tradeId ? this.trades.get(tradeId) : null;
+    const now = Date.now();
+    for (const [k, at] of this.invites) if (now - at > TRADE_INVITE_LIFE) this.invites.delete(k);
 
     switch (msg.op) {
       case 'invite': {
-        if (meta.guest || this.byId(msg.to)?.deserializeAttachment().guest) {
+        const other = typeof msg.to === 'string' ? this.byId(msg.to) : null;
+        const om = other?.deserializeAttachment();
+        if (meta.guest || om?.guest) {
           this.notice(ws, meta.guest ? 'Creá una cuenta para intercambiar objetos.' : 'Esa persona es invitada: todavía no puede intercambiar.');
           return;
         }
-        const other = this.byId(msg.to);
-        if (!other || msg.to === me || trade || this.tradeOf.has(msg.to)) {
+        // Con uno mismo (otra pestaña de la misma cuenta) no tiene sentido
+        if (!other || msg.to === me || om.userId === meta.userId || trade || this.tradeOf.has(msg.to)) {
           this.send(ws, { t: 'trade', op: 'busy' });
           return;
         }
-        this.invites.set(`${me}>${msg.to}`, Date.now());
-        this.send(other, { t: 'trade', op: 'invite', from: me, name: meta.name, userId: meta.userId });
+        // La misma invitación mientras sigue pendiente no se le vuelve a mostrar al otro
+        const key = `${me}>${msg.to}`;
+        if (this.invites.has(key)) return;
+        this.invites.set(key, now);
+        // Si el otro lo ignoró o restringió, la invitación no le llega (y quien invita no se entera)
+        const check = await this.accounts().tradeInviteCheck(meta.userId, om.userId);
+        if (check.ok) this.send(this.byId(msg.to), { t: 'trade', op: 'invite', from: me, name: meta.name, userId: meta.userId });
         break;
       }
       case 'accept': {
-        const key = `${msg.from}>${me}`;
+        const from = str(msg.from, 16);
+        const key = `${from}>${me}`;
         const at = this.invites.get(key);
         this.invites.delete(key);
-        const other = this.byId(msg.from);
-        if (!at || Date.now() - at > 60_000 || !other || trade || this.tradeOf.has(msg.from)) {
+        const other = this.byId(from);
+        if (!at || now - at > TRADE_INVITE_LIFE || !other || trade || this.tradeOf.has(from)) {
           this.send(ws, { t: 'trade', op: 'expired' });
           return;
         }
         const otherMeta = other.deserializeAttachment();
-        const t = { id: crypto.randomUUID().slice(0, 8), p: [msg.from, me], users: { [msg.from]: otherMeta.userId, [me]: meta.userId }, items: { [msg.from]: [], [me]: [] }, ready: {} };
+        const t = { id: crypto.randomUUID().slice(0, 8), p: [from, me], users: { [from]: otherMeta.userId, [me]: meta.userId }, items: { [from]: [], [me]: [] }, ready: {}, v: 0 };
         this.trades.set(t.id, t);
-        this.tradeOf.set(msg.from, t.id);
+        this.tradeOf.set(from, t.id);
         this.tradeOf.set(me, t.id);
         this.send(other, { t: 'trade', op: 'open', id: t.id, with: me, name: meta.name });
-        this.send(ws, { t: 'trade', op: 'open', id: t.id, with: msg.from, name: otherMeta.name });
+        this.send(ws, { t: 'trade', op: 'open', id: t.id, with: from, name: otherMeta.name });
         this.tradeState(t);
         break;
       }
       case 'decline': {
-        this.invites.delete(`${msg.from}>${me}`);
-        this.send(this.byId(msg.from), { t: 'trade', op: 'declined', name: meta.name });
+        const from = str(msg.from, 16);
+        if (!this.invites.delete(`${from}>${me}`)) return;
+        this.send(this.byId(from), { t: 'trade', op: 'declined', name: meta.name });
         break;
       }
       case 'offer': {
-        if (!trade) return;
-        trade.items[me] = await this.accounts().ownedItems(meta.userId, msg.iids);
+        if (!trade || trade.busy) return;
+        const v = ++trade.v;
+        const items = await this.accounts().ownedItems(meta.userId, msg.iids);
+        // Mientras se leían los objetos pudo cerrarse el intercambio o llegar otra oferta más nueva
+        if (this.trades.get(trade.id) !== trade || trade.busy || trade.v !== v) return;
+        trade.items[me] = items;
         trade.ready = {}; // si cambia la oferta, los dos tienen que volver a confirmar
         this.tradeState(trade);
         break;
       }
       case 'ready': {
-        if (!trade) return;
+        if (!trade || trade.busy) return;
         trade.ready[me] = !!msg.v;
         if (trade.p.every((p) => trade.ready[p])) {
+          // Se ejecuta una sola vez: mientras la cuenta hace el cambio, el intercambio queda trabado
+          trade.busy = true;
           const [a, b] = trade.p;
           const res = await this.accounts().trade(trade.users[a], trade.items[a].map((i) => i.iid), trade.users[b], trade.items[b].map((i) => i.iid));
           this.endTrade(trade, () => (res.ok ? { op: 'done' } : { op: 'failed', error: res.error }));
           // Los objetos equipados pudieron cambiar: actualizar cómo se ven los dos
           for (const p of trade.p) {
             const pws = this.byId(p);
-            if (pws) await this.webSocketMessage(pws, JSON.stringify({ t: 'look' }));
+            if (pws) await this.reloadLook(pws);
           }
         } else this.tradeState(trade);
         break;
       }
       case 'cancel': {
-        if (trade) this.endTrade(trade, (p) => ({ op: 'closed', byMe: p === me, name: meta.name }));
+        if (trade && !trade.busy) this.endTrade(trade, (p) => ({ op: 'closed', byMe: p === me, name: meta.name }));
         break;
       }
     }
@@ -913,14 +1009,24 @@ export class Room extends DurableObject {
     this.broadcast({ t: 'dj', on: false, id, name });
   }
 
-  async leave(ws) {
+  async leave(ws, { keepConn = false } = {}) {
     const meta = ws.deserializeAttachment();
-    if (!meta?.joined) return;
+    if (!meta) return;
+    if (!meta.joined) {
+      // Nunca terminó de entrar: si justo estaba entrando, ya no entra
+      if (!meta.left) { meta.left = true; try { ws.serializeAttachment(meta); } catch { /* cerrada */ } }
+      return;
+    }
     await this.load();
     meta.joined = false;
+    meta.left = true;
     ws.serializeAttachment(meta);
     this.states.delete(meta.id);
     this.lastSeen.delete(meta.id);
+    this.rates.delete(meta.id);
+    this.chatTimes.delete(meta.id);
+    this.lastText.delete(meta.id);
+    for (const k of this.invites.keys()) if (k.startsWith(`${meta.id}>`) || k.endsWith(`>${meta.id}`)) this.invites.delete(k);
     if (this.screen?.id === meta.id) {
       this.screen = null;
       this.broadcast({ t: 'screen', on: false, id: meta.id });
@@ -928,7 +1034,9 @@ export class Room extends DurableObject {
     if (this.dj?.id === meta.id) this.stopDJ();
     for (const part of PARTS) if (this.parts[part]?.id === meta.id) this.releasePart(part);
     const tradeId = this.tradeOf.get(meta.id);
-    if (tradeId) this.endTrade(this.trades.get(tradeId), () => ({ op: 'closed', name: meta.name }));
+    const trade = tradeId && this.trades.get(tradeId);
+    // Si justo se estaba ejecutando, termina solo (la cuenta lo hace todo o nada)
+    if (trade && !trade.busy) this.endTrade(trade, () => ({ op: 'closed', name: meta.name }));
     this.broadcast({ t: 'leave', id: meta.id }, ws);
     this.pulls.delete(meta.id);
     // Si se fue el último del grupo que quedaba en la sala, el grupo se disuelve
@@ -938,7 +1046,11 @@ export class Room extends DurableObject {
       const present = new Set(this.joined().filter((w) => w !== ws).map((w) => w.deserializeAttachment().userId));
       if (!this.groups[gid].members.some((u) => present.has(u))) { delete this.groups[gid]; await this.saveGroups(); }
     }
-    if (meta.userId) await this.accounts().presenceLeave(await this.roomName(), meta.userId);
+    if (meta.userId && !keepConn) {
+      await this.accounts().releaseConn(meta.userId, meta.id);
+      // Si la cuenta ya está en otra sala, la presencia es de esa
+      await this.accounts().presenceLeave(await this.roomName(), meta.userId);
+    }
   }
 
   async webSocketClose(ws, code) {

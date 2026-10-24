@@ -83,8 +83,8 @@ export function createPhone({ social, me, go, room }) {
       const b = document.createElement('b');
       b.textContent = u.name + (u.username ? ` · @${u.username}` : '');
       const s = document.createElement('span');
-      s.textContent = u.room ? 'Conectado' : 'Desconectado';
-      if (u.room) s.className = 'online';
+      s.textContent = u.online ? 'Conectado' : 'Desconectado';
+      if (u.online) s.className = 'online';
       who.append(b, s);
       const act = document.createElement('button');
       act.className = 'act';
