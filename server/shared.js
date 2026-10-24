@@ -40,16 +40,23 @@ export const EMOTES = {
 export const DANCES = ['Hip hop de brazos', 'Hip hop', 'Breakdance', 'Baile libre', 'House', 'House 2', 'Shuffle', 'Swing', 'Onda', 'Clásico'];
 DANCES.forEach((name, i) => { EMOTES[`baile${i + 1}`] = { name, loop: true, dance: true }; });
 
-export const HAIR_STYLES = ['corto', 'largo', 'rapado', 'rodete', 'rulos', 'coleta'];
-export const TOPS = ['remera', 'buzo'];
+// Peinados (modelos de MakeHuman). "rodete" ya no se ofrece: las cuentas que lo tenían se ven con trenza.
+export const HAIR_STYLES = ['corto', 'flequillo', 'largo', 'rapado', 'rulos', 'coleta', 'trenza', 'bob', 'rodete'];
+// Barba: un interruptor sí/no y, si está en sí, el tipo
+export const BEARD_STYLES = ['completa', 'tupida', 'candado', 'bigote'];
+// Ropa con volumen (modelos de MakeHuman). "buzo" es del editor viejo: se ve como manga larga.
+export const TOPS = ['remera', 'mangalarga', 'camisa', 'campera', 'buzo'];
+export const BOTTOMS = ['jean', 'short', 'calza', 'pollera'];
+export const FEET = ['zapatillas', 'botas', 'zapatos'];
 export const BODIES = ['masc', 'fem'];
 // Tipos de cuerpo del editor básico: cada uno es un punto de los deslizadores del avanzado
-// (peso: flaco 0 … gordo 1; músculo: poco 0 … mucho 1). Promedio = 0,5 / 0,5.
+// (peso 0..1 y músculo 0..1; promedio = 0,5 / 0,5). Se combinan como en MakeHuman:
+// mucho peso + poco músculo = gordo; mucho peso + mucho músculo = grande (decisión del 24/10).
 export const BODY_TYPES = {
-  flaco: { name: 'Flaco', weight: 0.15, muscle: 0.35 },
+  flaco: { name: 'Flaco', weight: 0, muscle: 0 },
   promedio: { name: 'Promedio', weight: 0.5, muscle: 0.5 },
-  gordo: { name: 'Gordo', weight: 0.9, muscle: 0.45 },
-  musculoso: { name: 'Musculoso', weight: 0.5, muscle: 0.95 },
+  gordo: { name: 'Gordo', weight: 1, muscle: 0 },
+  musculoso: { name: 'Musculoso', weight: 0.75, muscle: 1 },
 };
 const COLOR_KEYS = ['skin', 'hair', 'eyes', 'shirt', 'pants', 'shoes'];
 
@@ -66,8 +73,11 @@ export function cleanLook(look) {
   }
   if (HAIR_STYLES.includes(look.hairStyle)) out.hairStyle = look.hairStyle;
   if (TOPS.includes(look.top)) out.top = look.top;
+  if (BOTTOMS.includes(look.bottom)) out.bottom = look.bottom;
+  if (FEET.includes(look.feet)) out.feet = look.feet;
   if (BODIES.includes(look.body)) out.body = look.body;
   if (typeof look.beard === 'boolean') out.beard = look.beard;
+  if (BEARD_STYLES.includes(look.beardStyle)) out.beardStyle = look.beardStyle;
   const num = (v, lo, hi) => (Number.isFinite(Number(v)) ? Math.min(hi, Math.max(lo, Number(v))) : undefined);
   const height = num(look.height, 1.55, 1.95);
   // build (contextura) es del editor viejo: se sigue aceptando pero el personaje ya no lo usa

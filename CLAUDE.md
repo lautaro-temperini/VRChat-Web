@@ -47,7 +47,10 @@ npm run deploy   # build + wrangler deploy
 
 ## Cosas a saber
 
-- **Ramas:** se trabaja sobre `main` (todas las ramas anteriores ya se juntaron ahí).
+- **Ramas:** se trabaja sobre `main`. Hay ramas de agentes sin juntar (por ejemplo `agente/seguridad`):
+  antes de tocar archivos que ellas cambian, mirar `git diff main...origin/<rama>` para no pisarlas.
+- **Nube vs. PC del usuario:** el código se puede tocar desde cualquier sesión, pero regenerar los modelos del
+  personaje (Blender + MPFB 2 + MCP de Blender) solo se puede en la PC del usuario.
 - **Cuentas:** registro con mail + nickname único; se entra con cualquiera de los dos, o con **Google / Discord**
   (`oauthStart` → `/api/oauth/<proveedor>/callback` → `#login=<código>` → `oauthFinish`; si es nueva, `oauthNick`).
   Client ID en `wrangler.jsonc`; `GOOGLE_CLIENT_SECRET` y `DISCORD_CLIENT_SECRET` en `.dev.vars` / `wrangler secret`. Invitado =
@@ -102,7 +105,13 @@ npm run deploy   # build + wrangler deploy
   admins entran también a salas cerradas.
 - La interfaz de avatar (`setLook`, `setEquip`, `gesture(nombre)`, `update(dt, {speed, pose, turn, landing})`,
   `root`, `scale`, `phase`, `mats.skin/shirt`) la usan el controlador, los jugadores remotos y los brazos
-  de 1ª persona. El modelo (Quaternius) se carga en segundo plano: `avatar.model` es `null` hasta entonces.
+  de 1ª persona. El modelo se carga en segundo plano: `avatar.model` es `null` hasta entonces.
+- **Personaje MakeHuman** (`public/models/makehuman/`): se genera en Blender (MPFB 2 + MCP de Blender, solo en
+  la PC del usuario) con `assets-src/makehuman/build.py` y `export.py` (`GENDER = 'masc'|'fem'`). Esqueleto con
+  nombres de Quaternius en pose T; cada malla trae las formas `w{0,5,10}_m{0,5,10}` que `applyShape` mezcla
+  (bilineal) según peso y músculo. Pelo, barba y ropa en gris: el juego los tiñe. Material del cuerpo: `Body`.
+  Ropa: `clothes/<cuerpo>/<prenda>.gltf` (arriba/abajo/calzado, `outfitOf(look)`); el cuerpo trae `_cover` (bits
+  en el orden de `GARMENT_BITS`) y el sombreador descarta la piel tapada por lo puesto (`uHide`). Medias: material `Socks*`, sin teñir.
 - **Animaciones** en `src/player/anims.js`: se adaptan al esqueleto de Quaternius comparando con la pose
   de reposo (todas en pose T). Para sumar una de Mixamo: FBX Binary, Without Skin, 30 fps, en
   `public/models/anims/mixamo/` y agregarla en `GESTURE_CLIPS`.
