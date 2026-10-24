@@ -1,33 +1,60 @@
-﻿{
-  "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "galeria-online",
-  "main": "server/worker.js",
-  "compatibility_date": "2026-10-01",
-  // El cliente compilado (vite build) se sirve como archivos estáticos.
-  // /ws/* (salas) y /api/* (cuentas) van siempre al Worker.
-  "assets": {
-    "directory": "./dist",
-    "not_found_handling": "single-page-application",
-    "run_worker_first": ["/ws/*", "/api/*"]
-  },
-  // Cuentas con permisos de admin en todas las salas (IDs separados por coma).
-  // 747ec0adf3e01ea1 = "xvvave"
-  "vars": { "ADMIN_IDS": "747ec0adf3e01ea1", "REALTIME_APP_ID": "bb94df5270bf9262c04397a77e843258",
-    // Ingreso con Google y Discord (los secretos van en .dev.vars / wrangler secret)
-    "GOOGLE_CLIENT_ID": "1015529034698-cte3651nesdv632alf58nn1h9r4nljmp.apps.googleusercontent.com",
-    "DISCORD_CLIENT_ID": "1563272193373380608" },
-  // Obras del Museo rotativo (imágenes y modelos 3D). En local wrangler lo simula; online hay que
-  // activar R2 en Cloudflare y crear el bucket (npx wrangler r2 bucket create galeria-obras)
-  "r2_buckets": [{ "binding": "ART", "bucket_name": "galeria-obras" }],
-  "durable_objects": {
-    "bindings": [
-      { "name": "ROOMS", "class_name": "Room" },
-      { "name": "ACCOUNTS", "class_name": "Accounts" }
-    ]
-  },
-  // Plan gratuito de Cloudflare: los Durable Objects tienen que usar SQLite.
-  "migrations": [
-    { "tag": "v1", "new_sqlite_classes": ["Room"] },
-    { "tag": "v2", "new_sqlite_classes": ["Accounts"] }
-  ]
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "galeria-online",
+	"main": "server/worker.js",
+	"compatibility_date": "2026-10-01",
+	// El cliente compilado (vite build) se sirve como archivos estáticos.
+	// /ws/* (salas) y /api/* (cuentas) van siempre al Worker.
+	"assets": {
+		"directory": "./dist",
+		"not_found_handling": "single-page-application",
+		"run_worker_first": [
+			"/ws/*",
+			"/api/*"
+		]
+	},
+	// Cuentas con permisos de admin en todas las salas (IDs separados por coma).
+	// 747ec0adf3e01ea1 = "xvvave"
+	"vars": {
+		"ADMIN_IDS": "747ec0adf3e01ea1",
+		"REALTIME_APP_ID": "bb94df5270bf9262c04397a77e843258",
+		// Ingreso con Google y Discord (los secretos van en .dev.vars / wrangler secret)
+		"GOOGLE_CLIENT_ID": "1015529034698-cte3651nesdv632alf58nn1h9r4nljmp.apps.googleusercontent.com",
+		"DISCORD_CLIENT_ID": "1563272193373380608"
+	},
+	// Obras del Museo rotativo (imágenes y modelos 3D). En local wrangler lo simula; online hay que
+	// activar R2 en Cloudflare y crear el bucket (npx wrangler r2 bucket create galeria-obras)
+	"r2_buckets": [
+		{
+			"binding": "ART",
+			"bucket_name": "galeria-obras"
+		}
+	],
+	"durable_objects": {
+		"bindings": [
+			{
+				"name": "ROOMS",
+				"class_name": "Room"
+			},
+			{
+				"name": "ACCOUNTS",
+				"class_name": "Accounts"
+			}
+		]
+	},
+	// Plan gratuito de Cloudflare: los Durable Objects tienen que usar SQLite.
+	"migrations": [
+		{
+			"tag": "v1",
+			"new_sqlite_classes": [
+				"Room"
+			]
+		},
+		{
+			"tag": "v2",
+			"new_sqlite_classes": [
+				"Accounts"
+			]
+		}
+	]
 }
