@@ -300,3 +300,5 @@ La música del DJ y el puente OSC ya están hechos. Falta:
 | Recompensas con muebles (24/10) | Los premios de niveles y misiones salen al azar de la rareza que toca entre accesorios **y** muebles especiales, todo junto. Se pueden repetir (sirven para regalar o intercambiar) |
 | Inventario en pestañas (24/10) | **Mochila** (ropa, accesorios y, cuando existan, consumibles) y **Mobiliario** (muebles especiales: se pueden soltar e intercambiar como los demás) |
 | Tecla G (24/10) | Abre y cierra "Editar sala" (en tu sala) |
+| Consumibles: barra y muebles (24/10) | En la barra del hall, E → dos botones "Trago" / "Café" y te lo tomás en el momento. Muebles especiales nuevos que reparten (se toma en el momento): **barra de tragos** y **minibar** (trago), **cafetera** (café); los tres **raros**. Al tomar, el personaje sostiene el vaso/taza y hace el gesto (los demás lo ven) |
+| Beso: detalles (24/10) | Hay que estar a menos de 1,5 m. Ignorados y restringidos no pueden pedirlo (no se enteran). Se ve: los dos se acercan, se inclinan y se dan un beso corto (sin abrazo) |
