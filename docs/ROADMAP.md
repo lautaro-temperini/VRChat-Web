@@ -279,3 +279,4 @@ La música del DJ y el puente OSC ya están hechos. Falta:
 | Consumibles: cómo se consiguen | En la barra del hall (E, sin límite), como recompensa de misiones y niveles (van al inventario), regalándolos o intercambiándolos, y con muebles especiales que el dueño pone en su sala y dan consumibles a los visitantes |
 | Consumibles: efecto | 2 minutos sin gastar stamina. Mientras el efecto está activo no se puede tomar otro |
 | Beso | E sobre alguien → "Beso": al otro le llega el pedido con Aceptar / Rechazar. Si acepta, los dos hacen el gesto y los dos reciben el efecto de stamina. Rechazar usa el mismo bloqueo creciente que las invitaciones a grupos |
+| Cuerpo: base MakeHuman (24/10) | Peso y músculo se combinan como en MakeHuman (mucho peso + poco músculo = gordo; mucho peso + mucho músculo = grande). Tipos del básico: **flaco** = peso 0 y músculo 0; **promedio** = 0,5 y 0,5; **gordo** = peso 1 y músculo 0; **musculoso** = peso 0,75 y músculo 1 |
