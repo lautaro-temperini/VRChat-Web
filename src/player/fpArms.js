@@ -1,23 +1,42 @@
 import * as THREE from 'three';
-import { POSE, outfitOf } from './avatar.js';
+import { POSE } from './avatar.js';
 
 // Brazos y manos que se ven en primera persona (estilo cámara GoPro).
-// Viven en una escena aparte que se dibuja encima del mundo, así nunca
-// atraviesan una pared aunque estés pegado a ella.
+// Son el antebrazo y la mano del propio personaje (MakeHuman): se recortan del cuerpo y de la prenda de
+// arriba (la manga, si es larga) y usan los mismos materiales, así tienen el mismo tono de piel, peso y ropa.
+// Viven en una escena aparte que se dibuja encima del mundo, así nunca atraviesan una pared.
 
 const damp = (cur, target, k, dt) => cur + (target - cur) * (1 - Math.exp(-k * dt));
+const ARM_BONES = (s) => new RegExp(`^(lowerarm|hand|thumb_0\\d|index_0\\d|middle_0\\d|ring_0\\d|pinky_0\\d)_${s}$`);
 
-function taper(r1, r2, len, seg = 8) {
-  const pts = [];
-  for (let i = 0; i <= seg; i++) {
-    const a = -Math.PI / 2 + (i / seg) * (Math.PI / 2);
-    pts.push(new THREE.Vector2(r2 * Math.cos(a), -len + r2 + r2 * Math.sin(a)));
+// Copia de la geometría con solo los triángulos que mueve el antebrazo / la mano de un lado
+function armPiece(mesh, side) {
+  const g = mesh.geometry;
+  const { skinIndex, skinWeight } = g.attributes;
+  if (!skinIndex) return null;
+  const re = ARM_BONES(side);
+  const bones = mesh.skeleton.bones;
+  const keep = new Uint8Array(skinIndex.count);
+  for (let i = 0; i < skinIndex.count; i++) {
+    let best = 0, bi = 0;
+    for (let k = 0; k < 4; k++) { const w = skinWeight.getComponent(i, k); if (w > best) { best = w; bi = skinIndex.getComponent(i, k); } }
+    keep[i] = re.test(bones[bi]?.name ?? '') ? 1 : 0;
   }
-  for (let i = 0; i <= seg; i++) {
-    const a = (i / seg) * (Math.PI / 2);
-    pts.push(new THREE.Vector2(r1 * Math.cos(a), -r1 + r1 * Math.sin(a)));
+  const src = g.index ? g.index.array : [...Array(skinIndex.count).keys()];
+  const idx = [];
+  for (let t = 0; t < src.length; t += 3) {
+    if (keep[src[t]] && keep[src[t + 1]] && keep[src[t + 2]]) idx.push(src[t], src[t + 1], src[t + 2]);
   }
-  return new THREE.LatheGeometry(pts, 24);
+  if (!idx.length) return null;
+  const out = new THREE.BufferGeometry();
+  for (const [k, a] of Object.entries(g.attributes)) if (k !== 'skinIndex' && k !== 'skinWeight') out.setAttribute(k, a);
+  out.morphAttributes = g.morphAttributes;
+  out.morphTargetsRelative = g.morphTargetsRelative;
+  out.setIndex(idx);
+  const piece = new THREE.Mesh(out, mesh.material);
+  piece.userData.source = mesh;
+  piece.updateMorphTargets();
+  return piece;
 }
 
 export class FPArms {
@@ -35,42 +54,62 @@ export class FPArms {
     this.rig.add(this.hold);
     this.reach = 0;
     this.time = 0;
+    this.built = null; // qué cuerpo y prendas se usaron (para rehacer al cambiar)
 
-    const M = avatar.mats;
-    const sphere = new THREE.SphereGeometry(1, 24, 16);
+    // side -1 = izquierda de la pantalla (mano izquierda del personaje, que en el modelo está en +X)
     this.arms = [-1, 1].map((side) => {
       const pivot = new THREE.Group();
-      pivot.position.set(side * 0.23, -0.27, -0.03);
+      pivot.position.set(side * 0.2, -0.24, -0.03);
       this.hold.add(pivot);
-      const fore = new THREE.Mesh(taper(0.046, 0.037, 0.3), M.skin);
-      const cuff = new THREE.Mesh(taper(0.056, 0.049, 0.22), M.shirt);
-      pivot.add(fore, cuff);
-      const hand = new THREE.Group();
-      hand.position.y = -0.3;
-      pivot.add(hand);
-      const palm = new THREE.Mesh(sphere, M.skin);
-      palm.scale.set(0.038, 0.055, 0.026);
-      palm.position.y = -0.04;
-      const thumb = new THREE.Mesh(taper(0.014, 0.012, 0.055), M.skin);
-      thumb.position.set(-side * 0.015, -0.015, 0.022);
-      thumb.rotation.set(-0.5, 0, -side * 0.25);
-      hand.add(palm, thumb);
-      return { side, pivot, cuff };
+      const roll = new THREE.Group(); // gira para que la palma quede hacia abajo
+      roll.rotation.y = side < 0 ? Math.PI / 2 : -Math.PI / 2;
+      const aim = new THREE.Group();  // el brazo en pose T apunta a ±X: lo paso a -Y (hacia abajo del pivote)
+      aim.rotation.z = side < 0 ? -Math.PI / 2 : Math.PI / 2;
+      const holder = new THREE.Group(); // corre la malla para que el codo quede en el pivote
+      pivot.add(roll);
+      roll.add(aim);
+      aim.add(holder);
+      return { side, pivot, holder, bone: side < 0 ? 'l' : 'r', pieces: [] };
     });
   }
 
-  // Llamar cuando cambia la ropa (remera = brazo descubierto; manga larga, camisa y campera = manga)
+  // Rehace los antebrazos si cambió el cuerpo o la prenda de arriba
   syncLook() {
-    for (const a of this.arms) a.cuff.visible = outfitOf(this.avatar.look).top !== 'remera';
+    const av = this.avatar, m = av.model;
+    if (!m?.body) return;
+    const top = av.hairMeshes.find((h) => h.userData.style === 'top');
+    const key = `${m.type}|${m.body.uuid}|${top?.geometry.uuid ?? ''}`;
+    if (key === this.built) return;
+    this.built = key;
+    for (const a of this.arms) {
+      for (const p of a.pieces) { p.removeFromParent(); p.geometry.dispose(); }
+      a.pieces = [];
+      const elbow = m.rig.bones[`lowerarm_${a.bone}`]?.worldPos;
+      if (!elbow) continue;
+      a.holder.position.copy(elbow).negate();
+      for (const src of [m.body, top]) {
+        if (!src) continue;
+        const piece = armPiece(src, a.bone);
+        if (piece) { a.holder.add(piece); a.pieces.push(piece); }
+      }
+    }
   }
 
   // Estira la mano derecha al interactuar con algo
   poke() { this.reach = 1; }
 
   update(dt, camera, { speed, pose, phase }) {
+    this.syncLook(); // el modelo y la ropa cargan en segundo plano
     this.time += dt;
     this.rig.position.copy(camera.position);
     this.rig.quaternion.copy(camera.quaternion);
+    // Las mismas formas de peso y músculo que el cuerpo y la ropa
+    for (const a of this.arms) {
+      for (const p of a.pieces) {
+        const inf = p.userData.source.morphTargetInfluences;
+        if (inf && p.morphTargetInfluences) for (let i = 0; i < inf.length; i++) p.morphTargetInfluences[i] = inf[i];
+      }
+    }
 
     const grounded = pose === POSE.stand || pose === POSE.crouch;
     const am = grounded ? Math.min(speed / 4.5, 1) : 0;
