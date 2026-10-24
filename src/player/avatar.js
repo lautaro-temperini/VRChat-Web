@@ -24,7 +24,7 @@ export const LOOK_OPTIONS = {
   body: ['masc', 'fem'],
   skin: ['#ffe0c7', '#f1c09b', '#d9a07a', '#b97a52', '#8d5534', '#5c3520'],
   hair: ['#151010', '#3b2416', '#7a4a26', '#c98d4a', '#f2d48a', '#e8e8e8', '#d63a3a', '#3a7bd5', '#ff6fb5', '#5ad17a'],
-  hairStyle: ['corto', 'flequillo', 'largo', 'rapado', 'rulos', 'coleta', 'trenza', 'bob'],
+  hairStyle: ['corto', 'flequillo', 'largo', 'rapado', 'rulos', 'coleta', 'trenza', 'bob', 'despeinado', 'melena', 'revuelto', 'carre', 'rulitos', 'lacio', 'prolijo', 'jopo', 'trenzadoble', 'francesa', 'rodetetrenzado', 'francesadespeinada', 'haciaatras', 'bobdesfilado', 'largodesmechado', 'rodete', 'vincha', 'salvaje', 'bobrecto', 'bobrectoflequillo', 'bobadentro', 'bobadentroflequillo', 'bobinvertido', 'bobinvertidoflequillo'],
   beard: [false, true],
   beardStyle: ['completa', 'tupida', 'candado', 'bigote'],
   eyes: ['#4a3020', '#2e6b8a', '#3d7a3d', '#8a6a2a', '#1d1d1d', '#8a4be2'],
@@ -37,7 +37,7 @@ export const LOOK_OPTIONS = {
 };
 
 // Peinados viejos que ya no se ofrecen: se muestran como otro, pero el dato guardado no se toca
-const LEGACY_HAIR = { rodete: 'trenza' };
+const LEGACY_HAIR = {};
 
 const BASE = `${import.meta.env.BASE_URL}models/makehuman/`;
 // Dónde van los objetos equipados (en metros del modelo, en pose de reposo):

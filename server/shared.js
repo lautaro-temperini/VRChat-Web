@@ -40,8 +40,8 @@ export const EMOTES = {
 export const DANCES = ['Hip hop de brazos', 'Hip hop', 'Breakdance', 'Baile libre', 'House', 'House 2', 'Shuffle', 'Swing', 'Onda', 'Clásico'];
 DANCES.forEach((name, i) => { EMOTES[`baile${i + 1}`] = { name, loop: true, dance: true }; });
 
-// Peinados (modelos de MakeHuman). "rodete" ya no se ofrece: las cuentas que lo tenían se ven con trenza.
-export const HAIR_STYLES = ['corto', 'flequillo', 'largo', 'rapado', 'rulos', 'coleta', 'trenza', 'bob', 'rodete'];
+// Peinados (modelos de MakeHuman: pack del sistema + Hair 01). Todos se ofrecen en el avanzado.
+export const HAIR_STYLES = ['corto', 'flequillo', 'largo', 'rapado', 'rulos', 'coleta', 'trenza', 'bob', 'despeinado', 'melena', 'revuelto', 'carre', 'rulitos', 'lacio', 'prolijo', 'jopo', 'trenzadoble', 'francesa', 'rodetetrenzado', 'francesadespeinada', 'haciaatras', 'bobdesfilado', 'largodesmechado', 'rodete', 'vincha', 'salvaje', 'bobrecto', 'bobrectoflequillo', 'bobadentro', 'bobadentroflequillo', 'bobinvertido', 'bobinvertidoflequillo'];
 // Barba: un interruptor sí/no y, si está en sí, el tipo
 export const BEARD_STYLES = ['completa', 'tupida', 'candado', 'bigote'];
 // Ropa con volumen (modelos de MakeHuman). "buzo" es del editor viejo: se ve como manga larga.

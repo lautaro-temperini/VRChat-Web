@@ -22,6 +22,17 @@ G = globals().get('GENDER', 'masc')
 HAIRS = {  # estilo del juego -> pelo de MakeHuman (decisiones del 24/10 en docs/ROADMAP.md)
     'corto': 'short01', 'largo': 'long01', 'rapado': 'short04', 'rulos': 'afro01',
     'coleta': 'ponytail01', 'trenza': 'braid01', 'bob': 'bob02', 'flequillo': 'short03',
+    # Pack Hair 01 (CC0) y short02 del sistema (24/10)
+    'despeinado': 'short02', 'melena': 'cortu_shaggy_green_hair', 'revuelto': 'cortu_short_messy_hair',
+    'carre': 'cortu_straight_bangs', 'rulitos': 'cortu_strawberry_cloud_hair', 'lacio': 'culturalibre_hair_01',
+    'prolijo': 'culturalibre_hair_02', 'jopo': 'culturalibre_hair_05', 'trenzadoble': 'elvs_double_mh_braid',
+    'francesa': 'elvs_french_braid_variation', 'rodetetrenzado': 'elvs_reverse_french_braid_bun',
+    'francesadespeinada': 'elvs_unkempt_french_braid', 'haciaatras': 'faydaen_hair_1',
+    'bobdesfilado': 'littleright_bobcut_hair', 'largodesmechado': 'o4saken_long01', 'rodete': 'rehmanpolanski_hair_bun_brown',
+    'vincha': 'sonntag78_blond_with_headband', 'salvaje': 'sonntag78_junglebook_hair', 'bobrecto': 'toigo_blunt_bob',
+    'bobrectoflequillo': 'toigo_blunt_bob_with_bangs', 'bobadentro': 'toigo_curled_under_bob',
+    'bobadentroflequillo': 'toigo_curled_under_bob_with_bangs', 'bobinvertido': 'toigo_inverted_bob',
+    'bobinvertidoflequillo': 'toigo_inverted_bob_with_bangs',
 }
 BEARDS = {
     'tupida': 'wdg_scruffy_beard', 'completa': 'grinsegold_beard_sigmund_wip',

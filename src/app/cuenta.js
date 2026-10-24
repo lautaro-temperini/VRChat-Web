@@ -140,6 +140,13 @@ const ADVANCED = [
 ];
 const CHIP_LABELS = {
   masc: 'masculino', fem: 'femenino', false: 'sin barba', true: 'con barba', flequillo: 'corto con flequillo',
+  despeinado: 'corto despeinado', melena: 'melena desmechada', revuelto: 'corto revuelto', carre: 'carré con flequillo',
+  rulitos: 'rulos cortos', lacio: 'largo lacio', prolijo: 'corto prolijo', jopo: 'jopo', trenzadoble: 'trenza doble',
+  francesa: 'trenza francesa', rodetetrenzado: 'rodete trenzado', francesadespeinada: 'trenza francesa despeinada',
+  haciaatras: 'peinado hacia atrás', bobdesfilado: 'bob desfilado', largodesmechado: 'largo desmechado', rodete: 'rodete',
+  vincha: 'con vincha', salvaje: 'largo salvaje', bobrecto: 'bob recto', bobrectoflequillo: 'bob recto con flequillo',
+  bobadentro: 'bob hacia adentro', bobadentroflequillo: 'bob hacia adentro con flequillo', bobinvertido: 'bob invertido',
+  bobinvertidoflequillo: 'bob invertido con flequillo',
   completa: 'completa corta', tupida: 'tupida', candado: 'candado', bigote: 'bigote',
   mangalarga: 'manga larga', buzo: 'manga larga',
 };

@@ -84,8 +84,7 @@ Para volver a subir: `npm run deploy` desde la carpeta del proyecto.
 - Todo se genera en Blender con `assets-src/makehuman/build.py` + `export.py` (`GENDER = 'masc'|'fem'`); los
   `.blend` de trabajo también están ahí. **Solo se puede regenerar en la PC del usuario** (Blender + MPFB 2 +
   MCP de Blender; `.mcp.json` local, fuera de git). Packs instalados en MPFB: sistema, Bodyparts 05, Shoes 01.
-- **Hair 01** (228 MB, CC0) ya está bajado en `Descargas\makehuman\hair01_cc0.zip`: falta instalarlo en MPFB
-  (`Install pack from zip`) y elegir con el usuario cuáles de sus 25 peinados se suman.
+- ✅ **Hair 01**: 24 peinados sumados (32 en total en el avanzado).
 - ✅ **Manos de primera persona reales** (online): antebrazo y mano del propio cuerpo + la manga (`src/player/fpArms.js`).
 - ✅ **Editor Básico / Avanzado** (online, `src/app/cuenta.js`): Básico = una fila por cosa (6 peinados principales
   en `BASIC_HAIR`, 5 colores + botón "+" que abre el RGB); Avanzado = todo lo de `LOOK_OPTIONS` (lo nuevo aparece
