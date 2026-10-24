@@ -273,3 +273,9 @@ La música del DJ y el puente OSC ya están hechos. Falta:
 | Editor: especiales de ejemplo | Trono dorado, bola de espejos, sillón de terciopelo con neón y escultura de neón |
 | Paquete inicial (activado) | Las cuentas nuevas reciben 15 objetos al azar entre prendas y muebles especiales |
 | Editor: cambiar de plantilla (muebles básicos) | Se borran (con confirmación); arrancás con lo que trae la plantilla nueva |
+| Rareza de los muebles especiales | Provisoria, para probar los porcentajes: trono dorado = exótico; bola de espejos y sillón con neón = raro; escultura de neón = básico. Las prendas quedan como están (cadena raro, corona exótico, el resto básico) |
+| Modelos 3D de usuarios | Mismas reglas que los diseños de artistas: GLB, hasta 2 MB, 10.000 triángulos, texturas 1K, máximo 3 m, sin scripts; control automático, sin revisar el contenido |
+| Consumibles: cuáles | Para empezar: trago y café |
+| Consumibles: cómo se consiguen | En la barra del hall (E, sin límite), como recompensa de misiones y niveles (van al inventario), regalándolos o intercambiándolos, y con muebles especiales que el dueño pone en su sala y dan consumibles a los visitantes |
+| Consumibles: efecto | 2 minutos sin gastar stamina. Mientras el efecto está activo no se puede tomar otro |
+| Beso | E sobre alguien → "Beso": al otro le llega el pedido con Aceptar / Rechazar. Si acepta, los dos hacen el gesto y los dos reciben el efecto de stamina. Rechazar usa el mismo bloqueo creciente que las invitaciones a grupos |
