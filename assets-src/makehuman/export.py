@@ -10,6 +10,7 @@
 # Todas las mallas usan el mismo esqueleto (mismos huesos en el mismo orden).
 import os
 import bpy
+import bmesh
 import numpy as np
 from bl_ext.blender_org.mpfb.services.locationservice import LocationService
 
@@ -17,7 +18,7 @@ G = globals().get('GENDER', 'masc')
 OUT = r'E:\Proyectos\VRChat-Web\public\models\makehuman'
 TEX = os.path.join(OUT, 'textures')
 TEX1K = os.path.join(TEX, '1k')
-for d in (OUT, TEX, TEX1K, os.path.join(OUT, 'body'), os.path.join(OUT, 'hair', G)):
+for d in (OUT, TEX, TEX1K, os.path.join(OUT, 'body'), os.path.join(OUT, 'hair', G), os.path.join(OUT, 'clothes', G)):
     os.makedirs(d, exist_ok=True)
 D = LocationService.get_user_data
 SKIN = {'masc': ('young_caucasian_male', 'young_lightskinned_male_diffuse.png'),
@@ -121,6 +122,41 @@ for o in [o for o in bpy.data.objects if o.name.startswith(f'{G}_hair_') or o.na
     if src:
         assign(o, material(f'Hair_{key}', texture(src, key, gray=True, alpha=True), alpha=True, rough=0.8))
     print(o.name, '<-', src)
+# Ropa: textura en gris con su dibujo (el juego la tiñe). El nombre del material dice qué color usa:
+# Cloth_top_* (remera/buzo), Cloth_bottom_* (pantalón), Cloth_feet_* (calzado)
+SLOT = {'remera': 'top', 'mangalarga': 'top', 'camisa': 'top', 'campera': 'top', 'jean': 'bottom', 'short': 'bottom',
+        'calza': 'bottom', 'pollera': 'bottom', 'zapatillas': 'feet', 'botas': 'feet', 'zapatos': 'feet'}
+for o in [o for o in bpy.data.objects if o.name.startswith(f'{G}_cloth_')]:
+    garment = o.name[len(G) + 7:]
+    src = first_image(o)
+    if src:
+        tex = texture(src, f'cloth_{garment}', gray=True, alpha=True)
+        assign(o, material(f'Cloth_{SLOT[garment]}_{garment}', tex, rough=0.85))
+        if SLOT[garment] == 'feet':
+            # Las medias (tubos que suben más allá del tobillo sin tocar el piso) llevan su propio
+            # material: siempre blancas
+            o.data.materials.append(material(f'Socks_{garment}', tex, rough=0.9))
+            bm = bmesh.new()
+            bm.from_mesh(o.data)
+            seen = set()
+            for v in bm.verts:
+                if v in seen:
+                    continue
+                stack, comp = [v], []
+                while stack:
+                    x = stack.pop()
+                    if x in seen:
+                        continue
+                    seen.add(x)
+                    comp.append(x)
+                    stack.extend(e.other_vert(x) for e in x.link_edges)
+                if max(x.co.z for x in comp) > 0.15 and min(x.co.z for x in comp) > 0.015:
+                    for x in comp:
+                        for f in x.link_faces:
+                            f.material_index = 1
+            bm.to_mesh(o.data)
+            bm.free()
+    print(o.name, '<-', src)
 
 
 # ---------- Exportar ----------
@@ -133,7 +169,7 @@ def export(objs, path):
     bpy.ops.export_scene.gltf(
         filepath=path, export_format='GLTF_SEPARATE', export_texture_dir=os.path.relpath(TEX, os.path.dirname(path)),
         use_selection=True, export_apply=False, export_skins=True, export_morph=True, export_morph_normal=False,
-        export_animations=False, export_yup=True, export_extras=False)
+        export_animations=False, export_yup=True, export_extras=False, export_attributes=True)
     print('exportado', path, round(os.path.getsize(path.replace('.gltf', '.bin')) / 1e6, 2), 'MB de geometría')
 
 
@@ -142,3 +178,5 @@ for o in [o for o in bpy.data.objects if o.name.startswith(f'{G}_hair_') or o.na
     key = o.name[len(G) + 1:]
     name = key.replace('hair_', '').replace('beard_', 'barba_')
     export([rig, o], os.path.join(OUT, 'hair', G, f'{name}.gltf'))
+for o in [o for o in bpy.data.objects if o.name.startswith(f'{G}_cloth_')]:
+    export([rig, o], os.path.join(OUT, 'clothes', G, f'{o.name[len(G) + 7:]}.gltf'))

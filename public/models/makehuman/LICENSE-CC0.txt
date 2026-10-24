@@ -7,6 +7,10 @@ Todo lo que hay en esta carpeta es CC0 (dominio público):
 - Peinados: short01, short03, short04, long01, afro01, ponytail01, braid01 y bob02 del mismo pack (CC0).
 - Barbas y bigote: Bodyparts 05 (bodyparts05_cc0.zip), CC0.
   https://static.makehumancommunity.org/assets/assetpacks/bodyparts05.html
+- Ropa: conjuntos male_casualsuit01/02/05/06, female_casualsuit02, female_sportsuit01, female_elegantsuit01
+  y calzado shoes04/05 del pack del sistema (CC0).
+- Botas: toigo_ankle_boots_male / toigo_ankle_boots_female (Margaret Toigo) del pack Shoes 01
+  (shoes01_cc0.zip, 79 MB), CC0. https://static.makehumancommunity.org/assets/assetpacks/shoes01.html
 
 MPFB 2 (GPL) se usó solo como herramienta; lo que exporta es CC0.
 Los archivos de trabajo y los scripts que los generan están en assets-src/makehuman/ (build.py y export.py).

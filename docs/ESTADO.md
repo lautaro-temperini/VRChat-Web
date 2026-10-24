@@ -79,8 +79,9 @@ Para volver a subir: `npm run deploy` desde la carpeta del proyecto.
    provisoria ya está decidida en ROADMAP; ver `docs/ramas/progresion.md` → "Pendiente para conectar con el editor").
 2. **Personaje MakeHuman** ✅ (24/10): cuerpos masc/fem con 8 formas de peso y músculo, 8 peinados y 4 barbas
    (`public/models/makehuman/`, generados con `assets-src/makehuman/build.py` + `export.py` desde Blender con
-   MPFB 2 y el MCP de Blender). Falta: revisar cómo quedan los accesorios (gorros, anteojos, cadena), borrar
-   `public/models/quaternius/` cuando el usuario apruebe, ropa con volumen (consultar) y achicar las
+   MPFB 2 y el MCP de Blender). Ropa con volumen ✅ (11 prendas, piel tapada escondida, medias blancas).
+   Falta: revisar cómo quedan los accesorios (gorros, anteojos, cadena), borrar
+   `public/models/quaternius/` (hecho) y achicar las
    animaciones para celular. Consumibles y beso: decididos, sin programar.
 3. **Diseños de artistas como objetos** y más mapas públicos (paso 5).
 4. **Revisión de permisos del servidor y pruebas automáticas** (cuando se junten las ramas de los agentes):

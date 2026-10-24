@@ -11,12 +11,12 @@ import { LOCO, locomotionClips, gestureClip } from './anims.js';
 // (morph targets w{0,5,10}_m{0,5,10}) que se mezclan según peso y músculo.
 // El cuerpo y el pelo se cargan en segundo plano; mientras tanto el personaje
 // no se ve, pero la interfaz (setLook / setEquip / update) funciona igual.
-// La ropa no es un modelo aparte: el sombreador pinta cada parte del cuerpo
-// (torso, brazos, piernas, pies) con el color elegido, según qué hueso la mueve.
+// La ropa son prendas aparte (arriba, abajo, calzado) teñidas con el color elegido; la piel
+// que queda debajo se esconde (el cuerpo trae en "_cover" qué prendas tapan cada vértice).
 
 export const DEFAULT_LOOK = {
   body: 'masc', skin: '#d9a07a', hair: '#3b2416', hairStyle: 'corto', beard: false, beardStyle: 'completa', eyes: '#4a3020',
-  top: 'buzo', shirt: '#ff7a3d', pants: '#2b3445', shoes: '#f4f4f4',
+  top: 'remera', bottom: 'jean', feet: 'zapatillas', shirt: '#ff7a3d', pants: '#2b3445', shoes: '#f4f4f4',
   height: 1.75, weight: 0.5, muscle: 0.5,
 };
 
@@ -28,7 +28,9 @@ export const LOOK_OPTIONS = {
   beard: [false, true],
   beardStyle: ['completa', 'tupida', 'candado', 'bigote'],
   eyes: ['#4a3020', '#2e6b8a', '#3d7a3d', '#8a6a2a', '#1d1d1d', '#8a4be2'],
-  top: ['remera', 'buzo'],
+  top: ['remera', 'mangalarga', 'camisa', 'campera'],
+  bottom: ['jean', 'short', 'calza', 'pollera'],
+  feet: ['zapatillas', 'botas', 'zapatos'],
   shirt: ['#f4f4f4', '#1d1d22', '#ff7a3d', '#3a7bd5', '#e63946', '#2a9d8f', '#ffd23f', '#8a4be2', '#ff6fb5', '#5ad17a'],
   pants: ['#2b3445', '#1d1d22', '#4b6a8f', '#7a6a55', '#3d5a3a', '#e8e1d0', '#8a3a3a'],
   shoes: ['#f4f4f4', '#1d1d22', '#ff7a3d', '#3a7bd5', '#e63946', '#ffd23f'],
@@ -47,6 +49,19 @@ const BODIES = {
 };
 const hairFile = (type, style) => `hair/${type}/${style}.gltf`;
 const beardFile = (type, style) => `hair/${type}/barba_${style}.gltf`;
+const clothFile = (type, garment) => `clothes/${type}/${garment}.gltf`;
+// Orden de los bits de "_cover" (igual que GARMENTS en assets-src/makehuman/build.py)
+const GARMENT_BITS = ['remera', 'mangalarga', 'camisa', 'campera', 'jean', 'short', 'calza', 'pollera', 'zapatillas', 'botas', 'zapatos'];
+// Prenda de cada lugar según el look (con los valores viejos que ya no se ofrecen)
+const LEGACY_TOP = { buzo: 'mangalarga' };
+const pick = (list, v, fallback) => (list.includes(v) ? v : fallback);
+export function outfitOf(L) {
+  return {
+    top: pick(LOOK_OPTIONS.top, LEGACY_TOP[L.top] ?? L.top, 'remera'),
+    bottom: pick(LOOK_OPTIONS.bottom, L.bottom, 'jean'),
+    feet: pick(LOOK_OPTIONS.feet, L.feet, 'zapatillas'),
+  };
+}
 
 // ---------- Carga de modelos (una sola vez por archivo) ----------
 const manager = new THREE.LoadingManager();
@@ -61,43 +76,10 @@ function load(file) {
   return cache.get(file);
 }
 
-// Partes del cuerpo según el hueso: 0 piel, 1 torso, 2 brazo, 3 pierna, 4 pie
-function partOf(bone) {
-  if (/^(Head|neck|hand|index|middle|ring|pinky|thumb)/.test(bone)) return 0;
-  if (/^(spine|clavicle)/.test(bone)) return 1;
-  if (/^(upperarm|lowerarm)/.test(bone)) return 2;
-  if (/^(pelvis|thigh|calf|root)/.test(bone)) return 3;
-  return 4;
-}
-
 const isBodyMaterial = (name) => /^Body/.test(name);
 
-// Se ejecuta una vez por archivo: guarda en la geometría a qué parte pertenece cada vértice
 function prepare(gltf) {
-  gltf.scene.updateMatrixWorld(true);
-  gltf.scene.traverse((o) => {
-    if (!o.isSkinnedMesh) return;
-    o.material.vertexColors = false; // los colores de vértice del pack vienen en blanco
-    if (!isBodyMaterial(o.material.name)) return;
-    const { skinIndex, skinWeight, position } = o.geometry.attributes;
-    const bones = o.skeleton.bones;
-    const arm = { x0: bones.find((b) => b.name === 'upperarm_l'), x1: bones.find((b) => b.name === 'hand_l') };
-    const x0 = arm.x0.getWorldPosition(new THREE.Vector3()).x, x1 = arm.x1.getWorldPosition(new THREE.Vector3()).x;
-    const part = new Float32Array(position.count * 2);
-    const sums = new Float32Array(5);
-    for (let i = 0; i < position.count; i++) {
-      sums.fill(0);
-      for (let k = 0; k < 4; k++) sums[partOf(bones[skinIndex.getComponent(i, k)].name)] += skinWeight.getComponent(i, k);
-      let best = 0;
-      for (let p = 1; p < 5; p++) if (sums[p] > sums[best]) best = p;
-      part[i * 2] = best;
-      part[i * 2 + 1] = (Math.abs(position.getX(i)) - x0) / (x1 - x0); // 0 hombro … 1 muñeca
-    }
-    o.geometry.setAttribute('aPart', new THREE.BufferAttribute(part, 2));
-    const bone = (n) => bones.find((b) => b.name === n).getWorldPosition(new THREE.Vector3());
-    gltf.userData.neckY = bone('neck_01').y + 0.01;
-    gltf.userData.shoeY = bone('foot_l').y + 0.035;
-  });
+  gltf.scene.traverse((o) => { if (o.isSkinnedMesh) o.material.vertexColors = false; });
   return gltf;
 }
 
@@ -106,38 +88,27 @@ const toLinear = (hex) => new THREE.Color(hex);
 // Tono medio de piel de las texturas (medido en Blender): se usa para recolorear la piel
 const REF_SKIN = { masc: toLinear('#f3d6c1'), fem: toLinear('#e5cebe') };
 
+// Piel teñida con el color elegido; la que queda debajo de la ropa puesta no se dibuja
+// (uHide = bits de las prendas puestas; _cover = bits de las prendas que tapan cada vértice)
 function bodyMaterial(base, uniforms) {
   const m = base.clone();
   m.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms);
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', `#include <common>
-        attribute vec2 aPart;
-        uniform float uSleeve, uNeckY, uShoeY;
-        varying vec4 vCloth; // torso, piernas, pies, (sin usar)`)
+        attribute float _cover;
+        uniform int uHide;
+        varying float vHidden;`)
       .replace('#include <begin_vertex>', `#include <begin_vertex>
-        float p = aPart.x;
-        vec4 c = vec4(0.0);
-        if (position.y < uShoeY || p > 3.5) c.z = 1.0;
-        else if (p > 2.5) c.y = 1.0;
-        else if (p > 1.5) c.x = step(aPart.y, uSleeve);
-        else if (p > 0.5) c.x = step(position.y, uNeckY);
-        vCloth = c;`);
+        vHidden = (int(_cover + 0.5) & uHide) != 0 ? 1.0 : 0.0;`);
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', `#include <common>
-        uniform vec3 uSkin, uRefSkin, uShirt, uPants, uShoes;
-        varying vec4 vCloth;`)
+        uniform vec3 uSkin, uRefSkin;
+        varying float vHidden;`)
       .replace('#include <map_fragment>', `
+        if (vHidden > 0.5) discard;
         vec4 texel = texture2D(map, vMapUv);
-        vec3 detail = texel.rgb / uRefSkin;
-        // La ropa toma solo un poco del detalle de la piel (y nada del color)
-        float shade = mix(1.0, clamp(dot(detail, vec3(0.333)), 0.6, 1.3), 0.35);
-        vec3 cloth = (uShirt * vCloth.x + uPants * vCloth.y + uShoes * vCloth.z) * shade;
-        float covered = clamp(vCloth.x + vCloth.y + vCloth.z, 0.0, 1.0);
-        diffuseColor.rgb *= mix(detail * uSkin, cloth, covered);`)
-      // La ropa disimula la musculatura: se aplana el relieve del mapa de normales
-      .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
-        normal = normalize(mix(normal, nonPerturbedNormal, covered * 0.75));`);
+        diffuseColor.rgb *= texel.rgb / uRefSkin * uSkin;`);
   };
   m.customProgramCacheKey = () => 'avatar-body';
   return m;
@@ -294,7 +265,7 @@ export class Avatar {
     this.uniforms = {
       uSkin: { value: M.skin.color }, uShirt: { value: M.shirt.color }, uPants: { value: M.pants.color },
       uShoes: { value: M.shoes.color }, uEye: { value: M.eyes.color }, uRefSkin: { value: REF_SKIN.masc },
-      uSleeve: { value: 1 }, uNeckY: { value: 1.5 }, uShoeY: { value: 0.1 },
+      uHide: { value: 0 },
     };
 
     // Caja invisible para apuntarle con la E / el click (más barata que la malla animada)
@@ -332,7 +303,6 @@ export class Avatar {
     this.look = { ...DEFAULT_LOOK, ...look };
     const L = this.look;
     for (const k of ['skin', 'hair', 'eyes', 'shirt', 'pants', 'shoes']) this.mats[k].color.set(L[k]);
-    this.uniforms.uSleeve.value = L.top === 'buzo' ? 1.02 : 0.42;
     if (this.model?.type !== L.body) this.loadBody(L.body);
     else this.syncHair();
     if (this.model) this.applyShape();
@@ -363,8 +333,6 @@ export class Avatar {
       meshes.push(o);
     });
     this.uniforms.uRefSkin.value = REF_SKIN[type] ?? REF_SKIN.masc;
-    this.uniforms.uNeckY.value = gltf.userData.neckY;
-    this.uniforms.uShoeY.value = gltf.userData.shoeY;
     const rig = new Rig(scene);
     const anchor = (bone, [x, y, z, s]) => { const g = rig.holder(bone, [x, y, z]); g.scale.setScalar(s); return g; };
     const anchors = { head: anchor('Head', def.head), face: anchor('Head', def.face), chest: anchor('spine_03', def.chest) };
@@ -390,32 +358,43 @@ export class Avatar {
     this.syncHair();
   }
 
-  // Peinado y barba: se cargan aparte y se enganchan al esqueleto del cuerpo
+  // Peinado, barba y ropa: se cargan aparte y se enganchan al esqueleto del cuerpo
   async syncHair() {
     const m = this.model;
     if (!m) return;
     const L = this.look;
     const style = LEGACY_HAIR[L.hairStyle] ?? L.hairStyle;
-    const files = [hairFile(m.type, LOOK_OPTIONS.hairStyle.includes(style) ? style : 'corto'),
-      L.beard ? beardFile(m.type, LOOK_OPTIONS.beardStyle.includes(L.beardStyle) ? L.beardStyle : 'completa') : null].filter(Boolean);
-    const key = files.join('+');
+    const outfit = outfitOf(L);
+    // [archivo, qué es, color]
+    const parts = [
+      [hairFile(m.type, LOOK_OPTIONS.hairStyle.includes(style) ? style : 'corto'), style, this.mats.hair],
+      L.beard ? [beardFile(m.type, pick(LOOK_OPTIONS.beardStyle, L.beardStyle, 'completa')), 'barba', this.mats.hair] : null,
+      [clothFile(m.type, outfit.top), 'top', this.mats.shirt],
+      [clothFile(m.type, outfit.bottom), 'bottom', this.mats.pants],
+      [clothFile(m.type, outfit.feet), 'feet', this.mats.shoes],
+    ].filter(Boolean);
+    // La piel que tapan las prendas puestas no se dibuja
+    this.uniforms.uHide.value = Object.values(outfit).reduce((bits, g) => bits | (1 << GARMENT_BITS.indexOf(g)), 0);
+    const key = parts.map((p) => p[0]).join('+');
     this.updateHairVisibility();
     if (m.hairKey === key) return;
     m.hairKey = key;
-    const parts = await Promise.all(files.map((f) => load(f)));
+    const gltfs = await Promise.all(parts.map((p) => load(p[0])));
     if (this.disposed || this.model !== m || m.hairKey !== key) return;
     for (const h of this.hairMeshes) { h.removeFromParent(); h.material.dispose(); }
     this.hairMeshes = [];
     const skinBones = m.body.skeleton.bones;
-    for (const [i, gltf] of parts.entries()) {
+    for (const [i, gltf] of gltfs.entries()) {
+      const [, kind, mat] = parts[i];
       gltf.scene.traverse((o) => {
         if (!o.isSkinnedMesh) return;
         const mesh = new THREE.SkinnedMesh(o.geometry, o.material.clone());
-        mesh.material.color = this.mats.hair.color;
+        // La textura viene en gris: se tiñe con el color elegido (las medias quedan blancas)
+        if (!/^Socks/.test(o.material.name)) mesh.material.color = mat.color;
         mesh.castShadow = true;
         mesh.frustumCulled = false;
         mesh.raycast = noRaycast;
-        mesh.userData.style = i === 0 ? style : 'barba';
+        mesh.userData.style = kind;
         m.body.parent.add(mesh);
         mesh.bind(new THREE.Skeleton(skinBones, o.skeleton.boneInverses), m.body.bindMatrix);
         this.hairMeshes.push(mesh);

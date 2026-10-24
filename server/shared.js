@@ -44,7 +44,10 @@ DANCES.forEach((name, i) => { EMOTES[`baile${i + 1}`] = { name, loop: true, danc
 export const HAIR_STYLES = ['corto', 'flequillo', 'largo', 'rapado', 'rulos', 'coleta', 'trenza', 'bob', 'rodete'];
 // Barba: un interruptor sí/no y, si está en sí, el tipo
 export const BEARD_STYLES = ['completa', 'tupida', 'candado', 'bigote'];
-export const TOPS = ['remera', 'buzo'];
+// Ropa con volumen (modelos de MakeHuman). "buzo" es del editor viejo: se ve como manga larga.
+export const TOPS = ['remera', 'mangalarga', 'camisa', 'campera', 'buzo'];
+export const BOTTOMS = ['jean', 'short', 'calza', 'pollera'];
+export const FEET = ['zapatillas', 'botas', 'zapatos'];
 export const BODIES = ['masc', 'fem'];
 // Tipos de cuerpo del editor básico: cada uno es un punto de los deslizadores del avanzado
 // (peso 0..1 y músculo 0..1; promedio = 0,5 / 0,5). Se combinan como en MakeHuman:
@@ -70,6 +73,8 @@ export function cleanLook(look) {
   }
   if (HAIR_STYLES.includes(look.hairStyle)) out.hairStyle = look.hairStyle;
   if (TOPS.includes(look.top)) out.top = look.top;
+  if (BOTTOMS.includes(look.bottom)) out.bottom = look.bottom;
+  if (FEET.includes(look.feet)) out.feet = look.feet;
   if (BODIES.includes(look.body)) out.body = look.body;
   if (typeof look.beard === 'boolean') out.beard = look.beard;
   if (BEARD_STYLES.includes(look.beardStyle)) out.beardStyle = look.beardStyle;

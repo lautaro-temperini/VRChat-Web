@@ -104,7 +104,9 @@ npm run deploy   # build + wrangler deploy
 - **Personaje MakeHuman** (`public/models/makehuman/`): se genera en Blender (MPFB 2 + MCP de Blender, solo en
   la PC del usuario) con `assets-src/makehuman/build.py` y `export.py` (`GENDER = 'masc'|'fem'`). Esqueleto con
   nombres de Quaternius en pose T; cada malla trae las formas `w{0,5,10}_m{0,5,10}` que `applyShape` mezcla
-  (bilineal) según peso y músculo. Pelo y barba en gris: el juego los tiñe. Material del cuerpo: `Body`.
+  (bilineal) según peso y músculo. Pelo, barba y ropa en gris: el juego los tiñe. Material del cuerpo: `Body`.
+  Ropa: `clothes/<cuerpo>/<prenda>.gltf` (arriba/abajo/calzado, `outfitOf(look)`); el cuerpo trae `_cover` (bits
+  en el orden de `GARMENT_BITS`) y el sombreador descarta la piel tapada por lo puesto (`uHide`). Medias: material `Socks*`, sin teñir.
 - **Animaciones** en `src/player/anims.js`: se adaptan al esqueleto de Quaternius comparando con la pose
   de reposo (todas en pose T). Para sumar una de Mixamo: FBX Binary, Without Skin, 30 fps, en
   `public/models/anims/mixamo/` y agregarla en `GESTURE_CLIPS`.
