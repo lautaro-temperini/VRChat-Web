@@ -19,8 +19,7 @@ export const LOCO = {
   walk: { file: 'mixamo/caminar.fbx', speed: 1.66 },
   jog: { file: 'mixamo/trotar.fbx', speed: 2.4 },
   sprint: { file: 'mixamo/correr.fbx', speed: 4.4 },
-  crouch: { file: 'mixamo/agachado.fbx' },
-  crouchWalk: { file: 'mixamo/agachado_caminar.fbx', speed: 0.5 },
+  crouchWalk: { file: 'mixamo/agachado_caminar.fbx' }, // se usa un solo cuadro: la pose en cuclillas
   air: { file: 'mixamo/caer.fbx' },
   sit: { file: 'mixamo/sentado.fbx' },
   climb: { file: 'mixamo/trepar.fbx', hips: false },

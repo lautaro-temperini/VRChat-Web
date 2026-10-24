@@ -159,6 +159,11 @@ class Rig {
     b.bone.quaternion.copy(b.rest).multiply(_q.copy(b.inv).multiply(d).multiply(b.world));
   }
   euler(name, x, y, z) { this.set(name, _qe.setFromEuler(_e.set(x, y, z))); }
+  // Suma un giro D (en el espacio del modelo) sobre la pose que ya tiene el hueso
+  add(name, d) {
+    const b = this.bones[name];
+    b.bone.quaternion.multiply(_q.copy(b.inv).multiply(d).multiply(b.world));
+  }
   // Escala (x, 1, z) un hueso del torso y deshace ese ensanche en los hijos que cuelgan
   // de él (brazos, cuello), así crecen los hombros pero no se deforman brazos ni cabeza
   widen(name, w, children) {
@@ -187,6 +192,7 @@ class Rig {
 
 export const POSE = { stand: 0, crouch: 1, sit: 2, climb: 3, air: 4, vault: 5 };
 export const VAULT_TIME = 0.6; // segundos que dura saltar una baranda
+const SQUAT_AT = 0.4; // segundo de agachado_caminar que se usa como pose agachada
 
 // Celular (en coordenadas del modelo en pose T, colgado de la mano derecha):
 // largo a lo largo de Z, pantalla mirando a +X; al doblar el brazo queda vertical mirando la cara.
@@ -227,7 +233,7 @@ const GESTURES = {
   saludar: (t) => ({ sx: [-0.3, 0], sz: [-(2.55 + 0.28 * Math.sin(t * 11)), 0.1], el: [-0.25, -0.2] }),
   aplaudir: (t) => {
     const c = Math.abs(Math.sin(t * 8));
-    return { sx: [-0.95, -0.95], sz: [0.4 - 0.16 * c, -0.4 + 0.16 * c], el: [-1.25, -1.25] };
+    return { sx: [-1.0, -1.0], sz: [0.12 - 0.14 * c, -0.12 + 0.14 * c], el: [-1.15, -1.15] };
   },
   senalar: () => ({ sx: [-1.5, 0], sz: [-0.08, 0.1], el: [0, -0.2] }),
   bailar: (t) => {
@@ -636,9 +642,14 @@ export class Avatar {
     const stand = blend(speed, [[0, 'idle'], [1.6, 'walk'], [3.2, 'jog']]);
     if (this.talking) { stand.talk = stand.idle; stand.idle = 0; }
     for (const [k, v] of Object.entries(stand)) target[k] += v * w.stand;
-    // Agacharse, saltar y pasar barandas se hacen por código (abajo); mientras tanto la base es quieto
-    const proc = Math.min(1, w.crouch + w.air + w.vault);
+    // Saltar y pasar barandas se hacen por código (abajo); mientras tanto la base es quieto
+    const proc = Math.min(1, w.air + w.vault);
     target.idle += proc;
+    // Agachado: un cuadro en cuclillas de agachado_caminar (piernas parejas, pies en el piso); al avanzar
+    // se suman los pasos por código (el clip entero gira el cuerpo de costado y no sirve para caminar)
+    const squat = A.actions.crouchWalk;
+    if (squat) { squat.time = SQUAT_AT; squat.timeScale = 0; }
+    target.crouchWalk += w.crouch;
     target.climb += w.climb;
     // Trepar dura lo que tarda el juego en subirte (0,42 s): la animación arranca de cero cada vez
     if (A.actions.climb) {
@@ -655,6 +666,14 @@ export class Avatar {
     }
     if (A.gesture) A.gesture.setEffectiveWeight(ga);
     A.mixer.update(dt);
+    const step = w.crouch * Math.min(this.amount * 2, 1);
+    if (step > 0.01) {
+      [['l', 1], ['r', -1]].forEach(([s, side]) => {
+        const ph = this.phase + (side > 0 ? 0 : Math.PI);
+        R.add(`thigh_${s}`, qx(-Math.sin(ph) * 0.4 * step));
+        R.add(`calf_${s}`, qx(Math.max(0, -Math.cos(ph)) * 0.55 * step));
+      });
+    }
 
     // Gesto hecho por código (aplaudir, o mientras carga la animación): pisa los brazos
     if (gw > 0.001 && !A.gesture) {
@@ -669,7 +688,7 @@ export class Avatar {
     // Inclinarse en las curvas y el golpe al aterrizar (la raíz no la mueven las animaciones)
     const root = R.bones.root;
     // (la animación de sentarse ya trae su altura: no se resta la bajada de la pose hecha por código)
-    root.bone.position.copy(root.restPos).add(_v.set(0, Math.min(J.y + 0.42 * w.sit, 0) * 0.5, 0).applyQuaternion(root.parentInv));
+    root.bone.position.copy(root.restPos).add(_v.set(0, Math.min(J.y + 0.42 * w.sit + 0.36 * w.crouch, 0) * 0.5, 0).applyQuaternion(root.parentInv));
     R.euler('root', 0, 0, J.tilt);
 
     // Agachado y en el aire: la pose hecha por código, mezclada encima según cuánto pesa

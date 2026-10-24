@@ -106,6 +106,11 @@ Para volver a subir: `npm run deploy` desde la carpeta del proyecto.
 6. **Repaso de modelos y animaciones** (pedido 24/10): probar en orden todos los modelos y animaciones del juego
    (caminar, trotar, saltar, trepar, saltar baranda, sentarse, agacharse, gestos, celular, tomar, beso, DJ, accesorios,
    ropa, muebles…) y ajustar lo que se vea mal. Las dudas se juntan y se preguntan al final, sin cortar el trabajo.
+   Avance: ✅ quieto, caminar, trotar, correr, sentado, aire, trepar, saltar baranda, saludar, festejar, señalar;
+   ✅ agachado arreglado (cuadro en cuclillas de agachado_caminar + pasos por código). Falta: aplaudir (las manos
+   se cruzan: calibrar con la distancia entre dedos), los 10 bailes (capturas g_baile*.jpg sin revisar), hablar,
+   celular, tomar café, beso de a dos, DJ, accesorios, ropa, cuerpo fem, muebles, 1ª persona. Herramienta:
+   devtest/avatar.html tiene `__cap(nombre, {motion, steps, before, at})` que manda capturas a un receptor local.
 7. **Diseños de artistas como objetos** y más mapas públicos (paso 5).
 8. **Seguridad, lo que quedó para decidir** (ver `docs/ramas/seguridad.md`): teletransporte (posiciones falsas)
    y vencimiento de sesiones.
