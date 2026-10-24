@@ -10,7 +10,8 @@
     "dev:alt": "node scripts/dev-alt.js",
     "build": "vite build",
     "deploy": "vite build && wrangler deploy",
-    "puente": "node scripts/puente-osc.js"
+    "puente": "node scripts/puente-osc.js",
+    "test": "node scripts/test.mjs"
   },
   "dependencies": {
     "three": "^0.186.1"
