@@ -10,7 +10,7 @@
 // Todo entra por progressTrack(userId, acción, ref): lo llaman los enganches de accounts.js,
 // works.js y room.js. Nunca tira error (si algo falla, la acción original sigue igual).
 
-import { ITEMS, ITEM_RARITY, RARITIES } from './shared.js';
+import { ITEMS, ITEM_RARITY, RARITIES, FURNITURE } from './shared.js';
 
 const randomHex = (n) => [...crypto.getRandomValues(new Uint8Array(n))].map((b) => b.toString(16).padStart(2, '0')).join('');
 const pick = (list) => list[Math.floor(Math.random() * list.length)];
@@ -26,7 +26,7 @@ export const levelOf = (points) => Math.max(1, Math.floor((1 + Math.sqrt(1 + (4 
 
 // ---------- Recompensas (datos) ----------
 // Objetos al azar dentro de una rareza (lista en shared.js → ITEM_RARITY). Con el editor de salas
-// se suman los muebles a esa lista y empiezan a salir solos.
+// los muebles especiales también están en esa lista: sale cualquiera de la rareza que toca.
 export const REWARDS = {
   level: (n) => (n % 10 === 0 ? 'exotico' : n % 5 === 0 ? 'raro' : 'basico'), // cada nivel; raro c/5, exótico c/10
   pathStep: 'basico',            // cada paso del camino inicial
@@ -117,13 +117,15 @@ export const progressMethods = {
     this.sql.exec('INSERT INTO progress_news (id, user_id, text, kind, created) VALUES (?, ?, ?, ?, ?)', randomHex(8), userId, text, kind, Date.now());
   },
 
-  // Un objeto al azar de esa rareza → inventario. Devuelve "Nombre (Rareza)"
+  // Un objeto al azar de esa rareza → inventario: accesorio o mueble especial, todo junto y con
+  // repetidos (decisión del 24/10). Devuelve "Nombre (Rareza)"
   progressReward(userId, rarity) {
-    const pool = Object.keys(ITEM_RARITY).filter((t) => ITEM_RARITY[t] === rarity && ITEMS[t]);
+    const pool = Object.keys(ITEM_RARITY).filter((t) => ITEM_RARITY[t] === rarity && (ITEMS[t] || FURNITURE[t]?.special));
     if (!pool.length) return '';
     const type = pick(pool);
-    this.addItem(userId, type, pick(ITEMS[type].colors));
-    return `${ITEMS[type].name} (${RARITIES[rarity].name.toLowerCase()})`;
+    const def = ITEMS[type] ?? FURNITURE[type];
+    this.addItem(userId, type, ITEMS[type] ? pick(ITEMS[type].colors) : def.color);
+    return `${def.name} (${RARITIES[rarity].name.toLowerCase()})`;
   },
 
   progressPoints(userId, n) {

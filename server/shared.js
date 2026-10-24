@@ -116,6 +116,8 @@ export const ITEM_RARITY = {
   cap: 'basico', beanie: 'basico', headphones: 'basico', sunglasses: 'basico', glasses: 'basico', backpack: 'basico',
   chain: 'raro',
   crown: 'exotico',
+  // Muebles especiales (rareza provisoria del 24/10, para probar los porcentajes)
+  esculturaNeon: 'basico', espejos: 'raro', sillonNeon: 'raro', trono: 'exotico',
 };
 export const rarityOf = (type) => ITEM_RARITY[type] ?? 'basico';
 
