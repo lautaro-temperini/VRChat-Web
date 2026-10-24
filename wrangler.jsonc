@@ -14,9 +14,9 @@
 		]
 	},
 	// Cuentas con permisos de admin en todas las salas (IDs separados por coma).
-	// 747ec0adf3e01ea1 = "xvvave"
+	// 747ec0adf3e01ea1 = "xvvave" en la base local (npm run dev); 22b06bd4aaf200c7 = "xvvave" online
 	"vars": {
-		"ADMIN_IDS": "747ec0adf3e01ea1",
+		"ADMIN_IDS": "747ec0adf3e01ea1,22b06bd4aaf200c7",
 		"REALTIME_APP_ID": "bb94df5270bf9262c04397a77e843258",
 		// Ingreso con Google y Discord (los secretos van en .dev.vars / wrangler secret)
 		"GOOGLE_CLIENT_ID": "1015529034698-cte3651nesdv632alf58nn1h9r4nljmp.apps.googleusercontent.com",
