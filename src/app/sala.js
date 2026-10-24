@@ -228,8 +228,9 @@ function setAfk(v) {
 }
 const activity = () => { lastInput = performance.now(); if (!document.hidden) setAfk(false); };
 for (const ev of ['keydown', 'pointerdown', 'mousemove', 'touchstart', 'wheel']) addEventListener(ev, activity, { passive: true });
-document.addEventListener('visibilitychange', () => (document.hidden ? setAfk(true) : activity()));
-setInterval(() => { if (performance.now() - lastInput > 90_000) setAfk(true); }, 5000);
+// Cartel de AFK: a los 5 minutos sin tocar nada (también con la pestaña oculta)
+document.addEventListener('visibilitychange', () => { if (!document.hidden) activity(); });
+setInterval(() => { if (performance.now() - lastInput > 5 * 60_000) setAfk(true); }, 5000);
 
 
 Object.assign(G, { showKicked, openControls, join, setStatus });

@@ -213,14 +213,25 @@ export function buildMuseum(scene, renderer, quality) {
 
   // Hall: boiserie de madera, moldura y cornisa (el grosor va hacia adentro)
   const hallW = XP - X0, hallX = (X0 + XP) / 2;
-  for (const [x, z, alongX, len] of [[hallX, Z0, true, hallW], [hallX, Z1, true, hallW], [X0, 0, false, Z1 - Z0]]) {
-    const piece = (h, y, thick, mat, round) => {
-      const inward = (alongX ? -Math.sign(z) : -Math.sign(x)) * thick / 2;
-      box(alongX ? len : thick, h, alongX ? thick : len, alongX ? x : x + inward, y, alongX ? z + inward : z, mat, { cast: false, round });
+  // Tramos [desde, hasta] a lo largo de cada pared: se cortan en la puerta del baño y en la de entrada
+  const doorW = 2.8 / 2 + 0.18;
+  const walls = [
+    [Z0, true, [[X0, WC.door0], [WC.door1, XP]]],
+    [Z1, true, [[X0, XP]]],
+    [X0, false, [[Z0, -doorW], [doorW, Z1]]],
+  ];
+  for (const [at, alongX, spans] of walls) {
+    const piece = (a, b, h, y, thick, mat, round) => {
+      const inward = -Math.sign(at) * thick / 2, len = b - a, mid = (a + b) / 2;
+      box(alongX ? len : thick, h, alongX ? thick : len, alongX ? mid : at + inward, y, alongX ? at + inward : mid, mat, { cast: false, round });
     };
-    piece(1, 0.5, 0.04, woodMat);
-    piece(0.06, 1.03, 0.07, woodMat, 0.025);
-    piece(0.18, H - 0.09, 0.14, trimMat, 0.04);
+    for (const [a, b] of spans) {
+      piece(a, b, 1, 0.5, 0.04, woodMat);
+      piece(a, b, 0.06, 1.03, 0.07, woodMat, 0.025);
+    }
+    // La cornisa de arriba sigue entera (va por encima de las puertas)
+    const [a0, b0] = [spans[0][0], spans[spans.length - 1][1]];
+    piece(a0, b0, 0.18, H - 0.09, 0.14, trimMat, 0.04);
   }
 
   // Puerta doble de entrada (pared oeste)
@@ -416,7 +427,7 @@ export function buildMuseum(scene, renderer, quality) {
     scene.add(g);
     collider(x - 0.3, x + 0.3, z - 0.3, z + 0.3, 1.2, false);
   }
-  for (const [x, z] of [[-29.3, -10.3], [-29.3, 10.3], [-29.2, -2.1], [-29.2, 2.1], [-12.9, -10.3]]) plant(x, z);
+  for (const [x, z] of [[-29.3, -10.3], [-29.3, 10.3], [-29.2, -2.1], [-29.2, 2.1]]) plant(x, z);
 
   // ---------- Esculturas (del lado del hall de la pared del medio) ----------
   const sculptures = [];

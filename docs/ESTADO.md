@@ -103,10 +103,13 @@ Para volver a subir: `npm run deploy` desde la carpeta del proyecto.
    `room.js`; gestos `drink`/`kiss` en avatar.js. Falta probarlo con dos personas reales.
 5. **Sonido de la pista del museo**: line arrays colgados, subs de piso, tweeters/frontfill y surround atrás
    (todos suenan; los de piso se trepan).
-6. **Diseños de artistas como objetos** y más mapas públicos (paso 5).
-7. **Seguridad, lo que quedó para decidir** (ver `docs/ramas/seguridad.md`): teletransporte (posiciones falsas)
+6. **Repaso de modelos y animaciones** (pedido 24/10): probar en orden todos los modelos y animaciones del juego
+   (caminar, trotar, saltar, trepar, saltar baranda, sentarse, agacharse, gestos, celular, tomar, beso, DJ, accesorios,
+   ropa, muebles…) y ajustar lo que se vea mal. Las dudas se juntan y se preguntan al final, sin cortar el trabajo.
+7. **Diseños de artistas como objetos** y más mapas públicos (paso 5).
+8. **Seguridad, lo que quedó para decidir** (ver `docs/ramas/seguridad.md`): teletransporte (posiciones falsas)
    y vencimiento de sesiones.
-8. Achicar animaciones para celular. **Primera prueba con gente real** (inauguración con 5–10 artistas).
+9. Achicar animaciones para celular. **Primera prueba con gente real** (inauguración con 5–10 artistas).
 
 ### Pendientes sueltos (consultar antes)
 Reportar, nombre y marca definitivos, AR, ajustes de cara en el avanzado.

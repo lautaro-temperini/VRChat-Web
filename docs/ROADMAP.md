@@ -302,4 +302,5 @@ La música del DJ y el puente OSC ya están hechos. Falta:
 | Tecla G (24/10) | Abre y cierra "Editar sala" (en tu sala) |
 | Consumibles: barra y muebles (24/10) | En la barra del hall, E → dos botones "Trago" / "Café" y te lo tomás en el momento. Muebles especiales nuevos que reparten (se toma en el momento): **barra de tragos** y **minibar** (trago), **cafetera** (café); los tres **raros**. Al tomar, el personaje sostiene el vaso/taza y hace el gesto (los demás lo ven) |
 | Beso: detalles (24/10) | Hay que estar a menos de 1,5 m. Ignorados y restringidos no pueden pedirlo (no se enteran). Se ve: los dos se acercan, se inclinan y se dan un beso corto (sin abrazo) |
+| Cartel AFK (24/10) | Aparece a los **5 minutos** sin tocar nada (también si cambiaste de pestaña) |
 | Sonido de la pista del museo (24/10) | Se suman **line arrays colgados** (música principal izq./der.), **subs de piso** (solo graves), **tweeters/frontfill** en el borde del escenario y **surround** en el fondo y costados de la pista. Todos suenan de verdad. Los de piso (subs, surround) se pueden trepar; los colgados no |
