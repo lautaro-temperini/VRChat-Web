@@ -549,7 +549,7 @@ export function buildMuseum(scene, renderer, quality) {
     const cos = Math.cos(yaw), sin = Math.sin(yaw);
     const hw = Math.abs(cos) * 1.2 + Math.abs(sin) * 0.48, hd = Math.abs(sin) * 1.2 + Math.abs(cos) * 0.48;
     collider(x - hw, x + hw, z - hd, z + hd, y + 0.48, true, y);
-    const seats = [-0.7, 0, 0.7].map((d) => ({ x: x + cos * d + sin * 0.1, y, z: z - sin * d + cos * 0.1, yaw }));
+    const seats = [-0.7, 0, 0.7].map((d) => ({ x: x + cos * d - sin * 0.05, y, z: z - sin * d - cos * 0.05, yaw }));
     interactive(g, { kind: 'sit', prompt: 'Sentarse', seats });
   }
   const stoolSeatMat = new THREE.MeshStandardMaterial({ color: 0x8a1c1c, roughness: 0.5 });

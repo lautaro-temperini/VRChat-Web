@@ -74,7 +74,7 @@ export function buildFurniture(piece, env = {}) {
     for (const s of [-1, 1]) rbox(0.2, 0.42, 0.95, fabric, s * (width / 2 - 0.1), 0.45, 0, 0.06);
     collide(width, 0.95, 0.48);
     const n = Math.max(1, Math.round((width - 0.4) / 0.7));
-    for (let i = 0; i < n; i++) sit((i - (n - 1) / 2) * 0.7, 0.1, 0.48);
+    for (let i = 0; i < n; i++) sit((i - (n - 1) / 2) * 0.7, -0.05, 0.48); // contra el respaldo
     seatsAction();
   }
 
