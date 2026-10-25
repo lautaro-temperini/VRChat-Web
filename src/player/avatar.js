@@ -192,6 +192,9 @@ class Rig {
 
 export const POSE = { stand: 0, crouch: 1, sit: 2, climb: 3, air: 4, vault: 5 };
 export const VAULT_TIME = 0.6; // segundos que dura saltar una baranda
+// Pose del DJ (ángulos como en GESTURES; sz positivo = abrir el brazo hacia afuera)
+const DJ_POSE = { sx: -0.9, sz: 0.4, el: -0.6, lean: 0.15, neck: 0.15 }; // medida: los dedos tocan la consola
+if (import.meta.env.DEV) window.__DJ_POSE = DJ_POSE;
 const SQUAT_AT = 0.4; // segundo de agachado_caminar que se usa como pose agachada
 
 // Celular (en coordenadas del modelo en pose T, colgado de la mano derecha):
@@ -277,6 +280,7 @@ export class Avatar {
     this.gest = null;   // gesto en curso: { name, t, action? }
     this.talking = false; // hablando por voz: usa la animación de hablar cuando está quieto
     this.phone = false;   // con el celular en la mano (red social abierta): los demás lo ven
+    this.djing = false;   // pasando música en la cabina: manos en la consola y la cabeza al ritmo
     this.phoneW = 0;
     this.gestW = 0;     // cuánto pesa el gesto (para entrar y salir suave)
     this.gestPose = null;
@@ -581,6 +585,8 @@ export class Avatar {
       this.model.cup.visible = this.drinkW > 0.35;
       if (this.drinkW > 0.001) this.applyDrink(this.drinkW, 0.5 + 0.5 * Math.sin(this.time * 2.4));
       if (this.kissW > 0.001) this.applyKiss(this.kissW);
+      this.djW = damp(this.djW ?? 0, this.djing ? 1 : 0, 6, dt);
+      if (this.djW > 0.001) this.applyDJ(this.djW);
     }
   }
 
@@ -616,6 +622,22 @@ export class Avatar {
       R.euler(n, a, 0, 0);
       b.quaternion.copy(saved.slerp(b.quaternion, w));
     }
+  }
+
+  // DJ: las dos manos sobre la consola (una más cerca del plato) y la cabeza marcando el ritmo
+  applyDJ(w) {
+    const R = this.model.rig;
+    const names = ['upperarm_l', 'lowerarm_l', 'upperarm_r', 'lowerarm_r', 'neck_01', 'spine_03'];
+    const saved = names.map((n) => R.bones[n].bone.quaternion.clone());
+    const P = DJ_POSE, nod = Math.abs(Math.sin(this.time * Math.PI * 2)); // 120 bpm
+    [['l', 1], ['r', -1]].forEach(([s, side], i) => {
+      const scratch = i === 1 ? Math.sin(this.time * 5) * 0.08 : 0; // la derecha va y viene en el plato
+      R.set(`upperarm_${s}`, _q2.setFromEuler(_e.set(P.sx + scratch, 0, side * P.sz)).multiply(ARM_DOWN[side]));
+      R.set(`lowerarm_${s}`, _q3.copy(ARM_DOWN_INV[side]).multiply(qx(P.el)).multiply(ARM_DOWN[side]));
+    });
+    R.euler('spine_03', P.lean, 0, 0);
+    R.euler('neck_01', P.neck + 0.12 * nod, 0, 0);
+    names.forEach((n, k) => { const b = R.bones[n].bone; b.quaternion.copy(saved[k].slerp(b.quaternion, w)); });
   }
 
   // Brazo derecho sosteniendo el celular frente al pecho, cabeza mirándolo

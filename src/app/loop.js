@@ -22,6 +22,10 @@ renderer.setAnimationLoop(() => {
   const dt = Math.min(clock.getDelta(), 0.05);
   fpsWatch.tick(dt, ctrl.enabled && !document.hidden);
   const t = clock.elapsedTime;
+  // DJ: en la cabina pone las manos en la consola (yo, y el que está pasando música)
+  const djSpot = ctrl.booth && world.dj.spot; // en las salas personales es un objeto nuevo cada vez
+  me.djing = !!djSpot && Math.hypot(ctrl.booth.x - djSpot.x, ctrl.booth.z - djSpot.z) < 0.05;
+  for (const r of remotes.values()) r.avatar.djing = rtc.dj?.id === r.id;
   ctrl.update(dt);
   for (const r of remotes.values()) r.update(dt);
   world.update(dt, t);
