@@ -260,6 +260,8 @@ export function buildShell(id, { high }) {
     buildPlaza();
   } else if (id === 'cafeteria') {
     buildCafe();
+  } else if (id === 'azotea') {
+    buildRooftop();
   } else {
     // Terraza: al aire libre, deck de madera, baranda, fachada con la puerta al sur y la ciudad al norte
     floor(new THREE.MeshStandardMaterial({ map: repeatTex(woodFloor(), def.w / 3, def.d / 3), color: 0xc8b8a6, roughness: 0.7 }));
@@ -621,6 +623,128 @@ export function buildShell(id, { high }) {
       city.userData.windows.opacity = 1 - day;
       for (const l of warm) l.intensity = (high ? 10 : 14) + 10 * (1 - day);
     };
+  }
+
+  // ---------- Azotea (mapa público, 24 × 18 m): terraza de un edificio con baranda de vidrio, la caseta de la
+  // escalera (la puerta lleva al Mapa), tanque de agua y equipos, guirnaldas, pórtico de luces para la fiesta y
+  // la ciudad alrededor, más abajo. Las luces siguen la música (o a la consola de artistas por OSC) ----------
+  function buildRooftop() {
+    floor(new THREE.MeshStandardMaterial({ map: repeatTex(concrete(), def.w / 4, def.d / 4), color: 0x9c968c, roughness: 0.8 }));
+    const steel = new THREE.MeshStandardMaterial({ color: 0x2a2a30, roughness: 0.4, metalness: 0.8 });
+    const glass = new THREE.MeshStandardMaterial({ color: 0x9fb8c8, roughness: 0.05, transparent: true, opacity: 0.2, depthWrite: false });
+    const facade = new THREE.MeshStandardMaterial({ color: 0xb9b2a6, roughness: 0.95 });
+    const HUT = 3.2; // media caseta (ancho 6,4 m)
+    // Baranda de vidrio con pasamanos (no se trepa), con el hueco de la caseta al sur
+    const railRun = (x0, z0, x1, z1) => {
+      const len = Math.hypot(x1 - x0, z1 - z0), alongX = z0 === z1;
+      const mid = [(x0 + x1) / 2, (z0 + z1) / 2];
+      const b = (w, h, d, m, y) => { const o = new THREE.Mesh(new THREE.BoxGeometry(alongX ? len : w, h, alongX ? w : len), m); o.position.set(mid[0], y, mid[1]); group.add(o); return o; };
+      b(0.08, 0.06, 0.08, steel, 1.08);
+      b(0.02, 1.0, 0.02, glass, 0.55);
+      if (alongX) collider(Math.min(x0, x1), Math.max(x0, x1), z0 - 0.1, z0 + 0.1, 1.1); else collider(x0 - 0.1, x0 + 0.1, Math.min(z0, z1), Math.max(z0, z1), 1.1);
+    };
+    railRun(-W, -D, W, -D); railRun(-W, -D, -W, D); railRun(W, -D, W, D);
+    railRun(-W, D, -HUT, D); railRun(HUT, D, W, D);
+    // Caseta de la escalera, con su puerta mirando a la azotea
+    const hut = new THREE.Mesh(new THREE.BoxGeometry(2 * HUT, 3, 3), facade);
+    hut.position.set(0, 1.5, D + 1.5);
+    hut.castShadow = hut.receiveShadow = high;
+    group.add(hut);
+    blockers.push(hut);
+    collider(-HUT, -0.95, D, D + 3, 3); collider(0.95, HUT, D, D + 3, 3);
+    door(new THREE.MeshStandardMaterial({ color: 0x141414, roughness: 0.5, metalness: 0.4 }), new THREE.MeshStandardMaterial({ color: 0x3a3f46, roughness: 0.6, metalness: 0.3 }));
+    const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.12, 0.12), neonMat(0xfff1c8));
+    lamp.position.set(0, 2.75, D - 0.08);
+    group.add(lamp);
+    // Tanque de agua sobre patas y equipos de aire acondicionado (decorado, frenan)
+    const tankMat = new THREE.MeshStandardMaterial({ color: 0x7f8a8f, roughness: 0.6, metalness: 0.4 });
+    const tank = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.1, 1.8, 28), tankMat);
+    tank.position.set(-W + 2, 2.2, D - 2.2);
+    group.add(tank);
+    for (const [dx, dz] of [[-0.8, -0.8], [0.8, -0.8], [-0.8, 0.8], [0.8, 0.8]]) { const l = new THREE.Mesh(new THREE.BoxGeometry(0.1, 1.3, 0.1), steel); l.position.set(-W + 2 + dx, 0.65, D - 2.2 + dz); group.add(l); }
+    collider(-W + 0.9, -W + 3.1, D - 3.3, D - 1.1, 3.1, false);
+    for (const [x, z] of [[W - 1.6, D - 1.6], [W - 1.6, D - 3.6]]) {
+      box(1.4, 1.0, 1.2, new THREE.MeshStandardMaterial({ color: 0xd8d8d2, roughness: 0.7 }), x, 0.5, z);
+      const fan = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.04, 20), steel);
+      fan.position.set(x, 1.02, z);
+      group.add(fan);
+      collider(x - 0.7, x + 0.7, z - 0.6, z + 0.6, 1.0, true);
+    }
+    // Pórtico de luces sobre la pista, con 4 focos que siguen la música
+    const TRUSS_Z = -3.5, TRUSS_Y = 4.2, TW = 5;
+    for (const s of [-1, 1]) { box(0.2, TRUSS_Y, 0.2, steel, s * TW, TRUSS_Y / 2, TRUSS_Z); collider(s * TW - 0.15, s * TW + 0.15, TRUSS_Z - 0.15, TRUSS_Z + 0.15, TRUSS_Y, false); }
+    box(2 * TW + 0.2, 0.25, 0.25, steel, 0, TRUSS_Y, TRUSS_Z);
+    const spots = [];
+    for (let i = 0; i < 4; i++) {
+      const x = -3.75 + i * 2.5;
+      const can = box(0.22, 0.3, 0.22, new THREE.MeshStandardMaterial({ color: 0x1b1b20, metalness: 0.6, roughness: 0.4 }), x, TRUSS_Y - 0.28, TRUSS_Z);
+      const lens = new THREE.Mesh(new THREE.CircleGeometry(0.09, 20), neonMat(0xffffff));
+      lens.rotation.x = Math.PI / 2;
+      lens.position.y = -0.151;
+      can.add(lens);
+      const light = new THREE.SpotLight(0xffffff, 0, 14, 0.45, 0.5, 1.2);
+      light.position.set(x, TRUSS_Y - 0.4, TRUSS_Z);
+      light.target.position.set(x * 0.5, 0, TRUSS_Z + 3);
+      group.add(light, light.target);
+      spots.push({ light, lens, x });
+    }
+    // Guirnaldas de lamparitas de lado a lado
+    const bulbs = neonMat(0xffd27a);
+    for (let i = 0; i < 4; i++) {
+      const z = -D + 3 + i * 3.6, pts = [];
+      for (let k = 0; k <= 24; k++) { const u = k / 24; pts.push(new THREE.Vector3(-W + 0.3 + (2 * W - 0.6) * u, 3.2 - Math.sin(u * Math.PI) * 0.6, z)); }
+      group.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 48, 0.006, 4), steel));
+      for (let k = 1; k < 24; k += 2) { const b = new THREE.Mesh(new THREE.SphereGeometry(0.045, 8, 6), bulbs); b.position.copy(pts[k]).setY(pts[k].y - 0.07); group.add(b); }
+    }
+    for (const [x, z] of [[-W, -D], [W, -D], [-W, D], [W, D]]) { box(0.1, 3.3, 0.1, steel, x, 1.65, z); }
+    // El edificio debajo (para que por la baranda no se vea la terraza flotando) y el borde de la losa
+    const body = new THREE.Mesh(new THREE.BoxGeometry(def.w + 0.6, 40, def.d + 0.6), new THREE.MeshStandardMaterial({ color: 0x8d877d, roughness: 0.95 }));
+    body.position.set(0, -20.02, 0);
+    group.add(body);
+    for (const [w, d, x, z] of [[def.w + 0.6, 0.3, 0, -D - 0.15], [0.3, def.d + 0.6, -W - 0.15, 0], [0.3, def.d + 0.6, W + 0.15, 0], [def.w + 0.6, 0.3, 0, D + 0.15]]) box(w, 0.25, d, facade, x, 0.12, z);
+    // La ciudad alrededor, más abajo (estamos arriba de un edificio)
+    const cities = [[0, -40, 0], [0, 40, Math.PI], [-40, 0, Math.PI / 2], [40, 0, -Math.PI / 2]].map(([x, z, r]) => {
+      const city = cityBackdrop(110, 34);
+      city.position.set(x, -6, z);
+      city.rotation.y = r;
+      group.add(city);
+      return city;
+    });
+    const dome = new THREE.Mesh(new THREE.SphereGeometry(80, 24, 12), new THREE.MeshBasicMaterial({ color: 0x87b3e8, side: THREE.BackSide, fog: false }));
+    group.add(dome);
+    const sun = new THREE.DirectionalLight(0xffe2b8, 2.4);
+    sun.position.set(-10, 16, 6);
+    sun.castShadow = high;
+    if (high) { sun.shadow.mapSize.set(1024, 1024); Object.assign(sun.shadow.camera, { left: -14, right: 14, top: 14, bottom: -14, near: 1, far: 50 }); sun.shadow.bias = -0.0005; sun.shadow.normalBias = 0.03; }
+    group.add(sun);
+    const warm = new THREE.PointLight(0xffc27a, 0, 18, 1.4);
+    warm.position.set(0, 3, 2);
+    group.add(warm);
+    let dayK = 1;
+    timeFn = (day, golden) => {
+      dayK = day;
+      sun.intensity = 2.6 * day;
+      sun.color.set(0xffe2b8).lerp(new THREE.Color(0xff8a4a), golden);
+      hemi.intensity = 0.25 + 0.75 * day;
+      dome.material.color.copy(sky.set(0x0b1236)).lerp(new THREE.Color(0x87b3e8), day).lerp(new THREE.Color(0xff9e6b), golden * 0.7);
+      for (const c of cities) { c.material.color.setScalar(0.2 + 0.8 * day); c.userData.windows.opacity = 1 - day; }
+      bulbs.color.set(0xffd27a).multiplyScalar(1 + 4 * (1 - day));
+      warm.intensity = 8 * (1 - day);
+    };
+    const tmp = new THREE.Color();
+    animated.push((dt, t, { music = -1, lights = null }) => {
+      const p = music > 0 ? Math.min(1, music * 2.2) : 0;
+      const dim = 0.35 + 0.65 * (1 - dayK); // de día los focos se notan menos
+      spots.forEach((s, i) => {
+        const f = lights?.focos?.[i];
+        const c = lights ? (f?.color ? tmp.setRGB(...f.color) : lights.color ? tmp.setRGB(...lights.color) : tmp.setHSL((t * 0.08) % 1, 1, 0.5)) : tmp.setHSL((t * 0.05 + i * 0.25) % 1, 1, 0.55);
+        const k = lights ? Math.max(0, lights.intensidad ?? 1) * (f?.intensidad ?? 1) : 0.2 + p;
+        s.light.color.copy(c);
+        s.light.intensity = high ? 45 * k * dim : 0;
+        s.lens.material.color.copy(c).multiplyScalar(2 + 4 * k);
+        s.light.target.position.set(s.x * 0.5 + (lights ? (f?.pan ?? 0) * 3 : Math.sin(t * 0.7 + i) * 2), 0, TRUSS_Z + 3 + (lights ? (f?.tilt ?? 0) * 3 : Math.cos(t * 0.6 + i) * 2));
+      });
+    });
   }
 
   // Luz de lámparas colgantes (loft)

@@ -192,6 +192,7 @@ export const ROOM_TEMPLATES = {
   // Plantillas de los mapas públicos (public: no se ofrecen para las salas personales)
   plaza: { name: 'Plaza', w: 50, d: 50, h: 0, public: true },
   cafeteria: { name: 'Cafetería', w: 14, d: 10, h: 3.8, public: true },
+  azotea: { name: 'Azotea', w: 24, d: 18, h: 0, public: true },
 };
 
 // ---------- Mapas públicos (abiertos a todos, en el Mapa junto al Museo) ----------
@@ -218,6 +219,11 @@ export const PUBLIC_MAPS = {
       ]),
       ['mesaCafe', 4, -1.4, 0], ['sillaCafe', 3.38, -1.4, 90], ['sillaCafe', 4.62, -1.4, -90], ['sillaCafe', 4, -2.02, 0], ['sillaCafe', 4, -0.78, 180],
     ],
+  },
+  azotea: {
+    name: 'Azotea', where: 'En la Azotea', desc: 'Fiesta en la terraza de un edificio, con DJ y la ciudad alrededor', template: 'azotea',
+    spawn: { x: 0, z: 6.8 },
+    pieces: [['cabina', 0, -6.8, 0], ['parlante', -3.2, -7.6, 0], ['parlante', 3.2, -7.6, 0]],
   },
 };
 // Salas que existen: el Museo, los mapas públicos y las personales (u-<id de cuenta>)
