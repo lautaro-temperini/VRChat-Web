@@ -113,6 +113,27 @@ async function api(request, env, path) {
     return new Response(obj.body, { headers: { 'content-type': obj.httpMetadata?.contentType ?? 'application/octet-stream', 'cache-control': 'private, max-age=3600', ...FILE_HEADERS } });
   }
 
+  // Diseños de artistas: subir (formulario con archivos) y bajar sus archivos (de R2; son públicos)
+  if (path === 'design' && request.method === 'POST') {
+    if (Number(request.headers.get('content-length') ?? 0) > 4_000_000) return json({ ok: false, error: 'Los archivos son demasiado pesados.' }, 400);
+    let fd;
+    try { fd = await request.formData(); } catch { return json({ ok: false, error: 'Formulario inválido.' }, 400); }
+    const file = async (name) => {
+      const f = fd.get(name);
+      return f && typeof f === 'object' ? { mime: f.type, data: await f.arrayBuffer() } : null;
+    };
+    const f = Object.fromEntries(['kind', 'title', 'place', 'size', 'w', 'h'].map((k) => { const v = fd.get(k); return [k, typeof v === 'string' ? v : '']; }));
+    Object.assign(f, { img: await file('img'), hd: await file('hd'), model: await file('model') });
+    const result = await accounts.designSubmit(token, f);
+    return json(result, result.ok ? 200 : 400);
+  }
+  if (path === 'designfile' && request.method === 'GET') {
+    const key = await accounts.designFile(q.get('id'), q.get('f'));
+    const obj = key && env.ART ? await env.ART.get(key) : null;
+    if (!obj) return new Response('No encontrado', { status: 404 });
+    return new Response(obj.body, { headers: { 'content-type': obj.httpMetadata?.contentType ?? 'application/octet-stream', 'cache-control': 'public, max-age=604800, immutable', ...FILE_HEADERS } });
+  }
+
   // Vuelta de Google / Discord: se canjea el código y se vuelve al juego con un código de un solo uso
   // (el token de sesión nunca viaja en la dirección)
   const cb = path.match(/^oauth\/(google|discord)\/callback$/);
@@ -159,6 +180,7 @@ async function api(request, env, path) {
     case 'GET profile': result = await accounts.profile(new URL(request.url).searchParams.get('id'), token); break;
     case 'GET inventory': result = await accounts.inventory(token); break;
     case 'POST equip': result = await accounts.equip(token, body.iid, !!body.on); break;
+    case 'POST designcopy': result = await accounts.designCopy(token, body.iid); break;
     case 'GET friends': result = await accounts.friends(token); break;
     case 'POST friendrequest': result = await accounts.friendRequest(token, String(body.id ?? '')); break;
     case 'POST friendrespond': result = await accounts.friendRespond(token, String(body.id ?? ''), !!body.accept); break;

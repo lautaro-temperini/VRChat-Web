@@ -327,7 +327,7 @@ export const progressMethods = {
         const tier = have.get(id) ?? 0;
         return { id, name: b.name, icon: b.icon, what: b.what, tier, tierName: tier ? TIERS[tier - 1] : null, count, next: b.steps[tier] ?? null };
       }),
-      titles: ['curador', 'creador'].filter((t) => this.hasTitle(me.id, t)),
+      titles: ['curador', 'creador', 'disenador'].filter((t) => this.hasTitle(me.id, t)),
       news: this.takeNews(me.id),
     };
   },
@@ -340,7 +340,7 @@ export const progressMethods = {
     return {
       ok: true,
       badges: rows.filter((b) => BADGES[b.badge]).map((b) => ({ id: b.badge, name: BADGES[b.badge].name, icon: BADGES[b.badge].icon, tier: b.tier, tierName: TIERS[b.tier - 1] })),
-      titles: ['curador', 'creador'].filter((t) => this.hasTitle(row.id, t)),
+      titles: ['curador', 'creador', 'disenador'].filter((t) => this.hasTitle(row.id, t)),
     };
   },
 };

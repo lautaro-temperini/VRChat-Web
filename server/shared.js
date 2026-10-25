@@ -14,16 +14,56 @@ export const ITEMS = {
 // Lo que recibe cada cuenta nueva (se eligen 3 al azar, sin repetir)
 export const STARTER_ITEMS = ['cap', 'beanie', 'headphones', 'sunglasses', 'glasses', 'chain', 'backpack'];
 
-// Lista de objetos equipados que se muestra sobre un personaje: [{ type, color }]
+// Lista de objetos equipados que se muestra sobre un personaje: [{ type, color }], y los diseños:
+// [{ type: 'estampa' | 'disenoObjeto', design }] (estampa en la ropa, objeto 3D en la mano)
 export function cleanEquip(list) {
   if (!Array.isArray(list)) return [];
   const used = new Set();
   const out = [];
   for (const it of list.slice(0, 8)) {
+    const slot = DESIGN_SLOTS[it?.type];
+    if (slot) {
+      const design = cleanDesign(it.design);
+      if (!design || used.has(slot) || DESIGN_ITEM[design.kind] !== it.type) continue;
+      if (slot === 'mano' && !designHoldable(design)) continue;
+      used.add(slot);
+      out.push({ type: it.type, design });
+      continue;
+    }
     const def = typeof it?.type === 'string' && Object.hasOwn(ITEMS, it.type) ? ITEMS[it.type] : null;
     if (!def || used.has(def.slot) || !def.colors.includes(it.color)) continue;
     used.add(def.slot);
     out.push({ type: it.type, color: it.color });
+  }
+  return out;
+}
+
+// ---------- Diseños de artistas como objetos (server/designs.js) ----------
+// Cualquier cuenta sube estampas (van en la ropa), cuadros y objetos 3D (van a la sala, al piso o
+// a la mano si miden hasta 50 cm). Cada diseño es un objeto del inventario (items.design = id).
+export const DESIGN_KINDS = { estampa: 'Estampa', cuadro: 'Cuadro', objeto: 'Objeto 3D' };
+export const DESIGN_ITEM = { estampa: 'estampa', cuadro: 'disenoCuadro', objeto: 'disenoObjeto' }; // tipo del objeto
+const DESIGN_SLOTS = { estampa: 'estampa', disenoObjeto: 'mano' };
+export const STAMP_PLACES = { pecho: 'Pecho', espalda: 'Espalda' };
+export const STAMP_SIZES = { chico: 0.12, mediano: 0.25, grande: 0.38 }; // ancho en metros
+export const HAND_MAX = 0.5; // m: lo más grande que se puede sostener en la mano
+export const DESIGN_IMAGE = 1024; // px: estampas y cuadros (los cuadros también en HD hasta 2048)
+export const designHoldable = (d) => d?.kind === 'objeto' && Array.isArray(d.dims) && Math.max(...d.dims) <= HAND_MAX;
+// Lo público de un diseño (lo que viaja con el objeto); null si no es válido
+export function cleanDesign(d) {
+  if (!d || typeof d !== 'object' || !/^[0-9a-f]{16}$/.test(String(d.id)) || !Object.hasOwn(DESIGN_KINDS, d.kind)) return null;
+  const n = (v, lo, hi) => Math.min(hi, Math.max(lo, Number(v) || 0));
+  const out = { id: d.id, kind: d.kind, title: String(d.title ?? '').replace(/[\u0000-\u001f<>]/g, ' ').slice(0, 60) };
+  if (d.kind === 'objeto') {
+    if (!Array.isArray(d.dims) || d.dims.length !== 3) return null;
+    out.dims = d.dims.map((v) => Math.round(n(v, 0.01, 3) * 1000) / 1000);
+  } else {
+    out.w = Math.round(n(d.w, 1, 4096));
+    out.h = Math.round(n(d.h, 1, 4096));
+  }
+  if (d.kind === 'estampa') {
+    out.place = Object.hasOwn(STAMP_PLACES, d.place) ? d.place : 'pecho';
+    out.size = Object.hasOwn(STAMP_SIZES, d.size) ? d.size : 'mediano';
   }
   return out;
 }
@@ -180,9 +220,12 @@ export const FURNITURE = {
   espejos: { name: 'Bola de espejos', cat: 'especial', mount: 'floor', color: '#d9d9d9', size: [0.6, 0.6], special: true },
   sillonNeon: { name: 'Sillón de terciopelo con neón', cat: 'especial', mount: 'floor', color: '#5b1a6e', size: [2.2, 0.95], special: true },
   esculturaNeon: { name: 'Escultura de neón', cat: 'especial', mount: 'floor', color: '#19d3ff', size: [0.8, 0.8], special: true },
+  // Diseños de artistas (design: lo pone el servidor al colocarlo, desde el objeto del inventario)
+  disenoCuadro: { name: 'Cuadro de diseño', cat: 'especial', mount: 'wall', color: '#141414', size: [1.2, 0.1], special: true, design: true },
+  disenoObjeto: { name: 'Objeto 3D', cat: 'especial', mount: 'floor', color: '#ffffff', size: [1, 1], special: true, design: true },
 };
 export const FURNITURE_CATS = { living: 'Living', comedor: 'Comedor y bar', arte: 'Arte', deco: 'Deco y luz', equipo: 'Música y pantallas', especial: 'Especiales' };
-export const SPECIAL_FURNITURE = Object.keys(FURNITURE).filter((k) => FURNITURE[k].special);
+export const SPECIAL_FURNITURE = Object.keys(FURNITURE).filter((k) => FURNITURE[k].special && !FURNITURE[k].design);
 // Pantallas: tamaño (ancho en metros) y qué muestran: su propio VJ o lo mismo que la otra pantalla
 export const SCREEN_WIDTH = [1, 8];
 export const SCREEN_MODES = ['propia', 'espejo'];
@@ -218,6 +261,7 @@ export function cleanPiece(p, template) {
   out.c = typeof p.c === 'string' && /^#[0-9a-f]{6}$/i.test(p.c) ? p.c.toLowerCase() : def.color;
   if (def.special) out.iid = String(p.iid ?? '').slice(0, 32);
   if (p.type === 'cuadro' && p.photo) out.photo = String(p.photo).slice(0, 40);
+  if (def.design) { out.design = cleanDesign(p.design); if (!out.design) return null; }
   if (p.type === 'pantalla') {
     out.w = Math.round(Math.min(SCREEN_WIDTH[1], Math.max(SCREEN_WIDTH[0], num(p.w, 3.6))) * 100) / 100;
     out.m = SCREEN_MODES.includes(p.m) ? p.m : 'espejo';

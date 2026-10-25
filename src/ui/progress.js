@@ -2,6 +2,9 @@ import { api } from '../net/api.js';
 import { toast } from './toast.js';
 import './progress.css';
 
+// Títulos (solo reconocimiento): cómo se ven en el progreso y en el perfil
+const TITLE_BADGES = { curador: { icon: '🏛️', name: 'Curador' }, creador: { icon: '✒️', name: 'Creador' }, disenador: { icon: '🧩', name: 'Diseñador' } };
+
 // Progresión en el cliente:
 // - Barrita de nivel en el HUD (arriba a la izquierda). Tocándola se abre la app.
 // - App "Progreso" en el celular: nivel y puntos (privado), camino inicial, diarias e insignias.
@@ -112,7 +115,7 @@ export function createProgress({ net, me, openPhone }) {
     // Insignias (públicas)
     box.append(el('h2', 'pg-h', 'Insignias (se ven en tu perfil)'));
     const grid = el('div', 'pg-badges');
-    for (const t of state.titles) grid.append(badgeEl({ icon: t === 'curador' ? '🏛️' : '✒️', name: t === 'curador' ? 'Curador' : 'Creador', title: true }));
+    for (const t of state.titles) grid.append(badgeEl({ ...TITLE_BADGES[t], title: true }));
     for (const b of state.badges) {
       const e = badgeEl(b);
       e.append(el('span', 'meta', b.next ? `${b.count}/${b.next} ${b.what}` : `${b.count} ${b.what}`));
@@ -173,7 +176,7 @@ export function createProgress({ net, me, openPhone }) {
       if (!userId) return;
       const r = await api(`badges?id=${encodeURIComponent(userId)}`);
       if (!r.ok) return;
-      for (const t of r.titles) box.append(badgeEl({ icon: t === 'curador' ? '🏛️' : '✒️', name: t === 'curador' ? 'Curador' : 'Creador', title: true }));
+      for (const t of r.titles) box.append(badgeEl({ ...TITLE_BADGES[t], title: true }));
       for (const b of r.badges) box.append(badgeEl(b));
     },
   };

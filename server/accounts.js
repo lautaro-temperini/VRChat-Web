@@ -1,6 +1,7 @@
 import { DurableObject } from 'cloudflare:workers';
-import { cleanName, cleanLook, isImage, ITEMS, STARTER_ITEMS, FURNITURE, SPECIAL_FURNITURE, CONSUMABLES } from './shared.js';
+import { cleanName, cleanLook, isImage, ITEMS, STARTER_ITEMS, FURNITURE, SPECIAL_FURNITURE, CONSUMABLES, HAND_MAX, designHoldable } from './shared.js';
 import { setupWorks, worksMethods } from './works.js';
+import { setupDesigns, designsMethods } from './designs.js';
 import { setupMessages, messagesMethods } from './messages.js';
 import { setupProgress, progressMethods } from './progress.js';
 import { accountsEditorMethods } from './editor.js';
@@ -173,6 +174,7 @@ export class Accounts extends DurableObject {
       );
     `);
     setupWorks(this.sql); // Museo rotativo (works.js)
+    setupDesigns(this.sql); // Diseños de artistas como objetos (designs.js)
     setupMessages(this.sql); // Mensajes entre amigos (messages.js)
     setupProgress(this.sql); // Progresión (progress.js)
   }
@@ -486,13 +488,13 @@ export class Accounts extends DurableObject {
   }
 
   equipped(userId) {
-    return this.sql.exec('SELECT type, color FROM items WHERE owner_id = ? AND equipped = 1', userId).toArray()
-      .map(({ type, color }) => ({ type, color }));
+    return this.sql.exec('SELECT type, color, design FROM items WHERE owner_id = ? AND equipped = 1', userId).toArray()
+      .map(({ type, color, design }) => (design ? { type, design: this.designInfo(design) } : { type, color }));
   }
 
   items(userId) {
-    return this.sql.exec('SELECT iid, type, color, equipped FROM items WHERE owner_id = ? ORDER BY created', userId).toArray()
-      .map((r) => ({ iid: r.iid, type: r.type, color: r.color, equipped: !!r.equipped }));
+    return this.sql.exec('SELECT iid, type, color, equipped, design FROM items WHERE owner_id = ? ORDER BY created', userId).toArray()
+      .map((r) => ({ iid: r.iid, type: r.type, color: r.color, equipped: !!r.equipped, ...(r.design ? { design: this.designInfo(r.design) } : {}) }));
   }
 
   async inventory(token) {
@@ -509,13 +511,17 @@ export class Accounts extends DurableObject {
     if (this.isGuest(row)) return this.guestError();
     const item = this.sql.exec('SELECT * FROM items WHERE iid = ? AND owner_id = ?', String(iid ?? ''), row.id).toArray()[0];
     if (!item) return { ok: false, error: 'Ese objeto no es tuyo.' };
-    if (!ITEMS[item.type]) return { ok: false, error: 'Los muebles se ponen desde el editor de tu sala.' };
+    // Diseños: la estampa va en la ropa; los objetos 3D chicos, en la mano
+    const design = item.design ? this.designInfo(item.design) : null;
+    const slotOf = (it) => (it.type === 'estampa' ? 'estampa' : it.type === 'disenoObjeto' ? 'mano' : ITEMS[it.type]?.slot);
+    if (design && item.type === 'disenoObjeto' && !designHoldable(design)) return { ok: false, error: `Solo se sostienen en la mano los objetos de hasta ${HAND_MAX * 100} cm.` };
+    if (!ITEMS[item.type] && !(design && slotOf(item))) return { ok: false, error: 'Los muebles se ponen desde el editor de tu sala.' };
     this.ctx.storage.transactionSync(() => {
       if (on) {
         // Uno por lugar: sacar lo que haya en el mismo lugar del cuerpo
-        const slot = ITEMS[item.type]?.slot;
+        const slot = slotOf(item);
         for (const other of this.items(row.id)) {
-          if (other.equipped && ITEMS[other.type]?.slot === slot) this.sql.exec('UPDATE items SET equipped = 0 WHERE iid = ?', other.iid);
+          if (other.equipped && slotOf(other) === slot) this.sql.exec('UPDATE items SET equipped = 0 WHERE iid = ?', other.iid);
         }
       }
       this.sql.exec('UPDATE items SET equipped = ? WHERE iid = ?', on ? 1 : 0, item.iid);
@@ -553,7 +559,8 @@ export class Accounts extends DurableObject {
     const item = this.sql.exec('SELECT * FROM items WHERE iid = ? AND owner_id = ?', String(iid ?? ''), userId).toArray()[0];
     if (!item) return { ok: false, error: 'Ese objeto no es tuyo.' };
     this.sql.exec("UPDATE items SET owner_id = ?, equipped = 0 WHERE iid = ?", `ground:${userId}`, item.iid);
-    return { ok: true, item: { iid: item.iid, type: item.type, color: item.color }, equip: this.equipped(userId) };
+    const design = item.design ? this.designInfo(item.design) : null;
+    return { ok: true, item: { iid: item.iid, type: item.type, color: item.color, ...(design ? { design } : {}) }, equip: this.equipped(userId) };
   }
 
   async pickupItem(userId, iid) {
@@ -1075,6 +1082,7 @@ export class Accounts extends DurableObject {
 
 // Museo rotativo: postular, revisar, rotar (server/works.js)
 Object.assign(Accounts.prototype, worksMethods);
+Object.assign(Accounts.prototype, designsMethods);
 // Mensajes entre amigos (server/messages.js)
 Object.assign(Accounts.prototype, messagesMethods);
 // Progresión: puntos, niveles, insignias y misiones (server/progress.js)

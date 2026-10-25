@@ -68,6 +68,7 @@ export const roomEditorMethods = {
       if (def.special) {
         const r = await this.accounts().furnitureTake(owner, piece.iid, piece.type);
         if (!r.ok) return fail(r.error);
+        if (def.design) piece.design = r.design; // lo pone la cuenta, no el cliente
       }
       // Mientras se esperaba a la cuenta pudo cambiar la sala (otra pestaña, otra plantilla): se vuelve a mirar
       const full = this.roomLayout !== layout || layout.pieces.length >= ROOM_MAX_PIECES
@@ -89,7 +90,7 @@ export const roomEditorMethods = {
 
     if (msg.op === 'update') {
       // El tipo y el objeto del inventario no cambian; el resto sí (posición, giro, color, foto, pantalla)
-      const next = cleanPiece({ ...cur, ...msg.piece, id: cur.id, type: cur.type, iid: cur.iid }, layout.template);
+      const next = cleanPiece({ ...cur, ...msg.piece, id: cur.id, type: cur.type, iid: cur.iid, design: cur.design }, layout.template);
       if (!next) return;
       if (next.photo && next.photo !== cur.photo && !(await this.accounts().photoPublic(owner, next.photo))) {
         return fail('Esa foto no se puede colgar: tu galería tiene que estar visible para todos.', cur);
@@ -116,7 +117,7 @@ export const accountsEditorMethods = {
     const item = this.sql.exec('SELECT * FROM items WHERE iid = ? AND owner_id = ?', String(iid ?? ''), userId).toArray()[0];
     if (!item || item.type !== type) return { ok: false, error: 'Ese mueble no está en tu inventario.' };
     this.sql.exec('UPDATE items SET owner_id = ?, equipped = 0 WHERE iid = ?', `room:${userId}`, item.iid);
-    return { ok: true };
+    return { ok: true, design: item.design ? this.designInfo(item.design) : null };
   },
 
   // Devuelve muebles especiales puestos en la sala al inventario de su dueño
