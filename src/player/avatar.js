@@ -3,7 +3,9 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { buildAccessory } from './accessories.js';
-import { ITEMS, EMOTES } from '../../server/shared.js';
+import { ITEMS, EMOTES, STAMP_SIZES } from '../../server/shared.js';
+import { loadGLTF } from '../loaders.js';
+import { designFileUrl } from '../net/api.js';
 import { LOCO, locomotionClips, gestureClip } from './anims.js';
 
 // Personaje MakeHuman (CC0, armado en Blender con assets-src/makehuman/build.py), mira hacia +Z.
@@ -281,6 +283,9 @@ export class Avatar {
     this.talking = false; // hablando por voz: usa la animación de hablar cuando está quieto
     this.phone = false;   // con el celular en la mano (red social abierta): los demás lo ven
     this.djing = false;   // pasando música en la cabina: manos en la consola y la cabeza al ritmo
+    // Estampa de diseño sobre la parte de arriba de la ropa (ver stampMaterial)
+    this.stampU = { uStamp: { value: null }, uStampOn: { value: 0 }, uStampC: { value: new THREE.Vector2() }, uStampS: { value: new THREE.Vector2(1, 1) }, uStampSide: { value: 1 } };
+    this.held = null; // objeto 3D de diseño en la mano: { design, group }
     this.phoneW = 0;
     this.gestW = 0;     // cuánto pesa el gesto (para entrar y salir suave)
     this.gestPose = null;
@@ -321,7 +326,45 @@ export class Avatar {
       return { ...a, type: it.type };
     });
     this.attachAccessories();
+    this.stamp = list.find((it) => it.type === 'estampa')?.design ?? null;
+    this.applyStamp();
+    this.setHeld(list.find((it) => it.type === 'disenoObjeto')?.design ?? null);
     this.setLook(this.look);
+  }
+
+  // Estampa: la imagen, dónde va (pecho o espalda, debajo del cuello) y de qué tamaño
+  applyStamp() {
+    const U = this.stampU, d = this.stamp;
+    U.uStampOn.value = 0;
+    if (!d || !this.model) return;
+    const id = d.id;
+    stampTexture(id).then((tex) => {
+      if (this.stamp?.id !== id || !this.model) return;
+      const w = STAMP_SIZES[d.size] ?? STAMP_SIZES.mediano;
+      const h = Math.min(0.45, (w * (d.h || 1)) / (d.w || 1));
+      const neck = this.model.rig.bones.neck_01.worldPos.y;
+      U.uStamp.value = tex;
+      U.uStampS.value.set(w, h);
+      U.uStampC.value.set(0, neck - 0.1 - h / 2);
+      U.uStampSide.value = d.place === 'espalda' ? -1 : 1;
+      U.uStampOn.value = 1;
+    });
+  }
+
+  // Objeto 3D en la mano (diseños de hasta 50 cm): a tamaño real, parado sobre la mano derecha
+  setHeld(design) {
+    if (this.held?.design.id === design?.id) return;
+    this.held?.group.removeFromParent();
+    this.held = null;
+    if (!design) return;
+    const held = { design, group: new THREE.Group() };
+    this.held = held;
+    heldModel(design.id).then((obj) => {
+      if (this.held !== held) return;
+      obj.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.raycast = noRaycast; } });
+      held.group.add(obj);
+      this.root.add(held.group);
+    }).catch(() => {});
   }
 
   attachAccessories() {
@@ -392,6 +435,7 @@ export class Avatar {
     }).catch((e) => console.warn('No se pudieron cargar las animaciones', e));
     this.root.add(scene);
     this.attachAccessories();
+    this.applyStamp();
     this.applyShape();
     this.syncHair();
   }
@@ -436,6 +480,7 @@ export class Avatar {
         mesh.frustumCulled = false;
         mesh.raycast = noRaycast;
         mesh.userData.style = kind;
+        if (kind === 'top') stampMaterial(mesh.material, this.stampU);
         m.body.parent.add(mesh);
         mesh.bind(new THREE.Skeleton(skinBones, o.skeleton.boneInverses), m.body.bindMatrix);
         this.hairMeshes.push(mesh);
@@ -590,6 +635,11 @@ export class Avatar {
       if (this.kissW > 0.001) this.applyKiss(this.kissW);
       this.djW = damp(this.djW ?? 0, this.djing ? 1 : 0, 6, dt);
       if (this.djW > 0.001) this.applyDJ(this.djW);
+      // Objeto en la mano: brazo doblado hacia adelante (salvo con el celular, tomando o en la cabina)
+      const busy = this.phoneW > 0.35 || this.drinkW > 0.35 || this.djW > 0.35;
+      this.holdW = damp(this.holdW ?? 0, this.held && !busy ? 1 : 0, 8, dt);
+      if (this.holdW > 0.001) this.applyHold(this.holdW);
+      if (this.held) this.placeHeld(busy);
     }
   }
 
@@ -641,6 +691,29 @@ export class Avatar {
     R.euler('spine_03', P.lean, 0, 0);
     R.euler('neck_01', P.neck + 0.12 * nod, 0, 0);
     names.forEach((n, k) => { const b = R.bones[n].bone; b.quaternion.copy(saved[k].slerp(b.quaternion, w)); });
+  }
+
+  // Brazo derecho doblado hacia adelante, la mano con la palma para arriba (para sostener un objeto)
+  applyHold(w) {
+    const R = this.model.rig;
+    const names = ['upperarm_r', 'lowerarm_r'];
+    const saved = names.map((n) => R.bones[n].bone.quaternion.clone());
+    R.set('upperarm_r', _q2.setFromEuler(_e.set(-0.3, 0, 0.15)).multiply(ARM_DOWN[-1]));
+    R.set('lowerarm_r', _q3.copy(ARM_DOWN_INV[-1]).multiply(qx(-1.45)).multiply(ARM_DOWN[-1]));
+    names.forEach((n, k) => { const b = R.bones[n].bone; b.quaternion.copy(saved[k].slerp(b.quaternion, w)); });
+  }
+
+  // El objeto sigue a la mano derecha, siempre parado y mirando para donde mira el personaje
+  placeHeld(hidden) {
+    const g = this.held.group;
+    g.visible = !hidden && this.holdW > 0.5;
+    if (!g.visible) return;
+    const hand = this.model.rig.bones.hand_r.bone;
+    hand.updateWorldMatrix(true, false);
+    hand.getWorldPosition(_hp);
+    this.root.worldToLocal(_hp);
+    g.position.set(_hp.x, _hp.y + 0.03 / this.root.scale.y, _hp.z + 0.07 / this.root.scale.z); // sobre la palma, no la muñeca
+    g.scale.setScalar(1 / this.root.scale.x); // a tamaño real aunque el personaje sea más alto o más bajo
   }
 
   // Brazo derecho sosteniendo el celular frente al pecho, cabeza mirándolo
@@ -759,7 +832,63 @@ export class Avatar {
     for (const a of this.accessories) a.group.traverse((o) => { if (o.isMesh) { o.geometry.dispose(); o.material.dispose(); } });
   }
 }
-const _v = new THREE.Vector3(), _q2 = new THREE.Quaternion(), _q3 = new THREE.Quaternion();
+const _v = new THREE.Vector3(), _q2 = new THREE.Quaternion(), _q3 = new THREE.Quaternion(), _hp = new THREE.Vector3();
+
+// ---------- Diseños: estampas y objetos en la mano ----------
+const stampCache = new Map();
+function stampTexture(id) {
+  if (!stampCache.has(id)) {
+    stampCache.set(id, new THREE.TextureLoader().loadAsync(designFileUrl(id)).then((t) => {
+      t.colorSpace = THREE.SRGBColorSpace;
+      t.anisotropy = 4;
+      return t;
+    }).catch(() => { stampCache.delete(id); return null; }));
+  }
+  return stampCache.get(id);
+}
+const modelCache = new Map();
+// Copia del modelo, con la base en el piso y centrado (cada avatar tiene la suya)
+function heldModel(id) {
+  if (!modelCache.has(id)) modelCache.set(id, loadGLTF(designFileUrl(id, 'model')).catch((e) => { modelCache.delete(id); throw e; }));
+  return modelCache.get(id).then((gltf) => {
+    const obj = gltf.scene.clone(true);
+    const box = new THREE.Box3().setFromObject(obj);
+    const c = box.getCenter(new THREE.Vector3());
+    obj.position.set(-c.x, -box.min.y, -c.z);
+    const g = new THREE.Group();
+    g.add(obj);
+    return g;
+  });
+}
+// La estampa se proyecta sobre la prenda en su pose de reposo (antes de animar), mirando de frente
+// (pecho, +Z) o de atrás (espalda): así se deforma con la ropa sin depender de cómo está su textura
+function stampMaterial(mat, U) {
+  mat.onBeforeCompile = (sh) => {
+    Object.assign(sh.uniforms, U);
+    sh.vertexShader = `varying vec3 vStampP;
+varying vec3 vStampN;
+${sh.vertexShader.replace('#include <morphtarget_vertex>', `#include <morphtarget_vertex>
+vStampP = transformed;
+vStampN = objectNormal;`)}`;
+    sh.fragmentShader = `varying vec3 vStampP;
+varying vec3 vStampN;
+uniform sampler2D uStamp;
+uniform float uStampOn;
+uniform vec2 uStampC;
+uniform vec2 uStampS;
+uniform float uStampSide;
+`
+      + sh.fragmentShader.replace('#include <map_fragment>', `#include <map_fragment>
+        if (uStampOn > 0.5 && vStampN.z * uStampSide > 0.3) {
+          vec2 suv = vec2((vStampP.x - uStampC.x) * uStampSide / uStampS.x + 0.5, (vStampP.y - uStampC.y) / uStampS.y + 0.5);
+          if (suv.x > 0.0 && suv.x < 1.0 && suv.y > 0.0 && suv.y < 1.0) {
+            vec4 st = texture2D(uStamp, suv);
+            diffuseColor.rgb = mix(diffuseColor.rgb, st.rgb, st.a);
+          }
+        }`);
+  };
+  mat.customProgramCacheKey = () => 'estampa';
+}
 const ARM_BONES = ['upperarm_l', 'lowerarm_l', 'upperarm_r', 'lowerarm_r'];
 const PROC_BONES = ['root', 'spine_02', 'neck_01', 'thigh_l', 'calf_l', 'thigh_r', 'calf_r', ...ARM_BONES];
 
