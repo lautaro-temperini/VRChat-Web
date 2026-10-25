@@ -27,7 +27,7 @@ renderer.setAnimationLoop(() => {
   world.update(dt, t);
   roomEditor?.update(dt);
   ground.update(dt, t, G.account?.id);
-  rtc.update(camera, (key) => (key.endsWith(':dj') ? world.dj.speakers : key.endsWith(':screen') ? world.screen.position : remotes.get(key)?.mouth()));
+  rtc.update(camera, (key) => (key.endsWith(':dj') ? (world.dj.sources ?? world.dj.speakers) : key.endsWith(':screen') ? world.screen.position : remotes.get(key)?.mouth()));
   world.dj.setMusic(rtc.dj ? rtc.musicLevel() : -1);
   // Qué voces escucho (los 4 más cercanos que hablan, o mi grupo): cada medio segundo
   voiceTimer += dt;

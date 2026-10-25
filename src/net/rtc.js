@@ -5,8 +5,9 @@
 //
 // - Voz: escuchás a los 4 más cercanos que estén hablando, dentro de 10 m, con audio 3D.
 //   En un grupo privado solo escuchás a tu grupo (desde cualquier lugar de la sala).
-// - DJ: la música (estéreo, buena calidad) sale por los dos parlantes del escenario:
-//   el canal izquierdo por uno y el derecho por el otro. Se escucha también estando en grupo.
+// - DJ: la música (estéreo, buena calidad) sale por los equipos de la sala (world.dj.sources):
+//   en el museo, line arrays, subs, frontfill y surround, cada uno en su lugar; en las salas
+//   personales, los dos parlantes (izquierdo y derecho). Se escucha también estando en grupo.
 // - Pantalla del escenario (VJ): solo video.
 
 // Sin TURN configurado en el servidor (o si no responde) se usa solo el STUN de Cloudflare
@@ -17,6 +18,12 @@ const DROP_RANGE = 18;      // m: recién acá suelto la suscripción (para no i
 const MAX_AUDIBLE = 4;      // voces que suenan a la vez (las más cercanas que estén hablando)
 const MAX_PRELOAD = 8;      // voces a las que estoy suscripto a la vez (fuera de un grupo)
 const RETRY = 1500;         // ms entre intentos si la pista todavía no está publicada
+// Bandas de los equipos de sonido: [tipo de filtro, frecuencia en Hz]. 'full' (o nada) = sin filtro
+const MUSIC_BANDS = {
+  top: ['highpass', 90],    // line arrays y surround: los graves profundos van por los subs
+  low: ['lowpass', 110],    // subs: solo graves
+  high: ['highpass', 2000], // frontfill / tweeters: agudos, para que adelante se escuche claro
+};
 
 export class RTC {
   constructor(net) {
@@ -320,7 +327,8 @@ export class RTC {
     this.sounds.set(key, { el, src, panner, gain, analyser, data: new Uint8Array(analyser.fftSize) });
   }
 
-  // Música del DJ: el canal izquierdo sale por un parlante y el derecho por el otro
+  // Música del DJ: suena por los equipos de la sala. Cada equipo es una fuente en su lugar
+  // (ver musicSources); el grafo de cada uno se arma en update, cuando se sabe dónde está la música
   addMusic(key, stream) {
     this.dropSound(key);
     const ctx = this.audio();
@@ -331,15 +339,56 @@ export class RTC {
     const src = ctx.createMediaStreamSource(stream);
     const split = ctx.createChannelSplitter(2);
     const gain = ctx.createGain();
-    const panners = [0, 1].map((ch) => {
-      const p = new PannerNode(ctx, { panningModel: 'HRTF', distanceModel: 'inverse', refDistance: 5, rolloffFactor: 0.6, maxDistance: 80 });
-      split.connect(p, ch);
-      p.connect(gain);
-      return p;
-    });
     src.connect(split);
     gain.connect(this.mediaBus);
-    this.sounds.set(key, { el, src, panner: panners[0], panners, split, gain, ...this.beatAnalyser(src) });
+    this.sounds.set(key, { el, src, panners: [], chains: [], layout: null, split, gain, ...this.beatAnalyser(src) });
+  }
+
+  // Lista de fuentes de la música. positions puede ser:
+  //  - [izq., der.] (dos Vector3, como las salas personales): un parlante por canal, como siempre
+  //  - [{ pos, ch: 'L'|'R'|'mono', band: 'full'|'top'|'low'|'high', gain, model, ref, rolloff }]
+  //    (los equipos del museo: line arrays, subs, frontfill, surround)
+  musicSources(positions) {
+    if (!positions?.length) return null;
+    if (!positions[0].isVector3) return positions;
+    this._pairs ??= new WeakMap();
+    let list = this._pairs.get(positions);
+    if (!list) {
+      list = [{ pos: positions[0], ch: 'L' }, { pos: positions[1] ?? positions[0], ch: 'R' }];
+      this._pairs.set(positions, list);
+    }
+    return list;
+  }
+
+  // Arma (o rearma, si cambió la sala) un canal por fuente: canal → filtro → volumen → panner → música
+  buildMusic(s, list) {
+    for (const c of s.chains) c.nodes.forEach((n) => n.disconnect());
+    const ctx = this.ctx;
+    s.chains = list.map((f) => {
+      const out = new GainNode(ctx, { gain: f.gain ?? 1 });
+      const nodes = [out];
+      let input = out;
+      const band = MUSIC_BANDS[f.band];
+      if (band) {
+        input = new BiquadFilterNode(ctx, { type: band[0], frequency: band[1], Q: Math.SQRT1_2 });
+        input.connect(out);
+        nodes.push(input);
+      }
+      if (f.ch === 'mono') {
+        // Los dos canales juntos (a la mitad cada uno): lo hace el navegador al bajar a 1 canal
+        Object.assign(input, { channelCount: 1, channelCountMode: 'explicit', channelInterpretation: 'speakers' });
+        s.src.connect(input);
+      } else s.split.connect(input, f.ch === 'R' ? 1 : 0);
+      const panner = new PannerNode(ctx, {
+        panningModel: f.model ?? 'HRTF', distanceModel: 'inverse', refDistance: f.ref ?? 5, rolloffFactor: f.rolloff ?? 0.6, maxDistance: 80,
+        positionX: f.pos.x, positionY: f.pos.y, positionZ: f.pos.z,
+      });
+      out.connect(panner).connect(s.gain);
+      nodes.push(panner);
+      return { nodes, panner };
+    });
+    s.panners = s.chains.map((c) => c.panner);
+    s.layout = list;
   }
 
   // Analizador para que las luces sigan el ritmo (sirve también para mi propia música, sin que suene)
@@ -370,6 +419,7 @@ export class RTC {
     s.src.disconnect();
     s.panner?.disconnect();
     s.panners?.forEach((p) => p.disconnect());
+    s.chains?.forEach((c) => c.nodes.forEach((n) => n.disconnect()));
     s.split?.disconnect();
     s.gain?.disconnect();
     if (s.el) s.el.srcObject = null;
@@ -393,9 +443,11 @@ export class RTC {
     }
     for (const [key, s] of this.sounds) {
       if (s.panners) {
-        // Música: cada canal en su parlante
-        const spk = positionOf(key);
-        if (spk) s.panners.forEach((pn, i) => { pn.positionX.setTargetAtTime(spk[i].x, t, 0.05); pn.positionY.setTargetAtTime(spk[i].y, t, 0.05); pn.positionZ.setTargetAtTime(spk[i].z, t, 0.05); });
+        // Música: cada fuente en su equipo (si cambió la sala, se rearman)
+        const list = this.musicSources(positionOf(key));
+        if (!list) continue;
+        if (s.layout !== list) this.buildMusic(s, list);
+        s.chains.forEach(({ panner: pn }, i) => { const q = list[i].pos; pn.positionX.setTargetAtTime(q.x, t, 0.05); pn.positionY.setTargetAtTime(q.y, t, 0.05); pn.positionZ.setTargetAtTime(q.z, t, 0.05); });
         continue;
       }
       if (!s.panner) continue;
