@@ -754,6 +754,134 @@ export function buildMuseum(scene, renderer, quality) {
     if (dj) { boothSignMesh.material.map = boothSign(dj.name, dj.track); boothSignMesh.material.needsUpdate = true; }
   }
 
+  // ---------- Equipos de sonido de la pista ----------
+  // Todos suenan de verdad: cada uno es una fuente de la música del DJ en su lugar (soundSources →
+  // world.dj.sources, ver rtc.js). Los de piso se trepan; los colgados no tienen collider.
+  // Cada caja se arma mirando a +z (el frente) y después se gira con yaw.
+  const soundSources = [];
+  const cabMat = new THREE.MeshStandardMaterial({ color: 0x121215, roughness: 0.75, metalness: 0.1 });
+  const grillMat = new THREE.MeshStandardMaterial({ color: 0x050506, roughness: 1 });
+  const spkLed = neon(0x3dc8ff); // lucecita de cada equipo: late con el bombo
+  const v3 = (x, y, z) => new THREE.Vector3(x, y, z);
+  // Caja con rejilla al frente; cones: [[x, y, radio]] en la cara del frente (coordenadas locales)
+  function cabinet(parent, w, h, d, cones = [], led = true) {
+    const g = new THREE.Group();
+    const body = new THREE.Mesh(new RoundedBoxGeometry(w, h, d, SEG, Math.min(0.03, h / 6)), cabMat);
+    body.castShadow = high;
+    const grill = new THREE.Mesh(new THREE.PlaneGeometry(w - 0.06, h - 0.05), grillMat);
+    grill.position.z = d / 2 + 0.002;
+    g.add(body, grill);
+    for (const [x, y, r] of cones) {
+      const c = new THREE.Mesh(new THREE.CircleGeometry(r, 32), coneMat);
+      c.position.set(x, y, d / 2 + 0.004);
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(r, Math.max(0.008, r * 0.07), 6, 32), steelMat);
+      ring.position.copy(c.position);
+      g.add(c, ring);
+    }
+    if (led) {
+      const l = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.012, 0.004), spkLed);
+      l.position.set(w / 2 - 0.06, -h / 2 + 0.04, d / 2 + 0.005);
+      g.add(l);
+    }
+    parent.add(g);
+    return g;
+  }
+  function placed(x, y, z, yaw) {
+    const g = new THREE.Group();
+    g.position.set(x, y, z);
+    g.rotation.y = yaw;
+    scene.add(g);
+    return g;
+  }
+
+  // Line arrays colgados a los costados del escenario (música principal: izq. y der.).
+  // 8 cajas en curva "J" (las de abajo apuntan más hacia la pista), colgadas del techo con dos cadenas
+  {
+    const N = 8, EH = 0.3, ED = 0.55, EW = 1, TOP = 6.1, TILT = [0, 0, 1, 2, 3.5, 5, 7, 9.5];
+    for (const [z, s] of [[-5.6, 1], [5.6, -1]]) {
+      // Mirando a la pista (-x), un poco hacia el centro
+      const arr = placed(14.6, TOP, z, -Math.PI / 2 + s * 0.15);
+      const bar = new THREE.Mesh(new THREE.BoxGeometry(EW + 0.15, 0.06, ED + 0.1), steelMat);
+      bar.position.set(0, 0.06, 0);
+      arr.add(bar);
+      for (const cx of [-EW / 2, EW / 2]) {
+        const chain = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, H - TOP - 0.09, 6), steelMat);
+        chain.position.set(cx, 0.09 + (H - TOP - 0.09) / 2, 0);
+        arr.add(chain);
+      }
+      // Cada caja cuelga de la de arriba por el borde de adelante y se inclina un poco más (atrás queda la cuña)
+      const hinge = new THREE.Vector3(0, 0, ED / 2);
+      let acc = 0;
+      for (let i = 0; i < N; i++) {
+        acc += TILT[i] * Math.PI / 180;
+        const el = cabinet(arr, EW, EH - 0.01, ED, [[-0.28, 0, 0.1], [0.28, 0, 0.1]], i === N - 1);
+        // Rejilla de agudos en el medio
+        const horn = new THREE.Mesh(new THREE.PlaneGeometry(0.22, 0.2), steelMat);
+        horn.position.z = ED / 2 + 0.004;
+        el.add(horn);
+        el.rotation.x = acc;
+        const off = new THREE.Vector3(0, -EH / 2, -ED / 2).applyAxisAngle(new THREE.Vector3(1, 0, 0), acc);
+        el.position.copy(hinge).add(off);
+        hinge.add(new THREE.Vector3(0, -EH, 0).applyAxisAngle(new THREE.Vector3(1, 0, 0), acc));
+      }
+      soundSources.push({ pos: v3(14.4, TOP - 1.2, z), ch: s > 0 ? 'L' : 'R', band: 'top', gain: 0.7, model: 'HRTF', ref: 5, rolloff: 0.6 });
+    }
+  }
+
+  // Subs de piso adelante del escenario (solo graves, los dos canales juntos): dos por lado, se trepan
+  for (const zc of [-3.3, 3.3]) {
+    for (const z of [zc - 0.6, zc + 0.6]) {
+      cabinet(placed(12.5, 0.375, z, -Math.PI / 2), 1.15, 0.75, 0.8, [[0, 0, 0.28]], z === zc + 0.6);
+      collider(12.1, 12.9, z - 0.575, z + 0.575, 0.75);
+    }
+    soundSources.push({ pos: v3(12.5, 0.4, zc), ch: 'mono', band: 'low', gain: 0.6, model: 'equalpower', ref: 4, rolloff: 0.5 });
+  }
+
+  // Frontfill: parlantitos inclinados en el borde del escenario, entre los subs (sin collider: no estorban)
+  for (const z of [-1.5, -0.5, 0.5, 1.5]) {
+    const g = placed(13.2, 0.4 + 0.09, z, -Math.PI / 2);
+    const c = cabinet(g, 0.34, 0.18, 0.24, [[-0.07, 0, 0.055]], false);
+    c.rotation.x = -0.35; // mira hacia arriba, a la cara de los de adelante
+    const tw = new THREE.Mesh(new THREE.CircleGeometry(0.025, 16), steelMat);
+    tw.position.set(0.09, 0, 0.125);
+    c.add(tw);
+  }
+  for (const [z, ch] of [[-1, 'L'], [1, 'R']]) {
+    soundSources.push({ pos: v3(13.2, 0.55, z), ch, band: 'high', gain: 0.35, model: 'equalpower', ref: 1.5, rolloff: 1.4 });
+  }
+
+  // Monitores del escenario (las dos torres de siempre, a los costados de la cabina): bajitos
+  for (const [z, ch] of [[-4, 'L'], [4, 'R']]) {
+    soundSources.push({ pos: v3(16.2, 1.6, z), ch, band: 'full', gain: 0.25, model: 'equalpower', ref: 2, rolloff: 1 });
+  }
+
+  // Surround: en las columnas del balcón (costados y fondo de la pista) y dos de piso al fondo.
+  // Ganancia baja: no tapan a los principales, pero el sonido te rodea
+  const SUR = { band: 'top', gain: 0.12, model: 'equalpower', ref: 3, rolloff: 1 };
+  {
+    // Agarrados a la columna (x, cz) del lado de adentro, mirando a la pista
+    for (const [cx, cz, yaw] of [[5.5, -BZ, 0], [5.5, BZ, Math.PI], [BW, -BZ, 0.78], [BW, BZ, Math.PI - 0.78]]) {
+      const x = cx + Math.sin(yaw) * 0.4, z = cz + Math.cos(yaw) * 0.4;
+      const g = placed(x, 2.5, z, yaw);
+      cabinet(g, 0.4, 0.6, 0.35, [[0, -0.08, 0.13], [0, 0.18, 0.05]]);
+      const arm = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 0.2), steelMat);
+      arm.position.set(0, 0, -0.2);
+      g.add(arm);
+      soundSources.push({ pos: v3(x, 2.5, z), ch: z < 0 ? 'L' : 'R', ...SUR });
+    }
+    // De piso, al fondo (abajo del balcón oeste, a los costados de la consola de VJ): se trepan
+    for (const [z, yaw] of [[-4.2, Math.PI / 2 - 0.3], [4.2, Math.PI / 2 + 0.3]]) {
+      const x = -1.7;
+      const g = placed(x, 0, z, yaw);
+      const base = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.08, 0.45), steelMat);
+      base.position.y = 0.04;
+      g.add(base);
+      cabinet(g, 0.6, 1.1, 0.5, [[0, -0.22, 0.2], [0, 0.18, 0.13], [0, 0.4, 0.05]]).position.y = 0.08 + 0.55;
+      collider(x - 0.33, x + 0.33, z - 0.33, z + 0.33, 1.18);
+      soundSources.push({ pos: v3(x, 0.9, z), ch: z < 0 ? 'L' : 'R', ...SUR });
+    }
+  }
+
   // ---------- Pantalla: toda la pared este. La toma un VJ (solo video) ----------
   const SW = Z1 - Z0, SH = H - 0.4;
   const idle = document.createElement('canvas');
@@ -912,6 +1040,8 @@ export function buildMuseum(scene, renderer, quality) {
       stageLight.color.setHSL((t * 0.1 + 0.5) % 1, 1, 0.5);
       stageLight.intensity = (30 + p * 70) * party;
     }
+    // Lucecitas de los equipos de sonido
+    spkLed.color.setHex(0x3dc8ff).multiplyScalar(GLOW * (0.1 + 0.35 * party + 1.2 * flash));
   });
 
   // Las piezas quietas que comparten material se dibujan juntas (ver merge.js): mismo aspecto, menos trabajo
@@ -928,11 +1058,13 @@ export function buildMuseum(scene, renderer, quality) {
     stage: screenApi,
     // Museo rotativo: 9 lugares de cuadros y 5 de esculturas (en el orden del servidor)
     works: { paintings: paintingSlots, sculptures: sculptureSlots },
-    // Cabina del DJ: dónde se para (mirando a la pista), dónde se baja y los dos parlantes [izq., der.]
+    // Cabina del DJ: dónde se para (mirando a la pista), dónde se baja, los dos parlantes [izq., der.]
+    // y los equipos de sonido por donde sale la música (sources: ver rtc.js → musicSources)
     dj: {
       spot: { x: 17.05, y: 0.4, z: 0, yaw: -Math.PI / 2, exit: { x: 15.2, z: 0 } },
       exit: { x: 15.2, z: 0 },
       speakers: [new THREE.Vector3(16.2, 1.6, -4), new THREE.Vector3(16.2, 1.6, 4)],
+      sources: soundSources,
       setBooth,
       setMusic(level) { music.level = level; music.on = level >= 0; },
     },
