@@ -233,7 +233,7 @@ const GESTURES = {
   saludar: (t) => ({ sx: [-0.3, 0], sz: [-(2.55 + 0.28 * Math.sin(t * 11)), 0.1], el: [-0.25, -0.2] }),
   aplaudir: (t) => {
     const c = Math.abs(Math.sin(t * 8));
-    return { sx: [-1.0, -1.0], sz: [0.12 - 0.14 * c, -0.12 + 0.14 * c], el: [-1.15, -1.15] };
+    return { sx: [-1.2, -1.2], sz: [-0.26 + 0.16 * c, 0.26 - 0.16 * c], el: [-0.8, -0.8] }; // c = 1: manos juntas
   },
   senalar: () => ({ sx: [-1.5, 0], sz: [-0.08, 0.1], el: [0, -0.2] }),
   bailar: (t) => {
@@ -244,6 +244,7 @@ const GESTURES = {
     };
   },
 };
+if (import.meta.env.DEV) window.__GESTURES = GESTURES; // para calibrar en devtest
 // Cuánto pesa cada forma w{0,5,10}_m{0,5,10} para un peso y músculo (0..1). La del promedio
 // (w5_m5) es la base del modelo y no lleva forma.
 function shapeInfluences(weight, muscle) {
