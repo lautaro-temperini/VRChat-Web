@@ -313,3 +313,8 @@ La música del DJ y el puente OSC ya están hechos. Falta:
 | Diseños: regalar (25/10) | Las copias se regalan intercambiando o soltándolas al piso |
 | Estampas (25/10) | Van en la parte de arriba de la ropa, en el pecho o en la espalda, y con tamaño chico/mediano/grande: las dos cosas las elige quien la sube |
 | Cuadros y objetos 3D de diseño (25/10) | Se ponen en la sala (Mobiliario, con el editor), se sueltan al piso y se sostienen en la mano a tamaño real si miden hasta 50 cm (si son más grandes, solo sala y piso) |
+| Mapas públicos nuevos (25/10) | Plaza / parque, Cafetería, Azotea urbana, Galpón / Taller, Sala inmersiva y Galpón / rave, en ese orden. Abiertos a todos, en el Mapa junto al Museo |
+| Taller (25/10) | Para probar OSC y modelos, con tutoriales; también para exponer diseños |
+| Sala inmersiva (25/10) | Proyecciones en todo (paredes, piso y techo con la pantalla del VJ) y sonido envolvente |
+| Cafetería (25/10) | Barra de café (E, sin límite), mesas para sentarse y un atril con las últimas notas del muro |
+| Plaza (25/10) | Grande (50 × 50 m), con fuente y bancos alrededor y esculturas grandes fijas. La rodean rejas y árboles, con la ciudad atrás (de noche, ventanas prendidas) |

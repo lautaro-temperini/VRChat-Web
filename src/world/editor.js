@@ -125,7 +125,7 @@ export function createRoomEditor({ world, scene, camera, renderer, net, rtc, ctr
       return;
     }
     for (const [type, def] of Object.entries(FURNITURE)) {
-      if (def.cat !== cat || def.special) continue;
+      if (def.cat !== cat || def.special || def.hidden) continue;
       grid.append(card(type, def.color, () => addPiece(type)));
     }
   }
@@ -259,6 +259,7 @@ export function createRoomEditor({ world, scene, camera, renderer, net, rtc, ctr
       <div class="re-row"><button class="act" data-cancel>${first ? 'Más tarde' : 'Cancelar'}</button></div>`;
     const list = card.querySelector('.re-templates');
     for (const [id, t] of Object.entries(ROOM_TEMPLATES)) {
+      if (t.public) continue; // las de los mapas públicos
       const b = document.createElement('button');
       b.className = `re-template ${world.layout?.template === id && world.layout.chosen ? 'current' : ''}`;
       b.dataset.t = id;

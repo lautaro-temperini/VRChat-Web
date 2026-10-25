@@ -1,5 +1,5 @@
 import { DurableObject } from 'cloudflare:workers';
-import { cleanName, cleanLook, cleanEquip, EMOTES, ITEM_REACH, CONSUMABLES, FURNITURE, BOOST_TIME, KISS_RANGE } from './shared.js';
+import { cleanName, cleanLook, cleanEquip, EMOTES, ITEM_REACH, CONSUMABLES, FURNITURE, BOOST_TIME, KISS_RANGE, PUBLIC_MAPS } from './shared.js';
 import { roomTrack, roomEventTick } from './progress.js';
 import { roomEditorMethods, ROOM_SPAWN } from './editor.js';
 
@@ -585,7 +585,8 @@ export class Room extends DurableObject {
         break;
       }
       case 'spawn': {
-        const sp = (await this.ownerId()) ? ROOM_SPAWN : SPAWN; // las salas personales tienen su propia entrada
+        // Las salas personales y los mapas públicos tienen su propia entrada
+        const sp = (await this.ownerId()) ? ROOM_SPAWN : PUBLIC_MAPS[await this.roomName()]?.spawn ?? SPAWN;
         this.send(target, { t: 'teleport', x: sp.x, y: 0, z: sp.z, by: meta.name });
         break;
       }

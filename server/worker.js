@@ -12,8 +12,7 @@ const json = (data, status = 200) => new Response(JSON.stringify(data), {
 // ejecutar nada aunque alguien suba un HTML disfrazado de imagen
 const FILE_HEADERS = { 'x-content-type-options': 'nosniff', 'content-security-policy': "default-src 'none'; sandbox" };
 
-// Salas que existen: el Museo y las personales (u-<id de cuenta>)
-const ROOM_NAME = /^(museo|u-[0-9a-f]{16})$/;
+import { isRoomName } from './shared.js';
 
 // Direcciones a las que la vista previa no entra (la red propia, la del proveedor, etc.)
 const PRIVATE_HOST = /^(localhost|.*\.localhost|.*\.local|.*\.internal|0\.|127\.|10\.|192\.168\.|169\.254\.|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.|172\.(1[6-9]|2\d|3[01])\.|\[)/i;
@@ -234,7 +233,7 @@ export default {
     if (apiMatch) return api(request, env, apiMatch[1]);
 
     const wsMatch = url.pathname.match(/^\/ws\/([a-z0-9-]{1,32})$/i);
-    if (wsMatch && request.headers.get('Upgrade') === 'websocket' && ROOM_NAME.test(wsMatch[1].toLowerCase())) {
+    if (wsMatch && request.headers.get('Upgrade') === 'websocket' && isRoomName(wsMatch[1].toLowerCase())) {
       const room = wsMatch[1].toLowerCase();
       const stub = env.ROOMS.get(env.ROOMS.idFromName(room));
       // La sala no conoce su propio nombre: se lo pasamos (lo usa para avisar presencia)

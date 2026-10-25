@@ -256,6 +256,8 @@ export function buildShell(id, { high }) {
       wash.color.setHSL((t * 0.05 + 0.5) % 1, 0.8, 0.5);
       wash.intensity = 4 + 10 * p;
     });
+  } else if (id === 'plaza') {
+    buildPlaza();
   } else {
     // Terraza: al aire libre, deck de madera, baranda, fachada con la puerta al sur y la ciudad al norte
     floor(new THREE.MeshStandardMaterial({ map: repeatTex(woodFloor(), def.w / 3, def.d / 3), color: 0xc8b8a6, roughness: 0.7 }));
@@ -319,6 +321,193 @@ export function buildShell(id, { high }) {
     };
   }
 
+  // ---------- Plaza (mapa público, 50 × 50 m): fuente con bancos (muebles fijos), esculturas grandes,
+  // canteros con árboles, faroles, reja con portón al sur y la ciudad alrededor ----------
+  function buildPlaza() {
+    const stone = new THREE.MeshStandardMaterial({ color: 0xbdb6aa, roughness: 0.85, side: THREE.DoubleSide });
+    const darkStone = new THREE.MeshStandardMaterial({ color: 0x8f877b, roughness: 0.8 });
+    const iron = new THREE.MeshStandardMaterial({ color: 0x1d1f22, roughness: 0.5, metalness: 0.6 });
+    floor(new THREE.MeshStandardMaterial({ map: repeatTex(concrete(), def.w / 5, def.d / 5), color: 0xcfc8bc, roughness: 0.75 }));
+    // Canteros de pasto en las cuatro esquinas (caminos en cruz y alrededor de la fuente)
+    const grass = new THREE.MeshStandardMaterial({ color: 0x4f7a3a, roughness: 1 });
+    const LAWN = [6, 22];
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+      const size = LAWN[1] - LAWN[0], cx = sx * (LAWN[0] + size / 2), cz = sz * (LAWN[0] + size / 2);
+      const lawn = mesh(new THREE.PlaneGeometry(size, size), grass, cx, 0.02, cz);
+      lawn.rotation.x = -Math.PI / 2;
+      lawn.castShadow = false;
+      for (const [w, d, x, z] of [[size + 0.3, 0.15, cx, cz - size / 2], [size + 0.3, 0.15, cx, cz + size / 2], [0.15, size, cx - size / 2, cz], [0.15, size, cx + size / 2, cz]]) {
+        box(w, 0.12, d, darkStone, x, 0.06, z).castShadow = false;
+      }
+    }
+
+    // Fuente: pileta redonda, columna con dos platos y chorros
+    const R = 3.6;
+    mesh(new THREE.CylinderGeometry(R, R + 0.1, 0.55, 64, 1, true), stone, 0, 0.275, 0);
+    const lip = mesh(new THREE.TorusGeometry(R, 0.14, 10, 64), stone, 0, 0.55, 0);
+    lip.rotation.x = Math.PI / 2;
+    const waterMat = new THREE.MeshStandardMaterial({ color: 0x2f6f8f, roughness: 0.05, metalness: 0.3, transparent: true, opacity: 0.85 });
+    const water = mesh(new THREE.CircleGeometry(R - 0.05, 64), waterMat, 0, 0.42, 0);
+    water.rotation.x = -Math.PI / 2;
+    water.castShadow = false;
+    mesh(new THREE.CylinderGeometry(0.45, 0.7, 1.4, 24), stone, 0, 0.7, 0);
+    mesh(new THREE.CylinderGeometry(1.5, 0.5, 0.35, 40), stone, 0, 1.5, 0);
+    mesh(new THREE.CylinderGeometry(0.25, 0.35, 0.9, 20), stone, 0, 2.1, 0);
+    mesh(new THREE.CylinderGeometry(0.8, 0.3, 0.25, 32), stone, 0, 2.6, 0);
+    const jetMat = new THREE.MeshStandardMaterial({ color: 0xcfefff, roughness: 0.1, transparent: true, opacity: 0.45, depthWrite: false });
+    const jets = [];
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2;
+      const jet = mesh(new THREE.CylinderGeometry(0.03, 0.09, 1.1, 8, 1, true), jetMat, Math.sin(a) * 1.25, 1.2, Math.cos(a) * 1.25);
+      jet.castShadow = false;
+      jets.push(jet);
+    }
+    const spout = mesh(new THREE.CylinderGeometry(0.04, 0.12, 0.9, 8, 1, true), jetMat, 0, 3.15, 0);
+    spout.castShadow = false;
+    jets.push(spout);
+    animated.push((dt, t) => {
+      jets.forEach((j, i) => { j.scale.y = 1 + 0.12 * Math.sin(t * 6 + i); });
+      waterMat.color.setRGB(0.18 + 0.03 * Math.sin(t * 1.3), 0.42 + 0.03 * Math.sin(t * 1.7), 0.56);
+    });
+    // Se puede subir al borde (trepar), no a la columna
+    collider(-R * 0.82, R * 0.82, -R * 0.82, R * 0.82, 0.6, true);
+    collider(-0.7, 0.7, -0.7, 0.7, 2.8, false);
+
+    // Esculturas grandes fijas, sobre basamentos
+    const plinth = (x, z, w, h) => { box(w, h, w, darkStone, x, h / 2, z); collider(x - w / 2, x + w / 2, z - w / 2, z + w / 2, h + 0.01, false); };
+    // 1) Nudo de neón que gira
+    plinth(-14, -14, 2.2, 0.8);
+    const knotMat = neonMat(0x19d3ff);
+    const knot = mesh(new THREE.TorusKnotGeometry(1.1, 0.16, 220, 14, 2, 3), knotMat, -14, 2.6, -14);
+    knot.castShadow = false;
+    animated.push((dt) => { knot.rotation.y += dt * 0.25; });
+    // 2) Bloques de colores apilados
+    plinth(14, -14, 2.4, 0.5);
+    const blockMats = [0xe63946, 0xffd23f, 0x3a7bd5, 0xf4f4f4].map((c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.6 }));
+    [[1.8, 0.9, 1.8, 0, 0.95, 0, 0.2], [1.4, 0.9, 1.4, 0.15, 1.85, 0.1, -0.35], [1.0, 0.9, 1.0, -0.1, 2.75, -0.05, 0.5], [0.6, 0.9, 0.6, 0.05, 3.65, 0.05, -0.2]].forEach(([w, h, d, x, y, z, r], i) => {
+      box(w, h, d, blockMats[i], 14 + x, y, -14 + z).rotation.y = r;
+    });
+    // 3) Aro dorado gigante parado (se puede pasar por adentro)
+    const ringMat = new THREE.MeshStandardMaterial({ color: 0xd4a74a, roughness: 0.3, metalness: 0.85 });
+    const ring = mesh(new THREE.TorusGeometry(2.4, 0.28, 20, 64), ringMat, -14, 2.7, 14);
+    ring.rotation.y = Math.PI / 4;
+    for (const sd of [-1, 1]) {
+      const fx = -14 + sd * Math.cos(Math.PI / 4) * 2.4, fz = 14 - sd * Math.sin(Math.PI / 4) * 2.4;
+      box(0.9, 0.3, 0.9, darkStone, fx, 0.15, fz);
+      collider(fx - 0.45, fx + 0.45, fz - 0.45, fz + 0.45, 0.6, false);
+    }
+    // 4) Esferas espejadas
+    plinth(14, 14, 2.6, 0.4);
+    const chrome = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.05, metalness: 1 });
+    for (const [x, y, z, r] of [[0, 1.4, 0, 1], [0.9, 2.6, 0.3, 0.6], [-0.5, 3.3, -0.4, 0.4]]) mesh(new THREE.SphereGeometry(r, 40, 24), chrome, 14 + x, y, 14 + z);
+
+    // Árboles en los canteros y a lo largo de la reja (troncos y copas instanciados)
+    const trees = [];
+    let seed = 7;
+    const rand = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+    for (let a = -22; a <= 22; a += 5.5) {
+      for (const [x, z] of [[a, -23], [a, 23], [-23, a], [23, a]]) if (!(z === 23 && Math.abs(x) < 4)) trees.push([x, z]);
+    }
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) for (const [x, z] of [[9.5, 9.5], [18, 9.5], [9.5, 18], [18.5, 18.5]]) trees.push([sx * x + (rand() - 0.5), sz * z + (rand() - 0.5)]);
+    const trunkMat = new THREE.MeshStandardMaterial({ color: 0x5a4030, roughness: 0.9 });
+    const leafMat = new THREE.MeshStandardMaterial({ color: 0x3f6b2f, roughness: 0.9, flatShading: true });
+    const trunks = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.16, 0.24, 3, 8), trunkMat, trees.length);
+    const crowns = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1.6, 1), leafMat, trees.length);
+    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sv = new THREE.Vector3(), pv = new THREE.Vector3(), eu = new THREE.Euler();
+    trees.forEach(([x, z], i) => {
+      const k = 0.85 + rand() * 0.4;
+      trunks.setMatrixAt(i, m4.compose(pv.set(x, 1.5 * k, z), q.identity(), sv.set(k, k, k)));
+      crowns.setMatrixAt(i, m4.compose(pv.set(x, 3.6 * k, z), q.setFromEuler(eu.set(0, rand() * 3, 0)), sv.set(k, k * (0.9 + rand() * 0.3), k)));
+      collider(x - 0.25, x + 0.25, z - 0.25, z + 0.25, 3, false);
+    });
+    trunks.castShadow = crowns.castShadow = high;
+    group.add(trunks, crowns);
+
+    // Faroles alrededor de la fuente y en los caminos (de noche se prenden)
+    const bulbMat = neonMat(0xffe0a0);
+    const lampSpots = [];
+    for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2 + Math.PI / 8; lampSpots.push([Math.sin(a) * 10.5, Math.cos(a) * 10.5]); }
+    for (const v of [-17, 17]) lampSpots.push([v, 2.6], [v, -2.6], [2.6, v], [-2.6, v]);
+    const posts = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.06, 0.09, 3.6, 8), iron, lampSpots.length);
+    const bulbs = new THREE.InstancedMesh(new THREE.SphereGeometry(0.22, 14, 10), bulbMat, lampSpots.length);
+    lampSpots.forEach(([x, z], i) => {
+      posts.setMatrixAt(i, m4.compose(pv.set(x, 1.8, z), q.identity(), sv.set(1, 1, 1)));
+      bulbs.setMatrixAt(i, m4.compose(pv.set(x, 3.75, z), q.identity(), sv.set(1, 1, 1)));
+      collider(x - 0.12, x + 0.12, z - 0.12, z + 0.12, 3.6, false);
+    });
+    posts.castShadow = high;
+    bulbs.castShadow = false;
+    group.add(posts, bulbs);
+    const nightLights = [];
+    for (const [x, z] of high ? lampSpots.slice(0, 8).filter((_, i) => i % 2 === 0) : []) {
+      const l = new THREE.PointLight(0xffd59a, 0, 14, 1.6);
+      l.position.set(x, 3.5, z);
+      group.add(l);
+      nightLights.push(l);
+    }
+
+    // Reja baja de hierro alrededor (no se trepa), con portón al sur: salir por ahí abre el Mapa
+    const GATE = 2.2;
+    const bars = [];
+    for (let a = -D; a <= D; a += 0.18) {
+      bars.push([a, -D], [-W, a], [W, a]);
+      if (Math.abs(a) > GATE + 0.6) bars.push([a, D]);
+    }
+    const barMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(0.03, 1.2, 0.03), iron, bars.length);
+    bars.forEach(([x, z], i) => barMesh.setMatrixAt(i, m4.compose(pv.set(x, 0.6, z), q.identity(), sv.set(1, 1, 1))));
+    group.add(barMesh);
+    for (const y of [0.15, 1.15]) {
+      box(def.w, 0.05, 0.05, iron, 0, y, -D);
+      box(0.05, 0.05, def.d, iron, -W, y, 0);
+      box(0.05, 0.05, def.d, iron, W, y, 0);
+      box(D - GATE - 0.6, 0.05, 0.05, iron, -(D + GATE + 0.6) / 2, y, D);
+      box(D - GATE - 0.6, 0.05, 0.05, iron, (D + GATE + 0.6) / 2, y, D);
+    }
+    collider(-W, W, -D - 0.1, -D + 0.1, 1.25);
+    collider(-W - 0.1, -W + 0.1, -D, D, 1.25);
+    collider(W - 0.1, W + 0.1, -D, D, 1.25);
+    collider(-W, -GATE, D - 0.1, D + 0.1, 1.25);
+    collider(GATE, W, D - 0.1, D + 0.1, 1.25);
+    // Portón: dos pilares y un arco con el nombre; hacia afuera no se puede seguir caminando
+    for (const sd of [-1, 1]) { box(0.6, 3.2, 0.6, darkStone, sd * (GATE + 0.3), 1.6, D); collider(sd * (GATE + 0.3) - 0.3, sd * (GATE + 0.3) + 0.3, D - 0.3, D + 0.3, 3.2); }
+    box(2 * GATE + 1.2, 0.4, 0.5, darkStone, 0, 3.4, D);
+    for (const [z, r] of [[D - 0.26, Math.PI], [D + 0.26, 0]]) {
+      const sign = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 0.32), new THREE.MeshBasicMaterial({ map: plazaSign(), transparent: true }));
+      sign.position.set(0, 3.4, z);
+      sign.rotation.y = r;
+      group.add(sign);
+    }
+    collider(-GATE, GATE, D + 1, D + 1.2, 3);
+    exits.push({ x0: -GATE, x1: GATE, z0: D - 0.4, z1: D + 1.1 });
+
+    // La ciudad alrededor, el cielo y las luces
+    const cities = [[0, -46, 0], [0, 46, Math.PI], [-46, 0, Math.PI / 2], [46, 0, -Math.PI / 2]].map(([x, z, r]) => {
+      const city = cityBackdrop(130, 30);
+      city.position.set(x, 12, z);
+      city.rotation.y = r;
+      group.add(city);
+      return city;
+    });
+    const dome = new THREE.Mesh(new THREE.SphereGeometry(90, 24, 12), new THREE.MeshBasicMaterial({ color: 0x87b3e8, side: THREE.BackSide, fog: false }));
+    group.add(dome);
+    const sun = new THREE.DirectionalLight(0xffe2b8, 2.4);
+    sun.position.set(-18, 30, 10);
+    sun.castShadow = high;
+    if (high) { sun.shadow.mapSize.set(2048, 2048); Object.assign(sun.shadow.camera, { left: -28, right: 28, top: 28, bottom: -28, near: 1, far: 90 }); sun.shadow.bias = -0.0005; sun.shadow.normalBias = 0.04; }
+    group.add(sun, sun.target);
+    hemi.color.set(0xdfeaff); hemi.groundColor.set(0x5a6040);
+    timeFn = (day, golden) => {
+      sun.intensity = 2.6 * day;
+      sun.color.set(0xffe2b8).lerp(new THREE.Color(0xff8a4a), golden);
+      hemi.intensity = 0.2 + 0.8 * day;
+      dome.material.color.copy(sky.set(0x0b1236)).lerp(new THREE.Color(0x87b3e8), day).lerp(new THREE.Color(0xff9e6b), golden * 0.7);
+      for (const c of cities) { c.material.color.setScalar(0.2 + 0.8 * day); c.userData.windows.opacity = 1 - day; }
+      bulbMat.color.set(0xffe0a0).multiplyScalar(0.6 + 5 * (1 - day));
+      for (const l of nightLights) l.intensity = 22 * (1 - day);
+      knotMat.color.set(0x19d3ff).multiplyScalar(1.5 + 3.5 * (1 - day));
+    };
+  }
+
   // Luz de lámparas colgantes (loft)
   // (se ocultan junto con el techo en el editor)
   function pendant(x, z) {
@@ -334,7 +523,7 @@ export function buildShell(id, { high }) {
   return {
     id, def, group, colliders, blockers, walls, cutaway, exits,
     bounds: { minY: 0.2, maxY: def.h ? def.h - 0.2 : 30 },
-    spawn: { x: 0, z: D - 1, yaw: 0 }, // en la puerta, mirando hacia adentro
+    spawn: { x: 0, z: D - (id === 'plaza' ? 3 : 1), yaw: 0 }, // en la puerta, mirando hacia adentro
     setTime(hours) {
       const elev = Math.sin(((hours - 6.5) / 13) * Math.PI);
       const day = THREE.MathUtils.smoothstep(elev, -0.05, 0.35);
@@ -349,6 +538,21 @@ export function buildShell(id, { high }) {
       });
     },
   };
+}
+
+// Cartel del portón de la Plaza
+function plazaSign() {
+  const c = document.createElement('canvas');
+  c.width = 1024; c.height = 100;
+  const g = c.getContext('2d');
+  g.fillStyle = '#e9e2d0';
+  g.font = '700 70px Georgia, serif';
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  g.fillText('P L A Z A', 512, 54);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
 }
 
 // Ladrillos (loft)

@@ -189,7 +189,25 @@ export const ROOM_TEMPLATES = {
   galeria: { name: 'Galería', w: 12, d: 10, h: 4.5 },
   club: { name: 'Club', w: 12, d: 10, h: 5 },
   terraza: { name: 'Terraza', w: 12, d: 10, h: 0 }, // al aire libre: sin techo
+  // Plantillas de los mapas públicos (public: no se ofrecen para las salas personales)
+  plaza: { name: 'Plaza', w: 50, d: 50, h: 0, public: true },
 };
+
+// ---------- Mapas públicos (abiertos a todos, en el Mapa junto al Museo) ----------
+// Salas sin dueño con una plantilla y muebles fijos (nadie los edita): [tipo, x, z, rotación (grados), y]
+export const PUBLIC_MAPS = {
+  plaza: {
+    name: 'Plaza', where: 'En la Plaza', desc: 'Para pasear y charlar: fuente, bancos y esculturas', template: 'plaza',
+    spawn: { x: 0, z: 22 }, // entrando por el portón (al sur)
+    // Bancos alrededor de la fuente, mirándola
+    pieces: [0, 45, 90, 135, 180, 225, 270, 315].map((deg) => {
+      const a = (deg * Math.PI) / 180;
+      return ['bancoPlaza', Math.round(Math.sin(a) * 7 * 100) / 100, Math.round(Math.cos(a) * 7 * 100) / 100, deg + 180];
+    }),
+  },
+};
+// Salas que existen: el Museo, los mapas públicos y las personales (u-<id de cuenta>)
+export const isRoomName = (name) => name === 'museo' || Object.hasOwn(PUBLIC_MAPS, name) || /^u-[0-9a-f]{16}$/.test(name);
 export const ROOM_MAX_PIECES = 100;
 
 // Catálogo de muebles. Se referencian por id (la progresión los da como premio por id).
@@ -232,6 +250,8 @@ export const FURNITURE = {
   // Diseños de artistas (design: lo pone el servidor al colocarlo, desde el objeto del inventario)
   disenoCuadro: { name: 'Cuadro de diseño', cat: 'especial', mount: 'wall', color: '#141414', size: [1.2, 0.1], special: true, design: true },
   disenoObjeto: { name: 'Objeto 3D', cat: 'especial', mount: 'floor', color: '#ffffff', size: [1, 1], special: true, design: true },
+  // De los mapas públicos (hidden: no salen en el catálogo del editor)
+  bancoPlaza: { name: 'Banco de plaza', cat: 'living', mount: 'floor', color: '#6b4a2b', size: [1.8, 0.65], hidden: true },
 };
 export const FURNITURE_CATS = { living: 'Living', comedor: 'Comedor y bar', arte: 'Arte', deco: 'Deco y luz', equipo: 'Música y pantallas', especial: 'Especiales' };
 export const SPECIAL_FURNITURE = Object.keys(FURNITURE).filter((k) => FURNITURE[k].special && !FURNITURE[k].design);

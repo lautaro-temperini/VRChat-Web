@@ -1,5 +1,5 @@
 import { api } from '../net/api.js';
-import { ITEMS, FURNITURE, CONSUMABLES, rarityOf, designHoldable, HAND_MAX } from '../../server/shared.js';
+import { ITEMS, FURNITURE, CONSUMABLES, rarityOf, designHoldable, HAND_MAX, PUBLIC_MAPS } from '../../server/shared.js';
 import { designFileUrl } from '../net/api.js';
 import { itemIcon } from './icons.js';
 import { toast } from './toast.js';
@@ -160,6 +160,7 @@ export function createSocial({ net, ui, me, room, onEquip, onDrop }) {
   function roomLabel(r) {
     if (!r) return 'Desconectado';
     if (r === 'museo') return 'En el Museo';
+    if (PUBLIC_MAPS[r]) return PUBLIC_MAPS[r].where;
     if (r === roomOf(me()?.id)) return 'En tu sala';
     if (r.startsWith('u-')) {
       const owner = friendsData.friends.find((f) => roomOf(f.id) === r);

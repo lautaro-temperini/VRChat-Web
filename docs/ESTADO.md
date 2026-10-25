@@ -113,7 +113,9 @@ Para volver a subir: `npm run deploy` desde la carpeta del proyecto.
 7. ✅ **Diseños de artistas como objetos** (25/10): subir desde la Mochila, estampas en la ropa (pecho/espalda,
    3 tamaños), cuadros y objetos 3D en la sala (editor → Especiales), en el piso y en la mano (hasta 50 cm),
    "Copiar" solo el autor, título Diseñador con 3 objetos 3D. Pruebas en `test/disenos.test.mjs`.
-   Falta: **más mapas públicos** (paso 5, consultar el diseño).
+   **Mapas públicos** (orden decidido): ✅ Plaza (50 × 50 m: fuente, 8 bancos, 4 esculturas, árboles, faroles,
+   reja con portón que abre el Mapa, ciudad alrededor, día/noche). Faltan: Cafetería, Azotea, Taller, Inmersiva y
+   Rave (consultar los detalles de cada uno antes de armarlo).
 8. **Seguridad, lo que quedó para decidir** (ver `docs/ramas/seguridad.md`): teletransporte (posiciones falsas)
    y vencimiento de sesiones.
 9. ✅ Animaciones achicadas: paquete JSON (`npm run empaquetar`), al entrar baja ~0,7 MB en vez de ~13 MB.

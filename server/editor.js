@@ -1,4 +1,4 @@
-import { FURNITURE, ROOM_TEMPLATES, ROOM_MAX_PIECES, TEMPLATE_PIECES, cleanPiece } from './shared.js';
+import { FURNITURE, ROOM_TEMPLATES, ROOM_MAX_PIECES, TEMPLATE_PIECES, PUBLIC_MAPS, cleanPiece } from './shared.js';
 
 const has = (obj, key) => typeof key === 'string' && Object.hasOwn(obj, key);
 
@@ -25,7 +25,14 @@ export function templateLayout(template, chosen = true) {
 export const roomEditorMethods = {
   async layout() {
     if (this.roomLayout) return this.roomLayout;
-    if (!(await this.ownerId())) return null; // el Museo no se edita
+    if (!(await this.ownerId())) {
+      // Mapas públicos: diseño fijo (ids estables, nadie los edita); el Museo no tiene
+      const map = PUBLIC_MAPS[await this.roomName()];
+      if (!map) return null;
+      const pieces = map.pieces.map(([type, x, z, deg, y], i) => cleanPiece({ id: `m${i}`, type, x, z, y, r: (deg * Math.PI) / 180 }, map.template)).filter(Boolean);
+      this.roomLayout = { template: map.template, pieces, chosen: true, fixed: true };
+      return this.roomLayout;
+    }
     this.roomLayout = (await this.ctx.storage.get('layout')) ?? templateLayout('loft', false);
     return this.roomLayout;
   },
@@ -43,7 +50,7 @@ export const roomEditorMethods = {
     const fail = (text, piece) => { this.send(ws, { t: 'edit-fail', op: msg.op, id: msg.op === 'add' ? msg.piece?.id : msg.id, piece }); return this.notice(ws, text); };
 
     if (msg.op === 'template') {
-      if (!has(ROOM_TEMPLATES, msg.template)) return;
+      if (!has(ROOM_TEMPLATES, msg.template) || ROOM_TEMPLATES[msg.template].public) return;
       // Los especiales vuelven al inventario; los básicos se borran (la plantilla trae los suyos)
       // (primero se cambia la sala y después se devuelven: así nada queda puesto y en el inventario a la vez)
       const iids = layout.pieces.filter((p) => p.iid).map((p) => p.iid);

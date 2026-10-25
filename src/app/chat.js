@@ -1,6 +1,6 @@
 // Chat de la sala y comandos (/ayuda, /ir, /bailar…).
 import { api } from '../net/api.js';
-import { DANCES } from '../../server/shared.js';
+import { DANCES, PUBLIC_MAPS } from '../../server/shared.js';
 import { G, $, body } from './state.js';
 
 const { ctrl, social, net } = G;
@@ -90,11 +90,13 @@ function command(text) {
       break;
     }
     case 'salas':
-      system(`Salas: Museo · Tu sala${friends.length ? ' · ' + friends.map((f) => `Sala de ${f.name}${f.room ? `  (${social.roomLabel(f.room).toLowerCase()})` : ''}`).join(' · ') : ''}`);
+      system(`Salas: Museo · ${Object.values(PUBLIC_MAPS).map((m) => m.name).join(' · ')} · Tu sala${friends.length ? ' · ' + friends.map((f) => `Sala de ${f.name}${f.room ? `  (${social.roomLabel(f.room).toLowerCase()})` : ''}`).join(' · ') : ''}`);
       break;
     case 'ir': {
-      if (!arg) return system('Usá: /ir museo · /ir mi sala · /ir <amigo>');
+      if (!arg) return system('Usá: /ir museo · /ir plaza · /ir mi sala · /ir <amigo>');
       if (arg === 'museo') return social.go('museo');
+      const map = Object.entries(PUBLIC_MAPS).find(([id, m]) => id === arg || m.name.toLowerCase() === arg);
+      if (map) return social.go(map[0]);
       if (arg === 'mi sala' || arg === 'casa') return G.account && social.go(`u-${G.account.id}`);
       const f = friends.find((x) => x.name.toLowerCase().startsWith(arg) || x.username?.startsWith(arg));
       if (!f) return system(`No encontré a "${arg}" en tus amigos. Agregalo desde su perfil (E sobre su personaje).`);

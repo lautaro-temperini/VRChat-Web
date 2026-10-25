@@ -86,7 +86,8 @@ net
     applyGroups();
     if (rtc.mic) net.send({ t: 'mic', v: rtc.micState });
     roomPanel.setRoom(m.room ?? {});
-    roomEditor?.onWelcome(m);
+    if (roomEditor) roomEditor.onWelcome(m);
+    else if (m.layout) world.setLayout?.(m.layout); // mapas públicos: diseño fijo, sin editor
     if (me.phone) net.send({ t: 'phone', v: true });
     roomPanel.applyMutes();
     ground.clear();

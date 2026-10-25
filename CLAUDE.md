@@ -76,6 +76,9 @@ Cada agujero de seguridad que se cierre lleva su prueba en `test/` (clientes Web
 - **Salas personales y editor** (`src/world/rooms.js`, `templates.js`, `furniture.js`, `editor.js`; servidor
   `server/editor.js`): el diseño de cada sala vive en el storage de su Room (clave `layout`); catálogos
   `ROOM_TEMPLATES` y `FURNITURE` en `server/shared.js`. Muebles especiales puestos: `items.owner_id = 'room:<id>'`.
+- **Mapas públicos** (`PUBLIC_MAPS` en `server/shared.js`): salas sin dueño con plantilla (`ROOM_TEMPLATES` con
+  `public: true`, cascarón en `templates.js`) y muebles fijos; el servidor arma su diseño en `layout()` (editor.js) y
+  nadie lo edita. El cliente los arma con `rooms.js` (como las salas personales, sin editor). Salas válidas: `isRoomName`.
 - **Mensajes entre amigos** (`server/messages.js` mezclado en `Accounts`, `src/ui/messages.js` = app del celular):
   rutas `dms` (conversaciones), `dm?id=` (una conversación, la marca leída) y `POST dm`.
 - **Diseños de artistas** (`server/designs.js` mezclado en `Accounts`, `src/ui/designs.js`): cualquier cuenta sube
@@ -122,7 +125,7 @@ Cada agujero de seguridad que se cierre lleva su prueba en `test/` (clientes Web
 - **Seguridad** (ver `docs/ramas/seguridad.md`): catálogos con `Object.hasOwn` (nunca `CATALOGO[x]` con lo
   que manda el cliente: `constructor` existe en todo objeto); antiflood general por conexión (`RATE`/`allow`
   en room.js); una sola conexión por cuenta (`claimConn` → `takeover`, mensaje `elsewhere`); frenos por IP
-  en ingreso y cuentas nuevas (`limits`); salas válidas: `museo` y `u-<16 hex>`.
+  en ingreso y cuentas nuevas (`limits`); salas válidas: `isRoomName` (`museo`, los mapas públicos y `u-<16 hex>`).
 - **Catálogos compartidos** (objetos, peinados, validaciones) en `server/shared.js`, importados
   también por el cliente.
 - **Admins:** `wrangler.jsonc` → `vars.ADMIN_IDS`. El dueño de una sala `u-<id>` es esa cuenta. Los

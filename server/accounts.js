@@ -1,5 +1,5 @@
 import { DurableObject } from 'cloudflare:workers';
-import { cleanName, cleanLook, isImage, ITEMS, STARTER_ITEMS, FURNITURE, SPECIAL_FURNITURE, CONSUMABLES, HAND_MAX, designHoldable } from './shared.js';
+import { cleanName, cleanLook, isImage, ITEMS, STARTER_ITEMS, FURNITURE, SPECIAL_FURNITURE, CONSUMABLES, HAND_MAX, designHoldable, PUBLIC_MAPS } from './shared.js';
 import { setupWorks, worksMethods } from './works.js';
 import { setupDesigns, designsMethods } from './designs.js';
 import { setupMessages, messagesMethods } from './messages.js';
@@ -865,6 +865,7 @@ export class Accounts extends DurableObject {
 
   roomLabel(room) {
     if (room === 'museo') return { name: 'Museo', hearts: null };
+    if (Object.hasOwn(PUBLIC_MAPS, room)) return { name: PUBLIC_MAPS[room].name, hearts: null };
     if (room.startsWith('u-')) {
       const owner = this.row(room.slice(2));
       if (owner) return { name: this.roomTitle(owner), hearts: this.heartCount(owner.id), ownerName: owner.name };

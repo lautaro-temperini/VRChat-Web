@@ -2,6 +2,7 @@
 // el Mapa (favoritas, salas), los gestos (R), inventario e intercambios, el celular y la progresión.
 import * as THREE from 'three';
 import { api } from '../net/api.js';
+import { PUBLIC_MAPS } from '../../server/shared.js';
 import { createSocial } from '../ui/social.js';
 import { createDesignUpload } from '../ui/designs.js';
 import { createPhone } from '../ui/phone.js';
@@ -102,6 +103,7 @@ async function openMundi() {
   }
   section('Salas');
   add('Museo', 'Sala pública', 'museo');
+  for (const [id, m] of Object.entries(PUBLIC_MAPS)) add(m.name, `Mapa público · ${m.desc}`, id);
   if (G.account && !G.account.guest && mine?.ok) {
     const myRoom = `u-${G.account.id}`;
     const el = add(mine.room.name, ['Tu sala', PRIVACY_LABEL[mine.room.privacy], hearts(mine.room.hearts)].filter(Boolean).join(' · '), myRoom);
@@ -143,7 +145,7 @@ async function openMundi() {
     for (const f of friends) add(`Sala de ${f.name}`, f.room ? social.roomLabel(f.room).replace(/^En /, `${f.name} está en `) : 'Su sala personal', `u-${f.id}`);
   }
   // La sala actual, si no aparece en ninguna lista, igual se puede marcar como favorita
-  const listed = ['museo', G.account && `u-${G.account.id}`, ...favorites.map((f) => f.room), ...friends.map((f) => `u-${f.id}`)];
+  const listed = ['museo', ...Object.keys(PUBLIC_MAPS), G.account && `u-${G.account.id}`, ...favorites.map((f) => f.room), ...friends.map((f) => `u-${f.id}`)];
   if (!listed.includes(room)) {
     section('Estás en');
     add(G.roomTitle, '', room);

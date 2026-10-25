@@ -3,6 +3,7 @@
 import { Net } from '../net/net.js';
 import { RTC } from '../net/rtc.js';
 import { api } from '../net/api.js';
+import { PUBLIC_MAPS } from '../../server/shared.js';
 import { toast } from '../ui/toast.js';
 import { guestGate } from '../ui/guest.js';
 import { createRoomPanel } from '../ui/roompanel.js';
@@ -15,7 +16,7 @@ const net = new Net(room);
 const remotes = new Map();
 
 // Nombre de la sala (las salas personales usan el nombre que les puso su dueño)
-G.roomTitle = room === 'museo' ? 'Museo' : room;
+G.roomTitle = room === 'museo' ? 'Museo' : PUBLIC_MAPS[room]?.name ?? room;
 const roomOwner = room.startsWith('u-') ? room.slice(2) : null;
 if (roomOwner) {
   api(`profile?id=${roomOwner}`).then((r) => { if (r.ok) { G.roomTitle = r.profile.roomName; G.setStatus(); } });

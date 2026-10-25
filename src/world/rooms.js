@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { FURNITURE } from '../../server/shared.js';
+import { FURNITURE, PUBLIC_MAPS } from '../../server/shared.js';
 import { buildShell } from './templates.js';
 import { buildFurniture } from './furniture.js';
 import { boothSign, artistsSign } from './textures.js';
@@ -10,9 +10,10 @@ import { api, photoUrl } from '../net/api.js';
 // Devuelve un "mundo" con la misma forma que el del Museo (museum.js), así el controlador,
 // la interacción con E, la cabina del DJ, la consola y la pantalla funcionan igual.
 
+// Salas armadas con plantilla y muebles: las personales y los mapas públicos (diseño fijo)
 export function isPersonalRoom() {
   const sala = (new URLSearchParams(location.search).get('sala') || '').toLowerCase();
-  return sala.startsWith('u-');
+  return sala.startsWith('u-') || Object.hasOwn(PUBLIC_MAPS, sala);
 }
 
 const MAX_LAMP_LIGHTS = { high: 6, low: 2 }; // luces reales de lámparas (las demás solo brillan)
@@ -24,9 +25,10 @@ export function buildPersonalRoom(scene, renderer, quality) {
   scene.environmentIntensity = 0.4;
   scene.background = new THREE.Color(0x0d0d0f);
 
-  const ownerId = (new URLSearchParams(location.search).get('sala') || '').toLowerCase().slice(2);
+  const sala = (new URLSearchParams(location.search).get('sala') || '').toLowerCase();
+  const ownerId = sala.startsWith('u-') ? sala.slice(2) : null; // los mapas públicos no tienen dueño
   let ownerName = '';
-  api(`profile?id=${ownerId}`).then((r) => { if (r.ok) ownerName = r.profile.name; });
+  if (ownerId) api(`profile?id=${ownerId}`).then((r) => { if (r.ok) ownerName = r.profile.name; });
 
   let shell = null;
   let layout = null;      // { template, pieces, chosen }
@@ -38,10 +40,10 @@ export function buildPersonalRoom(scene, renderer, quality) {
   let idleTex = null;
 
   const world = {
-    editable: true,
+    editable: !!ownerId,
     colliders: [], blockers: [], interactables: [],
     bounds: { minY: 0.2, maxY: 4 },
-    spawn: { x: 0, z: 4, yaw: 0 },
+    spawn: { x: 0, z: 4, yaw: 0, ...PUBLIC_MAPS[sala]?.spawn }, // hasta que llega la plantilla
     works: { paintings: [], sculptures: [] },
     get layout() { return layout; },
     get shell() { return shell; },
@@ -330,8 +332,8 @@ export function buildPersonalRoom(scene, renderer, quality) {
     return idleTex;
   }
 
-  // Mientras llega el diseño de la sala, se ve el loft vacío
-  setLayout({ template: 'loft', pieces: [], chosen: false });
+  // Mientras llega el diseño de la sala, se ve el loft vacío (o la plantilla del mapa público)
+  setLayout({ template: PUBLIC_MAPS[sala]?.template ?? 'loft', pieces: [], chosen: false });
   return world;
 }
 

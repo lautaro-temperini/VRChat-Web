@@ -124,6 +124,24 @@ export function buildFurniture(piece, env = {}) {
       seatsAction();
       break;
     }
+    case 'bancoPlaza': {
+      // Banco de plaza: tablas de madera sobre patas de hierro, con respaldo inclinado (mapas públicos)
+      const wood = mat({ roughness: 0.75 });
+      for (let i = 0; i < 4; i++) cbox(1.8, 0.035, 0.1, wood, 0, 0.45, -0.2 + i * 0.13);
+      for (let i = 0; i < 3; i++) {
+        const slat = cbox(1.8, 0.1, 0.03, wood, 0, 0.62 + i * 0.13, -0.3 - i * 0.03);
+        slat.rotation.x = -0.15;
+      }
+      for (const x of [-0.75, 0.75]) {
+        cbox(0.05, 0.45, 0.05, shared.dark, x, 0.225, 0.18);
+        cbox(0.05, 0.9, 0.05, shared.dark, x, 0.45, -0.28).rotation.x = -0.12;
+        cbox(0.05, 0.05, 0.55, shared.dark, x, 0.43, -0.04);
+      }
+      collide(1.8, 0.6, 0.47);
+      for (const x of [-0.55, 0, 0.55]) sit(x, -0.02, 0.47);
+      seatsAction();
+      break;
+    }
     case 'banqueta': {
       cyl(0.03, 0.04, 0.7, shared.steel, 0, 0.36, 0, 16);
       cyl(0.2, 0.22, 0.03, shared.steel, 0, 0.015, 0, 32);
