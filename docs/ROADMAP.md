@@ -308,3 +308,8 @@ La música del DJ y el puente OSC ya están hechos. Falta:
 | Torres del escenario (25/10) | Siguen sonando bajito, como monitores; el sonido fuerte sale de los line arrays |
 | Beso de invitados (25/10) | Los invitados también pueden pedir y aceptar besos |
 | Diseños: quién sube (25/10) | Cualquier cuenta registrada |
+| Diseños: dónde se suben (25/10) | En la Mochila: botón "Subir diseño" (estampa, cuadro u objeto 3D). Sin límite por día (solo el control automático) |
+| Diseños: copia propia (25/10) | El que lo sube recibe una copia. Con "Hacer copia" (solo el autor) genera más; soltar o intercambiar le saca esa copia, como cualquier objeto |
+| Diseños: regalar (25/10) | Las copias se regalan intercambiando o soltándolas al piso |
+| Estampas (25/10) | Van en la parte de arriba de la ropa, en el pecho o en la espalda, y con tamaño chico/mediano/grande: las dos cosas las elige quien la sube |
+| Cuadros y objetos 3D de diseño (25/10) | Se ponen en la sala (Mobiliario, con el editor), se sueltan al piso y se sostienen en la mano a tamaño real si miden hasta 50 cm (si son más grandes, solo sala y piso) |
