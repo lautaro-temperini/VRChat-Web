@@ -78,6 +78,12 @@ Cada agujero de seguridad que se cierre lleva su prueba en `test/` (clientes Web
   `ROOM_TEMPLATES` y `FURNITURE` en `server/shared.js`. Muebles especiales puestos: `items.owner_id = 'room:<id>'`.
 - **Mensajes entre amigos** (`server/messages.js` mezclado en `Accounts`, `src/ui/messages.js` = app del celular):
   rutas `dms` (conversaciones), `dm?id=` (una conversación, la marca leída) y `POST dm`.
+- **Diseños de artistas** (`server/designs.js` mezclado en `Accounts`, `src/ui/designs.js`): cualquier cuenta sube
+  estampas, cuadros y objetos 3D desde la Mochila ("Subir diseño"); archivos en R2 `disenos/<id>/img|hd|model`, públicos
+  por `/api/designfile`. Control automático de GLB en `server/glb.js` (`checkGLB`, también en el cliente). Objetos del
+  inventario con `items.design`: tipos `estampa` (se equipa: sombreador `stampMaterial` en avatar.js, pecho o espalda),
+  `disenoCuadro` y `disenoObjeto` (muebles especiales con `piece.design`, que pone el servidor; los objetos de hasta
+  50 cm se equipan en la mano: `setHeld`). Solo el autor hace copias (`designcopy`); 3 objetos 3D = título Diseñador.
 - **Progresión** (`server/progress.js` mezclado en `Accounts`, `src/ui/progress.js`): puntos una sola vez por
   cosa (`progress_log`), insignias, camino y diarias. Enganches con `progressTrack(...)` en works/accounts/room.
 - **Carga de modelos:** usar `loadGLTF` de `src/loaders.js` (Draco, meshopt, KTX2), no `new GLTFLoader()`.
