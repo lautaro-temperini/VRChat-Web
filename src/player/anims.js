@@ -85,6 +85,7 @@ function loadFBX(file) {
 }
 
 // ---------- Adaptación al esqueleto de destino ----------
+const MAX_SWAY = 0.3; // m que la cadera se puede alejar de su lugar en una animación
 const _a = new THREE.Quaternion(), _b = new THREE.Quaternion(), _q = new THREE.Quaternion(), _v = new THREE.Vector3();
 
 // rig: el de avatar.js ({ bones: { nombre: { rest, world, inv, restPos, parentInv, worldPos } } })
@@ -120,9 +121,20 @@ function retarget(clip, src, rig, name, { hips = true } = {}) {
       const drift = d[n - 1].clone().sub(d[0]);
       for (let i = 0; i < n; i++) {
         const k = n > 1 ? i / (n - 1) : 0;
+        d[i].x -= d[0].x + drift.x * k;
+        d[i].z -= d[0].z + drift.z * k;
+      }
+      // Centrado en su lugar y, si se aleja más de MAX_SWAY (algunos bailes recorren un metro), achicado:
+      // si no, el cuerpo se ve lejos de donde está de verdad el jugador y atraviesa paredes
+      let mx = 0, mz = 0;
+      for (const p of d) { mx += p.x / n; mz += p.z / n; }
+      let far = 0;
+      for (const p of d) { p.x -= mx; p.z -= mz; far = Math.max(far, Math.hypot(p.x, p.z)); }
+      const shrink = far > MAX_SWAY ? MAX_SWAY / far : 1;
+      for (let i = 0; i < n; i++) {
         _v.copy(d[i]);
-        _v.x -= d[0].x + drift.x * k;
-        _v.z -= d[0].z + drift.z * k;
+        _v.x *= shrink;
+        _v.z *= shrink;
         _v.applyQuaternion(T.parentInv).add(T.restPos).toArray(v, i * 3);
       }
       tracks.push(new THREE.VectorKeyframeTrack(`${S.to}.position`, track.times, v));
