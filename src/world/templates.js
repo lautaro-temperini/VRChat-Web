@@ -22,6 +22,7 @@ export function buildShell(id, { high }) {
   const group = new THREE.Group();
   const colliders = [], blockers = [], walls = [], cutaway = [], animated = [], exits = [];
   let timeFn = () => {};
+  let videoFn = () => {}; // salas que muestran el video del VJ en sus superficies (inmersiva)
 
   function mesh(geo, mat, x, y, z) {
     const m = new THREE.Mesh(geo, mat);
@@ -262,6 +263,12 @@ export function buildShell(id, { high }) {
     buildCafe();
   } else if (id === 'azotea') {
     buildRooftop();
+  } else if (id === 'taller') {
+    buildWorkshop();
+  } else if (id === 'inmersiva') {
+    buildImmersive();
+  } else if (id === 'rave') {
+    buildRave();
   } else {
     // Terraza: al aire libre, deck de madera, baranda, fachada con la puerta al sur y la ciudad al norte
     floor(new THREE.MeshStandardMaterial({ map: repeatTex(woodFloor(), def.w / 3, def.d / 3), color: 0xc8b8a6, roughness: 0.7 }));
@@ -747,6 +754,273 @@ export function buildShell(id, { high }) {
     });
   }
 
+  // Focos de colores colgados (Taller, Galpón): siguen la música, o a la consola de artistas por OSC
+  function partySpots(list, { power = 45, reach = 16 } = {}) {
+    const spots = list.map(([x, y, z, tx, tz]) => {
+      const can = box(0.24, 0.32, 0.24, new THREE.MeshStandardMaterial({ color: 0x1b1b20, metalness: 0.6, roughness: 0.4 }), x, y, z);
+      const lens = new THREE.Mesh(new THREE.CircleGeometry(0.1, 20), neonMat(0xffffff));
+      lens.rotation.x = Math.PI / 2;
+      lens.position.y = -0.161;
+      can.add(lens);
+      const light = new THREE.SpotLight(0xffffff, 0, reach, 0.42, 0.5, 1.2);
+      light.position.set(x, y - 0.1, z);
+      light.target.position.set(tx, 0, tz);
+      group.add(light, light.target);
+      return { light, lens, x, z, tx, tz };
+    });
+    const tmp = new THREE.Color();
+    animated.push((dt, t, { music = -1, lights = null }) => {
+      const p = music > 0 ? Math.min(1, music * 2.2) : 0;
+      spots.forEach((s, i) => {
+        const f = lights?.focos?.[i % 4];
+        const c = lights ? (f?.color ? tmp.setRGB(...f.color) : lights.color ? tmp.setRGB(...lights.color) : tmp.setHSL((t * 0.08) % 1, 1, 0.5)) : tmp.setHSL((t * 0.05 + i * 0.17) % 1, 1, 0.55);
+        const k = lights ? Math.max(0, lights.intensidad ?? 1) * (f?.intensidad ?? 1) * (1 + (lights.flash ?? 0) * 2) : 0.25 + p;
+        s.light.color.copy(c);
+        s.light.intensity = high ? power * k : 0;
+        s.lens.material.color.copy(c).multiplyScalar(2 + 4 * k);
+        s.light.target.position.set(s.tx + (lights ? (f?.pan ?? 0) * 4 : Math.sin(t * 0.7 + i) * 2.5), 0, s.tz + (lights ? (f?.tilt ?? 0) * 4 : Math.cos(t * 0.6 + i * 1.3) * 2.5));
+      });
+    });
+    return spots;
+  }
+
+  // Cartel con texto (tutoriales del Taller)
+  function board(title, lines, x, y, z, ry, w = 2.2, h = 1.5) {
+    const c = document.createElement('canvas');
+    c.width = 1024; c.height = Math.round(1024 * h / w);
+    const g = c.getContext('2d');
+    g.fillStyle = '#16161c'; g.fillRect(0, 0, c.width, c.height);
+    g.strokeStyle = '#ffd23f'; g.lineWidth = 14; g.strokeRect(7, 7, c.width - 14, c.height - 14);
+    g.fillStyle = '#ffd23f'; g.font = '700 64px system-ui, sans-serif'; g.fillText(title, 50, 100);
+    g.fillStyle = '#f2f0ea'; g.font = '36px system-ui, sans-serif';
+    let yy = 175;
+    for (const line of lines) {
+      // Corta las líneas largas en palabras
+      let cur = '';
+      for (const word of line.split(' ')) {
+        if (g.measureText(cur + word).width > c.width - 110 && cur) { g.fillText(cur, 50, yy); yy += 50; cur = ''; }
+        cur += word + ' ';
+      }
+      g.fillText(cur, 50, yy);
+      yy += 62;
+    }
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.8 }));
+    m.position.set(x, y, z);
+    m.rotation.y = ry;
+    group.add(m);
+    return m;
+  }
+
+  // ---------- Taller (mapa público, 20 × 14 m): galpón de trabajo para probar OSC y modelos 3D. Consola de
+  // artistas con focos que responden al OSC, pantalla, probadores de modelos y carteles con tutoriales ----------
+  function buildWorkshop() {
+    floor(new THREE.MeshStandardMaterial({ map: repeatTex(concrete(), def.w / 5, def.d / 5), color: 0xa9a49b, roughness: 0.6 }));
+    const brick = new THREE.MeshStandardMaterial({ map: repeatTex(brickTex(), def.w / 3, H / 1.5), roughness: 0.9 });
+    const white = new THREE.MeshStandardMaterial({ color: 0xe9e6df, roughness: 0.95 });
+    wall('n', white); wall('o', brick); wall('e', brick); wall('s', brick, { door: [-0.95, 0.95] });
+    door(new THREE.MeshStandardMaterial({ color: 0x1b1b20, roughness: 0.5, metalness: 0.4 }), new THREE.MeshStandardMaterial({ color: 0x2f3a48, roughness: 0.5 }));
+    // Techo con cabriadas de hierro y claraboyas
+    ceiling(new THREE.MeshStandardMaterial({ color: 0x3a3a40, roughness: 0.9 }));
+    const steel = new THREE.MeshStandardMaterial({ color: 0x2a2a30, roughness: 0.4, metalness: 0.8 });
+    for (let x = -W + 2.5; x < W; x += 5) {
+      const beam = box(0.18, 0.35, def.d, steel, x, H - 0.4, 0);
+      cutaway.push({ object: beam, normal: null });
+      const sky = new THREE.Mesh(new THREE.PlaneGeometry(2.2, def.d - 2), new THREE.MeshBasicMaterial({ color: new THREE.Color(0xdfe9ff).multiplyScalar(1.2) }));
+      sky.rotation.x = Math.PI / 2;
+      sky.position.set(x + 2.5, H - 0.02, 0);
+      group.add(sky);
+      cutaway.push({ object: sky, normal: null });
+    }
+    // Mesas de trabajo con herramientas, caballetes y un tablero de herramientas en la pared este
+    const wood = new THREE.MeshStandardMaterial({ color: 0x8a6a48, roughness: 0.7 });
+    for (const [x, z] of [[-2.5, -3], [1.5, -3]]) {
+      box(2.4, 0.08, 1, wood, x, 0.92, z);
+      for (const [dx, dz] of [[-1.1, -0.42], [1.1, -0.42], [-1.1, 0.42], [1.1, 0.42]]) box(0.07, 0.9, 0.07, steel, x + dx, 0.45, z + dz);
+      box(0.5, 0.25, 0.35, new THREE.MeshStandardMaterial({ color: 0xc0392b, roughness: 0.5 }), x - 0.6, 1.08, z); // caja de herramientas
+      box(0.6, 0.02, 0.4, new THREE.MeshStandardMaterial({ color: 0x1d1d22, roughness: 0.3 }), x + 0.5, 0.97, z - 0.1); // notebook
+      collider(x - 1.2, x + 1.2, z - 0.5, z + 0.5, 0.96, true);
+    }
+    for (const [x, z] of [[-6.5, -4.5], [-8, -2]]) {
+      const easel = new THREE.Group();
+      easel.position.set(x, 0, z);
+      for (const sx of [-0.35, 0.35]) { const leg = new THREE.Mesh(new THREE.BoxGeometry(0.05, 1.9, 0.05), wood); leg.position.set(sx, 0.95, 0); leg.rotation.z = -sx * 0.25; easel.add(leg); }
+      const canvas = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.7, 0.03), white);
+      canvas.position.set(0, 1.35, 0.05);
+      easel.add(canvas);
+      group.add(easel);
+      collider(x - 0.45, x + 0.45, z - 0.3, z + 0.3, 1.8, false);
+    }
+    // Carteles con los tutoriales
+    board('Luces por OSC', [
+      '1. Corré el puente OSC en tu PC (scripts/puente-osc.js, con Node 18 o más nuevo).',
+      '2. Desde TouchDesigner, Ableton/Max o Blender mandá OSC a 127.0.0.1, puerto 9000.',
+      '3. E en la consola de artistas → "Tomar las luces". Los focos de acá responden.',
+      'Probá: /luces/color 1 0 0.5 · /luces/flash 1 · /luces/focos/mover 0.3 -0.2',
+    ], -W + 0.02, 2.4, -3.2, Math.PI / 2);
+    board('Pantalla (VJ)', [
+      'E en la consola de artistas → "Tomar la pantalla" y compartí una ventana o pestaña.',
+      'Se ve en la pantalla del Taller (y en la del Museo o tu sala, si la tomás ahí).',
+    ], -W + 0.02, 2.4, 3, Math.PI / 2, 2.2, 1.1);
+    board('Modelos 3D', [
+      'Archivo .glb en metros: hasta 2 MB, 10.000 triángulos, texturas de 1024 px y 3 m de alto.',
+      'Probalo en los pedestales de acá (E): lo ves solo vos, a tamaño real.',
+      'Si te gusta, subilo desde la Mochila → "Subir diseño" (Objeto 3D).',
+    ], W - 0.02, 2.4, -4.6, -Math.PI / 2);
+    board('Tus diseños', [
+      'Estampas (pecho o espalda), cuadros y objetos 3D: Mochila → "Subir diseño".',
+      'Solo vos hacés copias ("Copiar"); las regalás intercambiando o soltándolas al piso.',
+      'Con 3 objetos 3D que pasen el control sos Diseñador.',
+    ], W - 0.02, 2.4, 4.6, -Math.PI / 2);
+    // Focos de prueba colgados del techo, apuntando al centro
+    partySpots([[-4, H - 0.6, -1, -2, 1], [-1.3, H - 0.6, -1, -0.5, 1], [1.3, H - 0.6, -1, 0.5, 1], [4, H - 0.6, -1, 2, 1]], { power: 40 });
+    hemi.color.set(0xfff4e6); hemi.groundColor.set(0x5a554e); hemi.intensity = 1.0;
+    const key = new THREE.DirectionalLight(0xffffff, 1.0);
+    key.position.set(3, 10, 2);
+    group.add(key);
+    for (const [x, z] of [[-5, 0], [5, 0], [0, -4], [0, 4]]) pendant(x, z);
+    timeFn = (day) => { key.intensity = 0.4 + 0.9 * day; hemi.intensity = 0.7 + 0.4 * day; };
+  }
+
+  // ---------- Sala inmersiva (mapa público, 16 × 16 m): paredes, piso y techo con el video del VJ; sin VJ,
+  // un dibujo que se mueve solo con la música. Sonido envolvente con cuatro parlantes ----------
+  function buildImmersive() {
+    // Superficies que proyectan: un material compartido con el video (o el dibujo de espera)
+    const idleMat = new THREE.ShaderMaterial({
+      uniforms: { uTime: { value: 0 }, uBeat: { value: 0 } },
+      vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+      fragmentShader: `varying vec2 vUv; uniform float uTime; uniform float uBeat;
+        vec3 pal(float t) { return 0.45 + 0.45 * cos(6.2831 * (vec3(0.55, 0.62, 0.78) + t * vec3(1.0, 0.8, 0.6))); }
+        void main() {
+          vec2 p = vUv * 6.0;
+          float v = sin(p.x + uTime * 0.6) + sin(p.y * 1.3 - uTime * 0.4) + sin((p.x + p.y) * 0.7 + uTime * 0.5) + sin(length(p - 3.0) * 2.0 - uTime);
+          float lines = smoothstep(0.92, 1.0, sin(v * 6.0) * 0.5 + 0.5);
+          vec3 col = pal(v * 0.12 + uTime * 0.02) * (0.18 + 0.45 * uBeat) + lines * 0.25 * pal(uTime * 0.05 + 0.3);
+          gl_FragColor = vec4(col, 1.0);
+        }`,
+    });
+    const videoMat = new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false });
+    const surfaces = [];
+    const surface = (w, h, x, y, z, rx, ry) => {
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), idleMat);
+      m.position.set(x, y, z);
+      m.rotation.set(rx, ry, 0);
+      group.add(m);
+      surfaces.push(m);
+      return m;
+    };
+    const fl = surface(def.w, def.d, 0, 0.001, 0, -Math.PI / 2, 0);
+    fl.receiveShadow = true;
+    surface(def.w, def.d, 0, H - 0.01, 0, Math.PI / 2, 0);
+    const E = 0.01; // un poco adelante de las paredes (si no, titilan)
+    surface(def.w, H, 0, H / 2, -D + E, 0, 0);
+    surface(def.d, H, -W + E, H / 2, 0, 0, Math.PI / 2);
+    surface(def.d, H, W - E, H / 2, 0, 0, -Math.PI / 2);
+    // Pared sur: la de la entrada (con la puerta), también proyecta a los costados
+    surface(W - 0.95, H, -(W + 0.95) / 2, H / 2, D - E, 0, Math.PI);
+    surface(W - 0.95, H, (W + 0.95) / 2, H / 2, D - E, 0, Math.PI);
+    surface(1.9, H - 2.4, 0, 2.4 + (H - 2.4) / 2, D - E, 0, Math.PI);
+    // Paredes de verdad detrás (frenan y sostienen la puerta)
+    const black = new THREE.MeshStandardMaterial({ color: 0x050507, roughness: 1 });
+    wall('n', black); wall('o', black); wall('e', black); wall('s', black, { door: [-0.95, 0.95] });
+    door(new THREE.MeshStandardMaterial({ color: 0x0b0b0d, roughness: 0.5 }), new THREE.MeshStandardMaterial({ color: 0x15151a, roughness: 0.5 }));
+    hemi.color.set(0x8080a0); hemi.groundColor.set(0x101018); hemi.intensity = 0.25;
+    let videoTex = null;
+    videoFn = (video) => {
+      videoTex?.dispose();
+      videoTex = null;
+      if (video) {
+        videoTex = new THREE.VideoTexture(video);
+        videoTex.colorSpace = THREE.SRGBColorSpace;
+        videoMat.map = videoTex;
+        videoMat.needsUpdate = true;
+      }
+      for (const m of surfaces) m.material = video ? videoMat : idleMat;
+    };
+    animated.push((dt, t, { music = -1 }) => {
+      idleMat.uniforms.uTime.value = t;
+      const beat = music > 0 ? Math.min(1, music * 2.5) : 0.35;
+      idleMat.uniforms.uBeat.value += (beat - idleMat.uniforms.uBeat.value) * Math.min(1, dt * 8);
+    });
+    // Un poco de luz que sale de las proyecciones
+    const glow = new THREE.PointLight(0xb0a0ff, 6, 20, 1.2);
+    glow.position.set(0, H - 1, 0);
+    group.add(glow);
+  }
+
+  // ---------- Galpón / rave (mapa público, 32 × 22 m, 10 m de alto): nave industrial oscura. Escenario al norte
+  // con cabina y pantalla gigante, consola al fondo con otra pantalla, estructura de hierro con focos que
+  // siguen la música (o el OSC), conos de luz en el humo y tiras de LED ----------
+  function buildRave() {
+    floor(new THREE.MeshStandardMaterial({ map: repeatTex(concrete(), def.w / 6, def.d / 6), color: 0x55555c, roughness: 0.3, metalness: 0.1 }));
+    const dark = new THREE.MeshStandardMaterial({ color: 0x141418, roughness: 0.9 });
+    const steel = new THREE.MeshStandardMaterial({ color: 0x2a2a30, roughness: 0.4, metalness: 0.8 });
+    wall('n', dark); wall('o', dark); wall('e', dark); wall('s', dark, { door: [-0.95, 0.95] });
+    door(steel, new THREE.MeshStandardMaterial({ color: 0x23262b, roughness: 0.5, metalness: 0.4 }));
+    ceiling(new THREE.MeshStandardMaterial({ color: 0x0b0b0d, roughness: 1 }));
+    // Escenario al norte (se sube por los costados)
+    box(14, 0.8, 5, steel, 0, 0.4, -D + 2.5);
+    collider(-7, 7, -D, -D + 5, 0.8, true);
+    // Cabriadas de hierro a lo largo del techo
+    for (let x = -W + 3; x < W; x += 5.2) {
+      const beam = box(0.25, 0.5, def.d, steel, x, H - 0.8, 0);
+      cutaway.push({ object: beam, normal: null });
+    }
+    // Estructura de luces (truss) sobre la pista: dos vigas con 6 focos cada una
+    const trussY = 7;
+    for (const z of [-4, 3]) {
+      box(24, 0.35, 0.35, steel, 0, trussY, z);
+      for (const s of [-1, 1]) { box(0.35, trussY, 0.35, steel, s * 12, trussY / 2, z); collider(s * 12 - 0.2, s * 12 + 0.2, z - 0.2, z + 0.2, trussY, false); }
+    }
+    const spotList = [];
+    for (const z of [-4, 3]) for (let i = 0; i < 6; i++) { const x = -10 + i * 4; spotList.push([x, trussY - 0.3, z, x * 0.6, z + (z < 0 ? 3 : -3)]); }
+    const spots = partySpots(spotList, { power: 70, reach: 22 });
+    // Conos de luz en el humo (se ven los haces)
+    const coneGeo = new THREE.ConeGeometry(1.6, trussY - 0.4, 24, 1, true).translate(0, -(trussY - 0.4) / 2, 0);
+    const beams = spots.map((s) => {
+      const mat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.08, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+      const cone = new THREE.Mesh(coneGeo, mat);
+      cone.position.set(s.x, trussY - 0.35, s.z);
+      cone.castShadow = false;
+      group.add(cone);
+      return { cone, s };
+    });
+    const up = new THREE.Vector3(0, -1, 0), dir = new THREE.Vector3();
+    animated.push(() => {
+      for (const { cone, s } of beams) {
+        dir.copy(s.light.target.position).sub(cone.position).normalize();
+        cone.quaternion.setFromUnitVectors(up, dir);
+        cone.material.color.copy(s.light.color);
+        cone.material.opacity = Math.min(0.16, s.light.intensity / 70 * 0.12);
+      }
+    });
+    // Tiras de LED alrededor del techo y del borde del escenario
+    const led = neonMat(0xff4fd8);
+    for (const w of walls) {
+      const len = w.max - w.min;
+      const strip = new THREE.Mesh(new THREE.BoxGeometry(w.along === 'x' ? len : 0.05, 0.05, w.along === 'x' ? 0.05 : len), led);
+      strip.position.copy(w.point).addScaledVector(w.normal, 0.04).setY(H - 1.6);
+      group.add(strip);
+    }
+    box(14, 0.05, 0.05, led, 0, 0.78, -D + 5.03).castShadow = false;
+    const tmp = new THREE.Color();
+    animated.push((dt, t, { music = -1, lights = null }) => {
+      const p = music > 0 ? Math.min(1, music * 2.2) : 0;
+      if (lights?.leds?.color) led.color.setRGB(...lights.leds.color).multiplyScalar(5 * (lights.intensidad ?? 1));
+      else led.color.copy(tmp.setHSL((t * 0.06) % 1, 1, 0.5)).multiplyScalar(4 * (0.4 + p));
+    });
+    hemi.color.set(0x9080ff); hemi.groundColor.set(0x100c18); hemi.intensity = 0.3;
+    const wash = new THREE.PointLight(0xff4fd8, 6, 30, 1.2);
+    wash.position.set(0, H - 2, 0);
+    group.add(wash);
+    animated.push((dt, t, { music = -1 }) => {
+      const p = music > 0 ? Math.min(1, music * 2.2) : 0;
+      wash.color.setHSL((t * 0.05 + 0.5) % 1, 0.8, 0.5);
+      wash.intensity = 4 + 14 * p;
+    });
+  }
+
   // Luz de lámparas colgantes (loft)
   // (se ocultan junto con el techo en el editor)
   function pendant(x, z) {
@@ -770,6 +1044,7 @@ export function buildShell(id, { high }) {
       timeFn(day, golden);
     },
     update(dt, t, state) { for (const fn of animated) fn(dt, t, state); },
+    setVideo(video) { videoFn(video); },
     dispose() {
       group.traverse((o) => {
         o.geometry?.dispose();

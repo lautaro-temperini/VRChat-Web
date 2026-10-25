@@ -124,6 +124,17 @@ export function buildFurniture(piece, env = {}) {
       seatsAction();
       break;
     }
+    case 'probador': {
+      // Probador de modelos (Taller): pedestal con aro de luz; E y elegís un .glb de tu PC (lo ves solo vos)
+      cyl(0.5, 0.55, 0.9, mat({ roughness: 0.6 }), 0, 0.45, 0, 40);
+      const ringLight = add(new THREE.TorusGeometry(0.52, 0.02, 8, 48), neonMat(0x19d3ff), 0, 0.91, 0);
+      ringLight.rotation.x = Math.PI / 2;
+      ringLight.castShadow = false;
+      collide(1, 1, 0.9, { climb: false, noStand: true });
+      parts.top = 0.9;
+      interact = { kind: 'probador', prompt: 'Probar un modelo 3D' };
+      break;
+    }
     case 'mesaCafe': {
       // Mesa redonda de mármol con pie de hierro (Cafetería)
       cyl(0.36, 0.36, 0.03, mat({ roughness: 0.25 }), 0, 0.75, 0, 40);

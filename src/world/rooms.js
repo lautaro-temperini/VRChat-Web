@@ -203,6 +203,11 @@ export function buildPersonalRoom(scene, renderer, quality) {
     const fallback = booth ? new THREE.Vector3(booth.piece.x, 1.2, booth.piece.z) : new THREE.Vector3(0, 1.6, 0);
     speakers[0].copy(spk[0] ?? fallback);
     speakers[1].copy(spk[1] ?? spk[0] ?? fallback);
+    // Con 3 parlantes o más, sonido envolvente: cada uno es una fuente (los de la izquierda llevan el canal
+    // izquierdo); el volumen se reparte para que no suene más fuerte que con dos (ver rtc.js, musicSources)
+    world.dj.sources = spk.length >= 3
+      ? spk.map((pos) => ({ pos, ch: pos.x < 0 ? 'L' : 'R', model: 'equalpower', gain: 2 / spk.length, ref: 5, rolloff: 0.6 }))
+      : null;
     const scr = ofType('pantalla')[0];
     if (scr) screenPos.set(scr.piece.x, scr.piece.y, scr.piece.z);
     applyVideo();
@@ -294,6 +299,7 @@ export function buildPersonalRoom(scene, renderer, quality) {
   // Hasta 2 pantallas. La primera muestra al VJ de la consola; la segunda, lo mismo ("espejo")
   // o su propio VJ ("propia", se toma con E sobre ella: stage2.js)
   function applyVideo() {
+    shell?.setVideo?.(state.video); // salas que proyectan el video en sus propias superficies (inmersiva)
     const screens = ofType('pantalla');
     screens.forEach((e, i) => {
       const mesh = e.built.parts.screen;

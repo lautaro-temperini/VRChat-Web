@@ -2,6 +2,8 @@
 // de las obras (con vista previa del link), el perfil de otros jugadores y los atajos de teclado.
 import * as THREE from 'three';
 import { api, workFileUrl, designFileUrl } from '../net/api.js';
+import { parseGLTF } from '../loaders.js';
+import { checkGLB } from '../../server/glb.js';
 import { guestGate, lock } from '../ui/guest.js';
 import { renderGallery } from '../ui/gallery.js';
 import { toast } from '../ui/toast.js';
@@ -43,6 +45,7 @@ function interact() {
   } else if (t.kind === 'player') openProfile(t.player);
   else if (t.kind === 'screen') G.useScreen();
   else if (t.kind === 'screen2') roomEditor?.useScreen2(); // segunda pantalla de una sala personal
+  else if (t.kind === 'probador') tryModel(t);
   else if (t.kind === 'atril') roomOwner ? notes.open(roomOwner, G.account?.id === roomOwner) : notes.openLatest(); // en los mapas públicos: las últimas notas de todos
   else if (t.kind === 'museo') { if (G.account?.guest) guestGate('postular obras al Museo'); else works.open(); }
   else if (t.kind === 'dj') G.openDJPanel();
@@ -105,6 +108,33 @@ function photo(from, lookAt) {
 
 // Ficha de una obra / escultura / cartel informativo
 let previewToken = 0;
+// Probador de modelos (Taller): elegís un .glb de tu PC, pasa el control automático y se ve a tamaño real
+// arriba del pedestal. Solo para vos: no se sube a ningún lado
+let tried = null;
+function tryModel(t) {
+  const input = Object.assign(document.createElement('input'), { type: 'file', accept: '.glb,model/gltf-binary' });
+  input.onchange = async () => {
+    const file = input.files[0];
+    if (!file) return;
+    const data = await file.arrayBuffer();
+    const r = checkGLB(data);
+    if (!r.ok) return toast(`No pasa el control: ${r.error}`);
+    let gltf;
+    try { gltf = await parseGLTF(data); } catch { return toast('No se pudo abrir el modelo. ¿Es un .glb válido?'); }
+    tried?.removeFromParent();
+    const obj = gltf.scene;
+    const box = new THREE.Box3().setFromObject(obj), c = box.getCenter(new THREE.Vector3());
+    obj.position.set(-c.x, -box.min.y, -c.z);
+    tried = new THREE.Group();
+    tried.add(obj);
+    tried.position.y = 0.92;
+    t.object.add(tried);
+    const [x, y, z] = r.size.map((v) => `${Math.round(v * 100)} cm`);
+    toast(`Pasa el control ✓ ${x} × ${y} de alto × ${z} · ${r.tris.toLocaleString('es-AR')} triángulos. Lo ves solo vos; para tenerlo, Mochila → "Subir diseño".`, { time: 9000 });
+  };
+  input.click();
+}
+
 function openInspect(item) {
   const info = item.info;
   const publicPainting = item.work?.kind === 'cuadro';

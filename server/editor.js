@@ -29,7 +29,7 @@ export const roomEditorMethods = {
       // Mapas públicos: diseño fijo (ids estables, nadie los edita); el Museo no tiene
       const map = PUBLIC_MAPS[await this.roomName()];
       if (!map) return null;
-      const pieces = map.pieces.map(([type, x, z, deg, y], i) => cleanPiece({ id: `m${i}`, type, x, z, y, r: (deg * Math.PI) / 180 }, map.template)).filter(Boolean);
+      const pieces = map.pieces.map(([type, x, z, deg, y, w], i) => cleanPiece({ id: `m${i}`, type, x, z, y, r: (deg * Math.PI) / 180, ...(type === 'pantalla' ? { w: w ?? 4, m: 'espejo' } : {}) }, map.template)).filter(Boolean);
       this.roomLayout = { template: map.template, pieces, chosen: true, fixed: true };
       return this.roomLayout;
     }

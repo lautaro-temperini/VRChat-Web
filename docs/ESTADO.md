@@ -116,12 +116,24 @@ Para volver a subir: `npm run deploy` desde la carpeta del proyecto.
    **Mapas públicos** (orden decidido): ✅ Plaza (50 × 50 m: fuente, 8 bancos, 4 esculturas, árboles, faroles,
    reja con portón que abre el Mapa, ciudad alrededor, día/noche). ✅ Cafetería (café porteño 14 × 10 m: barra que
    da café, 7 mesas, atril con las últimas notas de todos, ventanales a la calle). ✅ Azotea (24 × 18 m: baranda de vidrio, cabina
-   y parlantes, pórtico de luces que siguen la música u OSC, caseta con puerta al Mapa, hora real). Faltan: Taller,
-   Inmersiva y Rave (consultar los detalles de cada uno antes de armarlo).
+   y parlantes, pórtico de luces que siguen la música u OSC, caseta con puerta al Mapa, hora real). ✅ Taller (20 × 14 m: consola
+   con focos que responden al OSC, pantalla, 2 probadores de modelos —elegís un .glb y lo ves solo vos a tamaño
+   real, con el control automático—, 4 carteles con tutoriales). ✅ Sala inmersiva (16 × 16 m: paredes, piso y techo
+   con el video del VJ; sin VJ, un dibujo que late con la música; consola, cabina y 4 parlantes con sonido envolvente,
+   pufs). ✅ Galpón (32 × 22 × 10 m: escenario con cabina y pantalla de 8 m, consola al fondo con otra pantalla,
+   truss con 12 focos y haces en el humo, LED, 6 parlantes envolventes).
 8. **Seguridad, lo que quedó para decidir** (ver `docs/ramas/seguridad.md`): teletransporte (posiciones falsas)
    y vencimiento de sesiones.
 9. ✅ Animaciones achicadas: paquete JSON (`npm run empaquetar`), al entrar baja ~0,7 MB en vez de ~13 MB.
 10. **Primera prueba con gente real** (inauguración con 5–10 artistas).
+
+### Para revisar con el usuario (decidido sin consultar, mientras no estaba; 25/10)
+- Taller: "exponer diseños" quedó sin hacer (falta decidir quién cuelga, dónde y por cuánto tiempo). Los tutoriales
+  dicen que el puente OSC es `scripts/puente-osc.js`: ¿se ofrece para descargar desde el juego?
+- Sala inmersiva: se sumaron una cabina de DJ, 4 parlantes y pufs para sentarse (para el "sonido envolvente").
+- Galpón: tamaño, escenario, 2 pantallas, consola al fondo y 6 parlantes los elegí yo; no tiene barra.
+- Con 3 parlantes o más en una sala (también las personales), la música sale por todos (sonido envolvente).
+- Faltan deployar los mapas nuevos y los diseños de la parte del servidor nueva (`npm run deploy`).
 
 ### Pendientes sueltos (consultar antes)
 Reportar, nombre y marca definitivos, AR, ajustes de cara en el avanzado.

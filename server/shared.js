@@ -193,6 +193,9 @@ export const ROOM_TEMPLATES = {
   plaza: { name: 'Plaza', w: 50, d: 50, h: 0, public: true },
   cafeteria: { name: 'Cafetería', w: 14, d: 10, h: 3.8, public: true },
   azotea: { name: 'Azotea', w: 24, d: 18, h: 0, public: true },
+  taller: { name: 'Taller', w: 20, d: 14, h: 6, public: true },
+  inmersiva: { name: 'Sala inmersiva', w: 16, d: 16, h: 6, public: true },
+  rave: { name: 'Galpón', w: 32, d: 22, h: 10, public: true },
 };
 
 // ---------- Mapas públicos (abiertos a todos, en el Mapa junto al Museo) ----------
@@ -224,6 +227,26 @@ export const PUBLIC_MAPS = {
     name: 'Azotea', where: 'En la Azotea', desc: 'Fiesta en la terraza de un edificio, con DJ y la ciudad alrededor', template: 'azotea',
     spawn: { x: 0, z: 6.8 },
     pieces: [['cabina', 0, -6.8, 0], ['parlante', -3.2, -7.6, 0], ['parlante', 3.2, -7.6, 0]],
+  },
+  taller: {
+    name: 'Taller', where: 'En el Taller', desc: 'Para probar OSC y modelos 3D, con tutoriales', template: 'taller',
+    spawn: { x: 0, z: 5.8 },
+    // Consola de artistas (luces por OSC y pantalla), pantalla en la pared y dos probadores de modelos
+    pieces: [['consola', -5.5, 1.5, 90], ['pantalla', 0, -7, 0, 3, 4.5], ['probador', 5.5, -1.5, 0], ['probador', 5.5, 2, 0]],
+  },
+  inmersiva: {
+    name: 'Sala inmersiva', where: 'En la Sala inmersiva', desc: 'Proyecciones en todas las paredes, el piso y el techo', template: 'inmersiva',
+    spawn: { x: 0, z: 6.8 },
+    // La consola del VJ, la cabina y cuatro parlantes en las esquinas (sonido envolvente); pufs para mirar
+    pieces: [['consola', -6.4, 5.8, 135], ['cabina', 0, -6.6, 0], ['parlante', -7.2, -7.2, 45], ['parlante', 7.2, -7.2, -45], ['parlante', -7.2, 7.2, 135], ['parlante', 7.2, 7.2, -135],
+      ['puf', -2, 0, 0], ['puf', 0, 1.2, 0], ['puf', 2, 0, 0], ['puf', -1, -1.4, 0], ['puf', 1.2, -1.6, 0]],
+  },
+  rave: {
+    name: 'Galpón', where: 'En el Galpón', desc: 'Nave industrial oscura: luces, pantallas gigantes y la pista más grande', template: 'rave',
+    spawn: { x: 0, z: 9.8 },
+    // Escenario al norte: cabina, pantalla gigante y otra arriba de la consola del fondo; parlantes alrededor
+    pieces: [['cabina', 0, -8.2, 0], ['pantalla', 0, -11, 0, 5.5, 8], ['consola', 0, 7.2, 180], ['pantalla', 0, 11, 180, 5.5, 6],
+      ['parlante', -6, -9.5, 0], ['parlante', 6, -9.5, 0], ['parlante', -15, 0, 90], ['parlante', 15, 0, -90], ['parlante', -12, 9.5, 150], ['parlante', 12, 9.5, -150]],
   },
 };
 // Salas que existen: el Museo, los mapas públicos y las personales (u-<id de cuenta>)
@@ -275,6 +298,7 @@ export const FURNITURE = {
   mesaCafe: { name: 'Mesa de café', cat: 'comedor', mount: 'floor', color: '#ece8e1', size: [0.75, 0.75], hidden: true },
   sillaCafe: { name: 'Silla de café', cat: 'comedor', mount: 'floor', color: '#3b2416', size: [0.45, 0.45], hidden: true },
   barraCafe: { name: 'Barra del café', cat: 'comedor', mount: 'floor', color: '#3b2416', size: [4.4, 0.7], hidden: true, gives: 'cafe' },
+  probador: { name: 'Probador de modelos', cat: 'arte', mount: 'floor', color: '#2a2a33', size: [1, 1], hidden: true },
 };
 export const FURNITURE_CATS = { living: 'Living', comedor: 'Comedor y bar', arte: 'Arte', deco: 'Deco y luz', equipo: 'Música y pantallas', especial: 'Especiales' };
 export const SPECIAL_FURNITURE = Object.keys(FURNITURE).filter((k) => FURNITURE[k].special && !FURNITURE[k].design);
