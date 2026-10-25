@@ -32,8 +32,8 @@ for (const m of Object.values(shared)) m.userData.shared = true; // no se libera
 export const neonMat = (hex) => { const m = new THREE.MeshBasicMaterial({ toneMapped: false }); m.color.set(hex).multiplyScalar(GLOW); return m; };
 
 // Versión chiquita (para cuando un mueble especial queda en el suelo)
-export function miniFurniture(type, color, size = 0.55) {
-  const { group } = buildFurniture({ type, c: color, w: 2 }, { h: 2.2 });
+export function miniFurniture(type, color, size = 0.55, extra = {}) {
+  const { group } = buildFurniture({ type, c: color, w: 2, ...extra }, { h: 2.2 });
   const labels = [];
   group.traverse((o) => { if (o.isCSS2DObject) labels.push(o); });
   for (const l of labels) l.removeFromParent();
