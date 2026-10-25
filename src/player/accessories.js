@@ -10,7 +10,8 @@ function at(mesh, x, y, z) { mesh.position.set(x, y, z); return mesh; }
 export function buildAccessory(type, color) {
   const g = new THREE.Group();
   const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.55 });
-  const metal = new THREE.MeshStandardMaterial({ color, roughness: 0.22, metalness: 1 });
+  // Metal a medias: 100 % metálico se ve negro donde no hay entorno que reflejar
+  const metal = new THREE.MeshStandardMaterial({ color, roughness: 0.3, metalness: 0.55 });
   const dark = new THREE.MeshStandardMaterial({ color: 0x111114, roughness: 0.3 });
   let part = 'head';
 
@@ -72,8 +73,8 @@ export function buildAccessory(type, color) {
           const lens = at(new THREE.Mesh(new THREE.CircleGeometry(0.023, 24), lensMat), s * 0.043, 0.016, 0.123);
           g.add(rim, lens);
         }
-        const arm = at(new THREE.Mesh(new THREE.BoxGeometry(0.006, 0.006, 0.12), frame), s * 0.112, 0.022, 0.065);
-        arm.rotation.y = s * 0.12;
+        const arm = at(new THREE.Mesh(new THREE.BoxGeometry(0.006, 0.006, 0.12), frame), s * 0.098, 0.022, 0.065);
+        arm.rotation.y = s * 0.05;
         g.add(arm);
       }
       g.add(at(new THREE.Mesh(new THREE.BoxGeometry(0.022, 0.006, 0.006), frame), 0, 0.024, 0.125));
@@ -81,10 +82,10 @@ export function buildAccessory(type, color) {
     }
     case 'chain': {
       part = 'chest';
-      const ring = at(new THREE.Mesh(new THREE.TorusGeometry(0.085, 0.01, 10, 48), metal), 0, 1.43, 0.02);
+      const ring = at(new THREE.Mesh(new THREE.TorusGeometry(0.085, 0.01, 10, 48), metal), 0, 1.48, -0.015); // en la base del cuello
       ring.rotation.x = Math.PI / 2 - 0.55;
       ring.scale.set(1.15, 1, 1);
-      const coin = at(new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.008, 28), metal), 0, 1.36, 0.14);
+      const coin = at(new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.008, 28), metal), 0, 1.385, 0.13); // apoyada en el pecho
       coin.rotation.x = Math.PI / 2 - 0.2;
       g.add(ring, coin);
       break;

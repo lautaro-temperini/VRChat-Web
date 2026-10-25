@@ -44,8 +44,8 @@ const BASE = `${import.meta.env.BASE_URL}models/makehuman/`;
 // head = gorros y auriculares, face = anteojos, chest = cadena y mochila.
 // Los accesorios se diseñaron para el personaje anterior (1,81 m): la escala los acomoda.
 const BODIES = {
-  masc: { file: 'body/masc.gltf', height: 1.728, head: [0, 1.632, 0.045, 0.82], face: [0, 1.585, 0.025, 0.85], chest: [0, 0.09, 0.045, 0.9] },
-  fem: { file: 'body/fem.gltf', height: 1.591, head: [0, 1.495, 0.04, 0.76], face: [0, 1.453, 0.022, 0.79], chest: [0, 0.08, 0.04, 0.83] },
+  masc: { file: 'body/masc.gltf', height: 1.728, head: [0, 1.632, 0.045, 0.82], face: [0, 1.595, 0.042, 0.85], chest: [0, 0.09, 0.045, 0.9] },
+  fem: { file: 'body/fem.gltf', height: 1.591, head: [0, 1.495, 0.04, 0.76], face: [0, 1.462, 0.038, 0.79], chest: [0, 0.08, 0.04, 0.83] },
 };
 const hairFile = (type, style) => `hair/${type}/${style}.gltf`;
 const beardFile = (type, style) => `hair/${type}/barba_${style}.gltf`;
@@ -428,7 +428,10 @@ export class Avatar {
         if (!o.isSkinnedMesh) return;
         const mesh = new THREE.SkinnedMesh(o.geometry, o.material.clone());
         // La textura viene en gris: se tiñe con el color elegido (las medias quedan blancas)
-        if (!/^Socks/.test(o.material.name)) mesh.material.color = mat.color;
+        const socks = /^Socks/.test(o.material.name);
+        if (!socks) mesh.material.color = mat.color;
+        // Con calza las medias atraviesan la tela en los tobillos: van tapadas
+        mesh.userData.hidden = socks && outfit.bottom === 'calza';
         mesh.castShadow = true;
         mesh.frustumCulled = false;
         mesh.raycast = noRaycast;
@@ -445,7 +448,7 @@ export class Avatar {
   // Con gorra o gorro no se ve el pelo corto (como en el personaje anterior)
   updateHairVisibility() {
     const hat = (this.equip ?? []).some((it) => ITEMS[it.type]?.slot === 'head' && it.type !== 'crown');
-    for (const h of this.hairMeshes) h.visible = !(hat && h.userData.style === 'corto');
+    for (const h of this.hairMeshes) h.visible = !h.userData.hidden && !(hat && h.userData.style === 'corto');
   }
 
   // Tipo de cuerpo (peso y músculo, 0..1; 0,5 = promedio), como los macros de MakeHuman: hay una forma
