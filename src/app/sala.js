@@ -4,6 +4,8 @@ import { RemotePlayer } from '../net/remote.js';
 import { session } from '../net/api.js';
 import { toast } from '../ui/toast.js';
 import { BOOST_TIME } from '../../server/shared.js';
+
+const KISS_GAP = 0.55; // m entre los dos al darse un beso (medido con la pose de applyKiss)
 import { G, $, body } from './state.js';
 
 const { scene, world, ctrl, me, isTouch, room, net, remotes, rtc, groups, applyGroups, roomPanel, social, phone, progress, ground, roomEditor } = G;
@@ -183,8 +185,21 @@ net
         const other = remotes.get(mine);
         if (other) {
           const d = other.avatar.root.position.clone().sub(ctrl.pos);
+          d.y = 0;
           ctrl.yaw = Math.atan2(-d.x, -d.z);
           ctrl.bodyYaw = ctrl.yaw + Math.PI; // el cuerpo también (en 3ª persona no sigue a la cámara)
+          // Los dos se acercan hasta la mitad: a KISS_GAP de distancia las caras se juntan al inclinarse
+          const dist = d.length();
+          if (dist > KISS_GAP) {
+            const from = ctrl.pos.clone(), step = d.multiplyScalar((dist - KISS_GAP) / 2 / dist);
+            const t0 = performance.now();
+            const slide = setInterval(() => {
+              const k = Math.min(1, (performance.now() - t0) / 350);
+              ctrl.pos.x = from.x + step.x * k;
+              ctrl.pos.z = from.z + step.z * k;
+              if (k >= 1) clearInterval(slide);
+            }, 16);
+          }
         }
         ctrl.boostUntil = performance.now() + BOOST_TIME;
         toast('💋 Por 2 minutos no te cansás.');

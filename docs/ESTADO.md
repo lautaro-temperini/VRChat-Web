@@ -108,8 +108,8 @@ Para volver a subir: `npm run deploy` desde la carpeta del proyecto.
    (caminar, trotar, saltar, trepar, saltar baranda, sentarse, agacharse, gestos, celular, tomar, beso, DJ, accesorios,
    ropa, muebles…) y ajustar lo que se vea mal. Las dudas se juntan y se preguntan al final, sin cortar el trabajo.
    Avance: ✅ quieto, caminar, trotar, correr, sentado, aire, trepar, saltar baranda, saludar, festejar, señalar;
-   ✅ agachado arreglado (cuadro en cuclillas de agachado_caminar + pasos por código). ✅ aplaudir. Falta: los 10 bailes (capturas g_baile*.jpg sin revisar), hablar,
-   celular, tomar café, beso de a dos, DJ, accesorios, ropa, cuerpo fem, muebles, 1ª persona. Herramienta:
+   ✅ agachado arreglado (cuadro en cuclillas de agachado_caminar + pasos por código). ✅ aplaudir, ✅ bailes (la cadera no se aleja más de 30 cm), ✅ hablar, celular,
+   café, ✅ beso de a dos (ahora se acercan a 55 cm). Falta: DJ, accesorios, ropa, cuerpo fem, muebles, 1ª persona. Herramienta:
    devtest/avatar.html tiene `__cap(nombre, {motion, steps, before, at})` que manda capturas a un receptor local.
 7. **Diseños de artistas como objetos** y más mapas públicos (paso 5).
 8. **Seguridad, lo que quedó para decidir** (ver `docs/ramas/seguridad.md`): teletransporte (posiciones falsas)
@@ -119,6 +119,7 @@ Para volver a subir: `npm run deploy` desde la carpeta del proyecto.
 ### Dudas para el usuario (juntadas durante el trabajo)
 - Sonido: las dos torres del escenario siguen sonando bajito como monitores (¿o solo decorado?). Los frontfill
   (0,18 m) no tienen collider: se atraviesan caminando por el escenario.
+- Beso: hoy los invitados pueden pedir y aceptar besos (el servidor no los frena). ¿Lo pueden hacer o va con candado?
 
 ### Pendientes sueltos (consultar antes)
 Reportar, nombre y marca definitivos, AR, ajustes de cara en el avanzado.
