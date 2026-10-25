@@ -683,9 +683,11 @@ export class Avatar {
       if (w.climb < 0.1) A.climbing = false;
     }
     target.sit += w.sit;
+    // El primer cuadro arranca ya en su pose (si no, al aparecer se ve en pose T hasta que sube el peso)
+    const first = !A.w;
     A.w ??= {};
     for (const [k, action] of Object.entries(A.actions)) {
-      A.w[k] = damp(A.w[k] ?? 0, target[k], k === 'talk' || k === 'idle' ? 4 : 14, dt); // hablar entra y sale despacio
+      A.w[k] = first ? target[k] : damp(A.w[k] ?? 0, target[k], k === 'talk' || k === 'idle' ? 4 : 14, dt); // hablar entra y sale despacio
       action.setEffectiveWeight(A.w[k] * base);
       const s = LOCO[k].speed;
       if (s) action.timeScale = THREE.MathUtils.clamp(speed / s / this.scale, 0.6, 2.5);
