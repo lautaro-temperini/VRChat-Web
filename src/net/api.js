@@ -73,3 +73,14 @@ export async function submitWork(form) {
     return { ok: false, error: 'No hay conexión con el servidor.' };
   }
 }
+
+// Diseños de artistas: subir (formulario con archivos) y la dirección de sus archivos (son públicos)
+export async function submitDesign(form) {
+  try {
+    const res = await fetch('/api/design', { method: 'POST', headers: authHeader(), body: form });
+    return await res.json();
+  } catch {
+    return { ok: false, error: 'No hay conexión con el servidor.' };
+  }
+}
+export const designFileUrl = (id, f = 'img') => `/api/designfile?id=${encodeURIComponent(id)}&f=${f}`;

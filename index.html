@@ -378,6 +378,7 @@
     </div>
     <p class="meta" id="inv-hint">Tocá un objeto para ponértelo o sacártelo. Uno por lugar del cuerpo.</p>
     <div id="inv-grid" class="items"></div>
+    <button class="act" id="btn-design-up" type="button">＋ Subir diseño</button>
     <button class="cta" data-close-panel>Listo</button>
   </aside>
 
@@ -455,6 +456,32 @@
       <div data-wpane="mias" id="works-mine" hidden></div>
       <div data-wpane="revisar" id="works-review" hidden></div>
       <div data-wpane="admin" id="works-admin" hidden></div>
+    </div>
+  </div>
+
+  <!-- Subir un diseño propio: estampa (va en la ropa), cuadro u objeto 3D (van a la sala). Ver src/ui/designs.js -->
+  <div id="design-up" class="overlay">
+    <div class="sheet works-sheet">
+      <button class="close" data-close aria-label="Cerrar">✕</button>
+      <p class="kicker">Tus diseños</p>
+      <h1 class="display">Subir diseño</h1>
+      <p class="meta">Lo que subas aparece en tu inventario. Solo vos podés hacer copias; las regalás intercambiándolas o soltándolas al piso.</p>
+      <form id="design-form" class="work-form" autocomplete="off">
+        <div class="field">Tipo
+          <div class="seg" id="design-kind"><button type="button" data-kind="estampa">Estampa</button><button type="button" data-kind="cuadro">Cuadro</button><button type="button" data-kind="objeto">Objeto 3D</button></div>
+        </div>
+        <label class="field">Archivo <input type="file" id="design-file" /></label>
+        <p class="meta" id="design-file-hint"></p>
+        <div id="design-preview"></div>
+        <div class="field" id="design-place-box">Dónde va
+          <div class="seg" id="design-place"><button type="button" data-v="pecho">Pecho</button><button type="button" data-v="espalda">Espalda</button></div>
+        </div>
+        <div class="field" id="design-size-box">Tamaño
+          <div class="seg" id="design-size"><button type="button" data-v="chico">Chica</button><button type="button" data-v="mediano">Mediana</button><button type="button" data-v="grande">Grande</button></div>
+        </div>
+        <label class="field">Nombre <input id="design-title" maxlength="60" placeholder="Cómo se llama tu diseño" /></label>
+        <button class="cta" id="design-send">Subir</button>
+      </form>
     </div>
   </div>
 

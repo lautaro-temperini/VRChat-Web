@@ -2,7 +2,7 @@
 // jugador no se mueve (salvo los paneles que no frenan).
 import { G, body } from './state.js';
 
-const OVERLAYS = ['editing', 'settings', 'inspecting', 'profiling', 'auth', 'inventory', 'friends', 'trading', 'viewing', 'roompanel', 'mundi', 'gestures', 'djing', 'artists', 'controls', 'kicked', 'notes', 'works', 'roomedit'];
+const OVERLAYS = ['editing', 'settings', 'inspecting', 'profiling', 'auth', 'inventory', 'friends', 'trading', 'viewing', 'roompanel', 'mundi', 'gestures', 'djing', 'artists', 'controls', 'kicked', 'notes', 'works', 'roomedit', 'designing'];
 // Paneles que no frenan al personaje (se puede seguir caminando con WASD)
 const NON_BLOCKING = ['inventory', 'friends', 'roompanel', 'editing', 'gestures', 'artists'];
 function openOverlay(cls) {

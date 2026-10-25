@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import { api } from '../net/api.js';
 import { createSocial } from '../ui/social.js';
+import { createDesignUpload } from '../ui/designs.js';
 import { createPhone } from '../ui/phone.js';
 import { createProgress } from '../ui/progress.js';
 import { toast } from '../ui/toast.js';
@@ -182,6 +183,9 @@ const social = createSocial({
   onDrop: (it, at) => dropItem(it, at),
 });
 $('btn-inv').onclick = () => (body.classList.contains('inventory') ? G.closeOverlays() : social.openInventory());
+// Subir diseños propios (estampas, cuadros, objetos 3D): botón del inventario (ui/designs.js)
+const designUp = createDesignUpload({ ui: G.ui, me: () => G.account, onDone: (items, kind) => social.showItems(items, kind === 'estampa' ? 'mochila' : 'mobiliario') });
+$('btn-design-up').onclick = () => designUp.open();
 
 // Celular (la red social): inicio = amigos. Mientras está abierto, el personaje lo tiene en la mano.
 const phone = createPhone({ social, me: () => G.account, go: (target) => social.go(target), room });

@@ -24,7 +24,7 @@ const STATUS = {
 };
 
 // ---------- Archivos: achicar imágenes y revisar modelos en el navegador ----------
-async function resize(bitmap, max, quality) {
+export async function resize(bitmap, max, quality) {
   const k = Math.min(1, max / Math.max(bitmap.width, bitmap.height));
   const w = Math.round(bitmap.width * k), h = Math.round(bitmap.height * k);
   const c = Object.assign(document.createElement('canvas'), { width: w, height: h });
@@ -64,7 +64,7 @@ async function checkModel(file) {
 }
 
 // Visor chiquito para modelos 3D (gira solo)
-function modelViewer(container, scene) {
+export function modelViewer(container, scene) {
   const r = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   const w = container.clientWidth || 320, h = 240;
   r.setSize(w, h);
