@@ -726,6 +726,18 @@ export class Accounts extends DurableObject {
     return { ok: true, owner: { id: owner.id, name: owner.name, room: this.roomTitle(owner) }, notes };
   }
 
+  // Las últimas notas del muro de todos (atril de la Cafetería), sin las de quien restringiste
+  async notesLatest(token) {
+    const me = token ? await this.userFromToken(token) : null;
+    const hidden = me ? this.blockedBy(me.id) : new Set();
+    const rows = this.sql.exec('SELECT id, owner, text, created FROM notes ORDER BY created DESC LIMIT 80').toArray();
+    const notes = rows.filter((n) => !hidden.has(n.owner)).slice(0, 30).map((n) => {
+      const o = this.row(n.owner);
+      return { id: n.id, text: n.text, created: n.created, author: o ? { id: o.id, name: o.name } : null };
+    }).filter((n) => n.author);
+    return { ok: true, notes };
+  }
+
   async noteAdd(token, text) {
     const me = await this.userFromToken(token);
     if (!me) return { ok: false, error: 'Sesión vencida.' };

@@ -194,6 +194,7 @@ async function api(request, env, path) {
     case 'POST photodelete': result = await accounts.photoDelete(token, body.id); break;
     case 'POST galleryprivacy': result = await accounts.setGalleryPrivacy(token, body.privacy); break;
     case 'GET notes': result = await accounts.notesList(q.get('id')); break;
+    case 'GET latestnotes': result = await accounts.notesLatest(token); break;
     case 'POST note': result = await accounts.noteAdd(token, body.text); break;
     case 'POST notedelete': result = await accounts.noteDelete(token, body.id); break;
     case 'GET feed': result = await accounts.feed(token); break;

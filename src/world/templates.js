@@ -66,7 +66,7 @@ export function buildShell(id, { high }) {
     if (door) {
       seg(-len / 2, door[0], 0, h);
       seg(door[1], len / 2, 0, h);
-      seg(door[0], door[1], 2.4, h);
+      if (h > 2.4) seg(door[0], door[1], 2.4, h); // (una pared baja con puerta no lleva dintel)
     } else seg(-len / 2, len / 2, 0, h);
     cutaway.push({ object: holder, normal });
     // Plano de la cara interior, para colgar cosas
@@ -258,6 +258,8 @@ export function buildShell(id, { high }) {
     });
   } else if (id === 'plaza') {
     buildPlaza();
+  } else if (id === 'cafeteria') {
+    buildCafe();
   } else {
     // Terraza: al aire libre, deck de madera, baranda, fachada con la puerta al sur y la ciudad al norte
     floor(new THREE.MeshStandardMaterial({ map: repeatTex(woodFloor(), def.w / 3, def.d / 3), color: 0xc8b8a6, roughness: 0.7 }));
@@ -508,6 +510,119 @@ export function buildShell(id, { high }) {
     };
   }
 
+  // ---------- Cafetería (mapa público, 14 × 10 m): café de barrio porteño. Baldosas blanco y negro,
+  // boiserie de madera oscura, espejos, estante de botellas, lámparas cálidas y ventanales a la calle ----------
+  function buildCafe() {
+    floor(new THREE.MeshStandardMaterial({ map: repeatTex(checkerTex(), def.w / 1.2, def.d / 1.2), roughness: 0.35 })); // baldosas de 60 cm
+    const cream = new THREE.MeshStandardMaterial({ color: 0xe8dcc4, roughness: 0.9 });
+    const wood = new THREE.MeshStandardMaterial({ color: 0x3b2416, roughness: 0.55 });
+    const brass = new THREE.MeshStandardMaterial({ color: 0xb08d57, roughness: 0.3, metalness: 0.8 });
+    wall('n', cream); wall('o', cream); wall('e', cream);
+    // Al sur: ventanales a la calle con la puerta en el medio
+    const south = wall('s', cream, { h: 0.6, door: [-0.95, 0.95] });
+    const frame = new THREE.MeshStandardMaterial({ color: 0x2a1a10, roughness: 0.5 });
+    const glass = new THREE.MeshStandardMaterial({ color: 0x9fb8c8, roughness: 0.05, transparent: true, opacity: 0.12, depthWrite: false });
+    const sz = D + T / 2;
+    for (const [a, b] of [[-W, -0.95], [0.95, W]]) {
+      const len = b - a, mid = (a + b) / 2;
+      const pane = new THREE.Mesh(new THREE.BoxGeometry(len, H - 0.6, 0.02), glass);
+      pane.position.set(mid, 0.6 + (H - 0.6) / 2, sz);
+      south.add(pane);
+      blockers.push(pane);
+      for (let x = a; x <= b + 0.01; x += len / 3) { const m = new THREE.Mesh(new THREE.BoxGeometry(0.08, H - 0.6, T), frame); m.position.set(x, 0.6 + (H - 0.6) / 2, sz); south.add(m); }
+      for (const y of [0.6, 2.4, H]) { const m = new THREE.Mesh(new THREE.BoxGeometry(len, 0.08, T), frame); m.position.set(mid, y, sz); south.add(m); }
+      collider(a, b, D, D + T, H);
+    }
+    // Vidrio arriba de la puerta
+    const transom = new THREE.Mesh(new THREE.BoxGeometry(1.9, H - 2.4, 0.02), glass);
+    transom.position.set(0, 2.4 + (H - 2.4) / 2, sz);
+    south.add(transom);
+    blockers.push(transom);
+    // Letras doradas en el vidrio
+    const sign = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 0.5), new THREE.MeshBasicMaterial({ map: cafeSign(), transparent: true, depthWrite: false, side: THREE.DoubleSide }));
+    sign.position.set(-3.6, 2.9, D + T / 2 + 0.02); // se lee desde la calle
+    south.add(sign);
+    door(frame, glass);
+    // Boiserie de madera hasta 1,1 m y moldura dorada en las paredes interiores
+    for (const w of walls) {
+      if (w.normal.z < -0.5) continue; // la de los ventanales no
+      const len = w.max - w.min;
+      const holder = cutaway.find((c) => c.normal && c.normal.equals(w.normal))?.object ?? group;
+      const panel = new THREE.Mesh(new THREE.BoxGeometry(w.along === 'x' ? len : 0.04, 1.1, w.along === 'x' ? 0.04 : len), wood);
+      panel.position.copy(w.point).addScaledVector(w.normal, 0.02).setY(0.55);
+      holder.add(panel);
+      const rail = new THREE.Mesh(new THREE.BoxGeometry(w.along === 'x' ? len : 0.05, 0.04, w.along === 'x' ? 0.05 : len), brass);
+      rail.position.copy(w.point).addScaledVector(w.normal, 0.04).setY(1.12);
+      holder.add(rail);
+    }
+    // Espejos con marco de madera en las paredes de los costados
+    const mirror = new THREE.MeshStandardMaterial({ color: 0xc9d3d8, roughness: 0.02, metalness: 1 });
+    for (const s of [-1, 1]) {
+      const holder = cutaway.find((c) => c.normal && c.normal.x === -s)?.object ?? group;
+      for (const z of [-2.2, 1.6]) {
+        const f = new THREE.Mesh(new THREE.BoxGeometry(0.04, 1.5, 2.4), wood);
+        f.position.set(s * (W - 0.03), 2.1, z);
+        const m = new THREE.Mesh(new THREE.BoxGeometry(0.02, 1.36, 2.26), mirror);
+        m.position.set(s * (W - 0.05), 2.1, z);
+        holder.add(f, m);
+      }
+    }
+    // Estante de botellas detrás de la barra (pared norte)
+    const north = cutaway.find((c) => c.normal && c.normal.z === 1)?.object ?? group;
+    const bottleMats = [0x2f5d3a, 0x6b2a1f, 0xc9a14a, 0x3a5a7a].map((c) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.15, transparent: true, opacity: 0.85 }));
+    for (const y of [1.6, 2.15]) {
+      const shelf = new THREE.Mesh(new THREE.BoxGeometry(4.6, 0.04, 0.3), wood);
+      shelf.position.set(1.8, y, -D + 0.17);
+      north.add(shelf);
+      for (let i = 0; i < 14; i++) {
+        const b = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.045, 0.3, 10), bottleMats[(i * 7 + (y > 2 ? 1 : 0)) % 4]);
+        b.position.set(-0.3 + i * 0.3, y + 0.17, -D + 0.17);
+        north.add(b);
+      }
+    }
+    // Pizarra con el menú
+    const menu = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 0.9), new THREE.MeshStandardMaterial({ map: menuTex(), roughness: 0.9 }));
+    menu.position.set(-2.4, 2.1, -D + 0.03);
+    north.add(menu);
+    // Techo de madera con lámparas colgantes cálidas
+    ceiling(new THREE.MeshStandardMaterial({ color: 0x4a3020, roughness: 0.8 }));
+    for (const [x, z] of [[-3, -1], [0.6, -1], [4, -1], [-3, 2], [0.6, 2.2], [4, 2]]) pendant(x, z);
+    hemi.color.set(0xffe2b8); hemi.groundColor.set(0x4a3020); hemi.intensity = 0.7;
+    const warm = [];
+    for (const [x, z] of high ? [[-2.5, 0.5], [3, 0.5]] : [[0, 0.5]]) {
+      const l = new THREE.PointLight(0xffc98a, 14, 12, 1.4);
+      l.position.set(x, H - 0.9, z);
+      group.add(l);
+      warm.push(l);
+    }
+    // La calle afuera: vereda, empedrado, un farol y edificios enfrente
+    const street = new THREE.Mesh(new THREE.PlaneGeometry(60, 14), new THREE.MeshStandardMaterial({ map: repeatTex(concrete(), 12, 3), color: 0x6d6a66, roughness: 0.9 }));
+    street.rotation.x = -Math.PI / 2;
+    street.position.set(0, -0.02, D + 8);
+    group.add(street);
+    const walk = new THREE.Mesh(new THREE.PlaneGeometry(60, 2.6), new THREE.MeshStandardMaterial({ color: 0xb8b0a2, roughness: 0.9 }));
+    walk.rotation.x = -Math.PI / 2;
+    walk.position.set(0, 0.01, D + 1.5);
+    group.add(walk);
+    const city = cityBackdrop(70, 16);
+    city.position.set(0, 7, D + 16);
+    city.rotation.y = Math.PI;
+    group.add(city);
+    const dome = new THREE.Mesh(new THREE.SphereGeometry(50, 20, 10), new THREE.MeshBasicMaterial({ color: 0x87b3e8, side: THREE.BackSide, fog: false }));
+    group.add(dome);
+    const sun = new THREE.DirectionalLight(0xffe2b8, 1.6);
+    sun.position.set(-4, 9, 14);
+    group.add(sun);
+    timeFn = (day, golden) => {
+      sun.intensity = 1.8 * day;
+      hemi.intensity = 0.55 + 0.35 * day;
+      dome.material.color.copy(sky.set(0x0b1236)).lerp(new THREE.Color(0x87b3e8), day).lerp(new THREE.Color(0xff9e6b), golden * 0.7);
+      city.material.color.setScalar(0.2 + 0.8 * day);
+      city.userData.windows.opacity = 1 - day;
+      for (const l of warm) l.intensity = (high ? 10 : 14) + 10 * (1 - day);
+    };
+  }
+
   // Luz de lámparas colgantes (loft)
   // (se ocultan junto con el techo en el editor)
   function pendant(x, z) {
@@ -538,6 +653,58 @@ export function buildShell(id, { high }) {
       });
     },
   };
+}
+
+// Baldosas blanco y negro (Cafetería): 2 × 2 baldosas por repetición
+function checkerTex() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 256;
+  const g = c.getContext('2d');
+  for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) {
+    g.fillStyle = (i + j) % 2 ? '#1b1b1d' : '#ece8df';
+    g.fillRect(i * 128, j * 128, 128, 128);
+  }
+  g.strokeStyle = 'rgba(120,110,100,0.5)';
+  g.lineWidth = 2;
+  for (let k = 0; k <= 256; k += 128) { g.beginPath(); g.moveTo(k, 0); g.lineTo(k, 256); g.moveTo(0, k); g.lineTo(256, k); g.stroke(); }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  return t;
+}
+
+// Letras doradas en el ventanal y la pizarra del menú (Cafetería)
+function cafeSign() {
+  const c = document.createElement('canvas');
+  c.width = 1024; c.height = 200;
+  const g = c.getContext('2d');
+  g.fillStyle = '#d4a74a';
+  g.font = 'italic 700 120px Georgia, serif';
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  g.fillText('Café', 512, 104);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+function menuTex() {
+  const c = document.createElement('canvas');
+  c.width = 512; c.height = 330;
+  const g = c.getContext('2d');
+  g.fillStyle = '#20241f';
+  g.fillRect(0, 0, 512, 330);
+  g.strokeStyle = '#6b4a2b';
+  g.lineWidth = 18;
+  g.strokeRect(0, 0, 512, 330);
+  g.fillStyle = '#efeadd';
+  g.textAlign = 'center';
+  g.font = '700 44px Georgia, serif';
+  g.fillText('Hoy', 256, 70);
+  g.font = '28px Georgia, serif';
+  ['Cortado', 'Café con leche', 'Lágrima', 'Medialunas'].forEach((s, i) => g.fillText(s, 256, 130 + i * 46));
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
 }
 
 // Cartel del portón de la Plaza

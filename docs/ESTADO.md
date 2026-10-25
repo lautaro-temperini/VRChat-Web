@@ -114,8 +114,9 @@ Para volver a subir: `npm run deploy` desde la carpeta del proyecto.
    3 tamaños), cuadros y objetos 3D en la sala (editor → Especiales), en el piso y en la mano (hasta 50 cm),
    "Copiar" solo el autor, título Diseñador con 3 objetos 3D. Pruebas en `test/disenos.test.mjs`.
    **Mapas públicos** (orden decidido): ✅ Plaza (50 × 50 m: fuente, 8 bancos, 4 esculturas, árboles, faroles,
-   reja con portón que abre el Mapa, ciudad alrededor, día/noche). Faltan: Cafetería, Azotea, Taller, Inmersiva y
-   Rave (consultar los detalles de cada uno antes de armarlo).
+   reja con portón que abre el Mapa, ciudad alrededor, día/noche). ✅ Cafetería (café porteño 14 × 10 m: barra que
+   da café, 7 mesas, atril con las últimas notas de todos, ventanales a la calle). Faltan: Azotea, Taller, Inmersiva
+   y Rave (consultar los detalles de cada uno antes de armarlo).
 8. **Seguridad, lo que quedó para decidir** (ver `docs/ramas/seguridad.md`): teletransporte (posiciones falsas)
    y vencimiento de sesiones.
 9. ✅ Animaciones achicadas: paquete JSON (`npm run empaquetar`), al entrar baja ~0,7 MB en vez de ~13 MB.

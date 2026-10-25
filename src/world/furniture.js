@@ -124,6 +124,43 @@ export function buildFurniture(piece, env = {}) {
       seatsAction();
       break;
     }
+    case 'mesaCafe': {
+      // Mesa redonda de mármol con pie de hierro (Cafetería)
+      cyl(0.36, 0.36, 0.03, mat({ roughness: 0.25 }), 0, 0.75, 0, 40);
+      cyl(0.035, 0.035, 0.72, shared.dark, 0, 0.37, 0, 12);
+      cyl(0.22, 0.26, 0.04, shared.dark, 0, 0.02, 0, 24);
+      collide(0.7, 0.7, 0.77);
+      break;
+    }
+    case 'sillaCafe': {
+      // Silla de madera curvada (estilo Thonet): asiento redondo, aro de respaldo y patas
+      const wood = mat({ roughness: 0.55 });
+      cyl(0.2, 0.2, 0.04, wood, 0, 0.46, 0.02, 28);
+      for (const [x, z] of [[-0.15, 0.15], [0.15, 0.15], [-0.14, -0.13], [0.14, -0.13]]) cyl(0.015, 0.012, 0.46, wood, x, 0.23, z + 0.02, 8);
+      const hoop = add(new THREE.TorusGeometry(0.17, 0.014, 8, 24, Math.PI), wood, 0, 0.72, -0.16);
+      hoop.rotation.z = 0;
+      for (const x of [-0.17, 0.17]) cyl(0.014, 0.014, 0.28, wood, x, 0.58, -0.16, 8);
+      collide(0.42, 0.42, 0.47);
+      sit(0, 0.02, 0.47);
+      seatsAction();
+      break;
+    }
+    case 'barraCafe': {
+      // Barra del café: madera oscura con tapa de mármol, máquina de espresso y tazas; E y te tomás un café
+      rbox(4.4, 1.05, 0.65, mat({ roughness: 0.45 }), 0, 0.525, 0, 0.03);
+      rbox(4.6, 0.05, 0.8, new THREE.MeshStandardMaterial({ color: 0xe9e4dc, roughness: 0.25 }), 0, 1.075, -0.02, 0.015);
+      cbox(4.4, 0.05, 0.05, new THREE.MeshStandardMaterial({ color: 0xb08d57, roughness: 0.3, metalness: 0.8 }), 0, 0.12, 0.34);
+      const chrome = new THREE.MeshStandardMaterial({ color: 0xdadada, roughness: 0.15, metalness: 1 });
+      rbox(0.7, 0.45, 0.4, chrome, -1.2, 1.33, -0.1, 0.04);
+      rbox(0.72, 0.06, 0.42, new THREE.MeshStandardMaterial({ color: 0x8a1c1c, roughness: 0.4 }), -1.2, 1.58, -0.1, 0.02);
+      for (const x of [-1.38, -1.02]) cyl(0.03, 0.03, 0.1, shared.dark, x, 1.08 + 0.12, 0.12, 10);
+      const porcelain = new THREE.MeshStandardMaterial({ color: 0xf6f6f2, roughness: 0.35 });
+      for (let i = 0; i < 5; i++) cyl(0.04, 0.035, 0.06, porcelain, 0.2 + i * 0.13, 1.13, -0.15, 12);
+      cyl(0.2, 0.2, 0.25, new THREE.MeshStandardMaterial({ color: 0xf2efe8, roughness: 0.2, transparent: true, opacity: 0.55 }), 1.3, 1.23, -0.1, 20); // campana de las medialunas
+      collide(4.4, 0.65, 1.1, { climb: false, noStand: true });
+      interact = { kind: 'dispense', gives: 'cafe', prompt: 'Pedir un café' };
+      break;
+    }
     case 'bancoPlaza': {
       // Banco de plaza: tablas de madera sobre patas de hierro, con respaldo inclinado (mapas públicos)
       const wood = mat({ roughness: 0.75 });

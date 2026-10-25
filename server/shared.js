@@ -191,6 +191,7 @@ export const ROOM_TEMPLATES = {
   terraza: { name: 'Terraza', w: 12, d: 10, h: 0 }, // al aire libre: sin techo
   // Plantillas de los mapas públicos (public: no se ofrecen para las salas personales)
   plaza: { name: 'Plaza', w: 50, d: 50, h: 0, public: true },
+  cafeteria: { name: 'Cafetería', w: 14, d: 10, h: 3.8, public: true },
 };
 
 // ---------- Mapas públicos (abiertos a todos, en el Mapa junto al Museo) ----------
@@ -204,6 +205,19 @@ export const PUBLIC_MAPS = {
       const a = (deg * Math.PI) / 180;
       return ['bancoPlaza', Math.round(Math.sin(a) * 7 * 100) / 100, Math.round(Math.cos(a) * 7 * 100) / 100, deg + 180];
     }),
+  },
+  cafeteria: {
+    name: 'Cafetería', where: 'En la Cafetería', desc: 'Café de barrio: pedí un café y sentate a charlar', template: 'cafeteria',
+    spawn: { x: 0, z: 3.8 },
+    pieces: [
+      ['barraCafe', 1.8, -4.3, 0],
+      ['atril', -5.9, 3.7, 50],
+      // Mesas de dos (una silla de cada lado, mirando la mesa) y una de cuatro
+      ...[[-4.6, -2.6], [-1.4, -2.6], [-4.6, 0.4], [-1.4, 0.4], [2.6, 1.6], [5.4, 1.6]].flatMap(([x, z]) => [
+        ['mesaCafe', x, z, 0], ['sillaCafe', x - 0.62, z, 90], ['sillaCafe', x + 0.62, z, -90],
+      ]),
+      ['mesaCafe', 4, -1.4, 0], ['sillaCafe', 3.38, -1.4, 90], ['sillaCafe', 4.62, -1.4, -90], ['sillaCafe', 4, -2.02, 0], ['sillaCafe', 4, -0.78, 180],
+    ],
   },
 };
 // Salas que existen: el Museo, los mapas públicos y las personales (u-<id de cuenta>)
@@ -252,6 +266,9 @@ export const FURNITURE = {
   disenoObjeto: { name: 'Objeto 3D', cat: 'especial', mount: 'floor', color: '#ffffff', size: [1, 1], special: true, design: true },
   // De los mapas públicos (hidden: no salen en el catálogo del editor)
   bancoPlaza: { name: 'Banco de plaza', cat: 'living', mount: 'floor', color: '#6b4a2b', size: [1.8, 0.65], hidden: true },
+  mesaCafe: { name: 'Mesa de café', cat: 'comedor', mount: 'floor', color: '#ece8e1', size: [0.75, 0.75], hidden: true },
+  sillaCafe: { name: 'Silla de café', cat: 'comedor', mount: 'floor', color: '#3b2416', size: [0.45, 0.45], hidden: true },
+  barraCafe: { name: 'Barra del café', cat: 'comedor', mount: 'floor', color: '#3b2416', size: [4.4, 0.7], hidden: true, gives: 'cafe' },
 };
 export const FURNITURE_CATS = { living: 'Living', comedor: 'Comedor y bar', arte: 'Arte', deco: 'Deco y luz', equipo: 'Música y pantallas', especial: 'Especiales' };
 export const SPECIAL_FURNITURE = Object.keys(FURNITURE).filter((k) => FURNITURE[k].special && !FURNITURE[k].design);

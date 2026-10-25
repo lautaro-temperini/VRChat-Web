@@ -318,3 +318,4 @@ La música del DJ y el puente OSC ya están hechos. Falta:
 | Sala inmersiva (25/10) | Proyecciones en todo (paredes, piso y techo con la pantalla del VJ) y sonido envolvente |
 | Cafetería (25/10) | Barra de café (E, sin límite), mesas para sentarse y un atril con las últimas notas del muro |
 | Plaza (25/10) | Grande (50 × 50 m), con fuente y bancos alrededor y esculturas grandes fijas. La rodean rejas y árboles, con la ciudad atrás (de noche, ventanas prendidas) |
+| Cafetería: detalles (25/10) | Café de barrio porteño (madera oscura, baldosas blanco y negro, espejos, luz cálida, ventanales a la calle), chica (14 × 10 m). El atril muestra las últimas notas del muro de todos |

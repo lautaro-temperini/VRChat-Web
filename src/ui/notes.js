@@ -82,9 +82,42 @@ export function createNotes({ ui, onHearts, me }) {
   };
   $('notes-input').oninput = (e) => { $('notes-count').textContent = `${e.target.value.length}/${e.target.maxLength}`; };
 
+  // Atril de la Cafetería: las últimas notas del muro de todos (sin corazones ni para escribir)
+  async function renderLatest() {
+    const r = await api('latestnotes');
+    const list = $('notes-list');
+    list.innerHTML = '';
+    if (!r.ok) { list.textContent = r.error; return; }
+    if (!r.notes.length) { const p = document.createElement('p'); p.className = 'meta'; p.textContent = 'Todavía nadie escribió notas.'; list.append(p); }
+    for (const n of r.notes) {
+      const el = document.createElement('article');
+      el.className = 'note';
+      const who = document.createElement('b');
+      who.textContent = n.author.name;
+      const text = document.createElement('p');
+      text.textContent = n.text;
+      const meta = document.createElement('span');
+      meta.className = 'meta';
+      meta.textContent = ago(n.created);
+      el.append(who, text, meta);
+      list.append(el);
+    }
+  }
+
   return {
+    async openLatest() {
+      ownerId = null;
+      $('notes').classList.remove('mine');
+      $('notes').classList.add('latest');
+      $('notes-sub').textContent = 'Muro de todos';
+      $('notes-title').textContent = 'Últimas notas';
+      $('notes-list').innerHTML = '';
+      ui.openOverlay('notes');
+      await renderLatest();
+    },
     async open(id, isMine) {
       ownerId = id;
+      $('notes').classList.remove('latest');
       $('notes').classList.toggle('mine', isMine);
       $('notes-list').innerHTML = '';
       ui.openOverlay('notes');

@@ -577,6 +577,7 @@ body.notes #notes { display: flex; }
 /* ---------- Atril del Museo: Museo rotativo ---------- */
 body.works #works { display: flex; }
 body.designing #design-up { display: flex; }
+#notes.latest .hearts-row, #notes.latest #notes-form { display: none; }
 #btn-design-up { align-self: flex-start; }
 .item .ico img { width: 100%; height: 100%; object-fit: contain; display: block; }
 .item .credit { display: block; font-size: 10px; font-weight: 600; color: var(--muted); }

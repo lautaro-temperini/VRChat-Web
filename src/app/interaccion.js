@@ -43,7 +43,7 @@ function interact() {
   } else if (t.kind === 'player') openProfile(t.player);
   else if (t.kind === 'screen') G.useScreen();
   else if (t.kind === 'screen2') roomEditor?.useScreen2(); // segunda pantalla de una sala personal
-  else if (t.kind === 'atril') notes.open(roomOwner, G.account?.id === roomOwner);
+  else if (t.kind === 'atril') roomOwner ? notes.open(roomOwner, G.account?.id === roomOwner) : notes.openLatest(); // en los mapas públicos: las últimas notas de todos
   else if (t.kind === 'museo') { if (G.account?.guest) guestGate('postular obras al Museo'); else works.open(); }
   else if (t.kind === 'dj') G.openDJPanel();
   else if (t.kind === 'artists') G.openArtists();
