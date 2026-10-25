@@ -11,6 +11,7 @@
     "build": "vite build",
     "deploy": "vite build && wrangler deploy",
     "puente": "node scripts/puente-osc.js",
+    "empaquetar": "node scripts/empaquetar.mjs",
     "test": "node scripts/test.mjs"
   },
   "dependencies": {

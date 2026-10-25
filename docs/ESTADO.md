@@ -104,17 +104,17 @@ Para volver a subir: `npm run deploy` desde la carpeta del proyecto.
 5. ✅ **Sonido de la pista del museo**: 14 fuentes (`world.dj.sources` en museum.js; `buildMusic` en rtc.js con
    filtros por banda). Line arrays (HRTF), subs (graves, mono por lado), frontfill (agudos), surround en columnas y
    de piso; las torres de siempre quedaron como monitores bajitos. Volúmenes calculados, no escuchados con el SFU.
-6. **Repaso de modelos y animaciones** (pedido 24/10): probar en orden todos los modelos y animaciones del juego
-   (caminar, trotar, saltar, trepar, saltar baranda, sentarse, agacharse, gestos, celular, tomar, beso, DJ, accesorios,
-   ropa, muebles…) y ajustar lo que se vea mal. Las dudas se juntan y se preguntan al final, sin cortar el trabajo.
-   Avance: ✅ quieto, caminar, trotar, correr, sentado, aire, trepar, saltar baranda, saludar, festejar, señalar;
-   ✅ agachado arreglado (cuadro en cuclillas de agachado_caminar + pasos por código). ✅ aplaudir, ✅ bailes (la cadera no se aleja más de 30 cm), ✅ hablar, celular,
-   café, ✅ beso de a dos (ahora se acercan a 55 cm). Falta: DJ, accesorios, ropa, cuerpo fem, muebles, 1ª persona. Herramienta:
-   devtest/avatar.html tiene `__cap(nombre, {motion, steps, before, at})` que manda capturas a un receptor local.
+6. ✅ **Repaso de modelos y animaciones** (24–25/10): arreglados agachado (en cuclillas), aplaudir, bailes que se
+   iban de lugar, beso (se acercan a 55 cm), DJ (manos en la consola), sillones (contra el respaldo), pose T al
+   aparecer, corona/metales, anteojos, cadena y medias con calza. Revisado y bien: caminar, trotar, correr, saltar,
+   trepar, baranda, sentado, gestos, celular, tomar, hablar, ropa en los dos cuerpos, muebles, 1ª persona.
+   Herramientas locales: `devtest/avatar.html` (`__cap`) y `devtest/muebles.html`. Queda: la camisa asoma un poco
+   entre el pelo largo en la espalda (difícil sin tocar los modelos).
 7. **Diseños de artistas como objetos** y más mapas públicos (paso 5).
 8. **Seguridad, lo que quedó para decidir** (ver `docs/ramas/seguridad.md`): teletransporte (posiciones falsas)
    y vencimiento de sesiones.
-9. Achicar animaciones para celular. **Primera prueba con gente real** (inauguración con 5–10 artistas).
+9. ✅ Animaciones achicadas: paquete JSON (`npm run empaquetar`), al entrar baja ~0,7 MB en vez de ~13 MB.
+10. **Primera prueba con gente real** (inauguración con 5–10 artistas).
 
 ### Dudas para el usuario (juntadas durante el trabajo)
 - Sonido: las dos torres del escenario siguen sonando bajito como monitores (¿o solo decorado?). Los frontfill

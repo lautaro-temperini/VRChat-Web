@@ -9,6 +9,9 @@ import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 // hueso "respecto de su pose de reposo" de un esqueleto al otro (ver retarget()).
 
 const BASE = `${import.meta.env.BASE_URL}models/anims/`;
+// Paquete: cada clip recortado a lo que usa el juego, en JSON (lo arma devtest/empaquetar.html).
+// Pesa mucho menos que los FBX y que ual.glb entero; si falta un clip, se lee el original.
+const PACK = `${BASE}pack/`;
 
 // Movimiento básico y su velocidad natural en m/s (ya escalada a la altura de nuestros personajes).
 // file = Mixamo (más natural; puede ser distinto por cuerpo), clip = Universal Animation Library.
@@ -84,6 +87,34 @@ function loadFBX(file) {
   });
 }
 
+// Un clip y su esqueleto de origen. def: { file } (Mixamo) o { ual } (nombre del clip en ual.glb)
+export async function loadRaw(def) {
+  if (def.file) return loadFBX(def.file);
+  const ual = await loadUAL();
+  return { clip: ual.clips[def.ual], src: ual.src };
+}
+export const packName = (def) => (def.file ? def.file.replace(/\.fbx$/, '') : `ual_${def.ual}`).replace(/[/:]/g, '_') + '.json';
+function loadClip(def) {
+  return once(`clip:${packName(def)}`, async () => {
+    try {
+      const res = await fetch(PACK + packName(def));
+      if (res.ok && res.headers.get('content-type')?.includes('json')) return unpack(await res.json());
+    } catch { /* sin paquete: el original */ }
+    return loadRaw(def);
+  });
+}
+// Del JSON del paquete a { src, clip } (lo mismo que dan los cargadores originales)
+function unpack(d) {
+  const q = (a, i) => new THREE.Quaternion(a[i], a[i + 1], a[i + 2], a[i + 3]);
+  const bones = {};
+  for (const [name, b] of Object.entries(d.bones)) bones[name] = { to: b[0], local: q(b, 1), world: q(b, 5) };
+  const tracks = d.tracks.map(([name, kind, times, values]) => new (kind === 'q' ? THREE.QuaternionKeyframeTrack : THREE.VectorKeyframeTrack)(name, times, values));
+  return {
+    src: { bones, hips: d.hips, hipsPos: new THREE.Vector3().fromArray(d.hipsPos), hipsParent: new THREE.Matrix4().fromArray(d.hipsParent) },
+    clip: new THREE.AnimationClip(d.name, d.duration, tracks),
+  };
+}
+
 // ---------- Adaptación al esqueleto de destino ----------
 const MAX_SWAY = 0.3; // m que la cadera se puede alejar de su lugar en una animación
 const _a = new THREE.Quaternion(), _b = new THREE.Quaternion(), _q = new THREE.Quaternion(), _v = new THREE.Vector3();
@@ -153,11 +184,7 @@ function adapt(key, rig, make, opts) {
 export function locomotionClips(bodyType, rig) {
   return Promise.all(Object.entries(LOCO).map(async ([k, def]) => {
     const file = typeof def.file === 'object' ? def.file[bodyType] ?? def.file.masc : def.file;
-    const clip = await adapt(`${bodyType}:${file ?? def.clip}`, rig, async () => {
-      if (file) return loadFBX(file);
-      const ual = await loadUAL();
-      return { clip: ual.clips[def.clip], src: ual.src };
-    }, { hips: def.hips ?? true });
+    const clip = await adapt(`${bodyType}:${file ?? def.clip}`, rig, () => loadClip(file ? { file } : { ual: def.clip }), { hips: def.hips ?? true });
     return [k, clip];
   })).then(Object.fromEntries);
 }
@@ -165,8 +192,5 @@ export function locomotionClips(bodyType, rig) {
 export function gestureClip(bodyType, rig, name) {
   const def = GESTURE_CLIPS[name];
   if (!def) return Promise.resolve(null);
-  return adapt(`${bodyType}:${name}`, rig, async () => {
-    if (def.ual) { const ual = await loadUAL(); return { clip: ual.clips[def.ual], src: ual.src }; }
-    return loadFBX(def.file);
-  });
+  return adapt(`${bodyType}:${name}`, rig, () => loadClip(def.ual ? { ual: def.ual } : { file: def.file }));
 }

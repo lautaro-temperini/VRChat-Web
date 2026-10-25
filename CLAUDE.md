@@ -41,6 +41,7 @@ Guía para trabajar en este proyecto con Claude Code. Leé también [docs/ESTADO
 npm run dev      # cliente (5173) + servidor (8787) juntos
 npm run dev:alt  # segunda copia: servidor en el 8788 con sus propios datos
 npm run puente   # puente OSC para artistas
+npm run empaquetar  # rearma el paquete de animaciones (ver "Animaciones")
 npm run build    # compila el cliente en dist/
 npm run deploy   # build + wrangler deploy
 npm test         # pruebas automáticas (levanta su propio servidor en el 8790; ver docs/ramas/seguridad.md)
@@ -132,5 +133,8 @@ Cada agujero de seguridad que se cierre lleva su prueba en `test/` (clientes Web
 - **Animaciones** en `src/player/anims.js`: se adaptan al esqueleto de Quaternius comparando con la pose
   de reposo (todas en pose T). Para sumar una de Mixamo: FBX Binary, Without Skin, 30 fps, en
   `public/models/anims/mixamo/` y agregarla en `GESTURE_CLIPS`.
+  El juego no baja los FBX: usa el **paquete** `public/models/anims/pack/*.json` (solo lo que se usa, ~10 veces más
+  liviano). Después de sumar o cambiar una animación: con `npm run dev` andando, `npm run empaquetar` y abrir
+  http://localhost:5173/scripts/empaquetar.html (si falta un clip en el paquete, se lee el original).
 - **Calidad gráfica** automática en `src/quality.js` (`?calidad=low|medium|high` la fuerza en desarrollo).
 - Para probar el personaje sin entrar al juego: `devtest/` (no se sube) con páginas sueltas de Vite.

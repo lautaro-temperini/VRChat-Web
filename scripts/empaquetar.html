@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="es">
+<head><meta charset="utf-8" /><title>Empaquetar animaciones</title></head>
+<body>
+<pre id="log"></pre>
+<script type="module">
+// Herramienta: lee cada animación original (FBX de Mixamo o clip de ual.glb),
+// se queda con lo que usa el juego (huesos con equivalente, la cadera), redondea y saca cuadros repetidos.
+// Manda cada JSON a scripts/empaquetar.mjs (npm run empaquetar), que los guarda en public/models/anims/pack/.
+import { LOCO, GESTURE_CLIPS, loadRaw, packName } from '/src/player/anims.js';
+
+const log = (t) => { document.getElementById('log').textContent += t + '\n'; };
+const r4 = (v) => Math.round(v * 1e4) / 1e4;
+const EPS = 2e-4;
+
+function pack(src, clip) {
+  const bones = {};
+  for (const [name, b] of Object.entries(src.bones)) bones[name] = [b.to, ...b.local.toArray().map(r4), ...b.world.toArray().map(r4)];
+  const tracks = [];
+  for (const t of clip.tracks) {
+    const dot = t.name.lastIndexOf('.');
+    const bone = t.name.slice(0, dot), prop = t.name.slice(dot + 1);
+    if (!src.bones[bone]) continue;
+    const kind = prop === 'quaternion' ? 'q' : prop === 'position' && bone === src.hips ? 'v' : null;
+    if (!kind) continue;
+    const n = kind === 'q' ? 4 : 3, times = [], values = [];
+    const count = t.times.length;
+    const same = (i, j) => { for (let k = 0; k < n; k++) if (Math.abs(t.values[i * n + k] - t.values[j * n + k]) > EPS) return false; return true; };
+    for (let i = 0; i < count; i++) {
+      // Un cuadro igual al anterior y al siguiente no aporta nada
+      if (i > 0 && i < count - 1 && same(i, i - 1) && same(i, i + 1)) continue;
+      times.push(Math.round(t.times[i] * 1000) / 1000);
+      for (let k = 0; k < n; k++) values.push(r4(t.values[i * n + k]));
+    }
+    tracks.push([t.name, kind, times, values]);
+  }
+  return { name: clip.name, duration: r4(clip.duration), hips: src.hips, hipsPos: src.hipsPos.toArray().map(r4), hipsParent: src.hipsParent.toArray().map(r4), bones, tracks };
+}
+
+const defs = [];
+for (const d of Object.values(LOCO)) {
+  if (typeof d.file === 'object') for (const f of Object.values(d.file)) defs.push({ file: f });
+  else defs.push(d.file ? { file: d.file } : { ual: d.clip });
+}
+for (const d of Object.values(GESTURE_CLIPS)) defs.push(d.ual ? { ual: d.ual } : { file: d.file });
+let total = 0;
+for (const def of defs) {
+  const { src, clip } = await loadRaw(def);
+  const json = JSON.stringify(pack(src, clip));
+  total += json.length;
+  await fetch('http://127.0.0.1:9556/' + packName(def), { method: 'POST', body: json });
+  log(`${packName(def)}: ${(json.length / 1024).toFixed(0)} KB`);
+}
+log(`Listo: ${defs.length} clips, ${(total / 1048576).toFixed(1)} MB`);
+window.__done = true;
+</script>
+</body>
+</html>
