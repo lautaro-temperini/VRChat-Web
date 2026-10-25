@@ -305,3 +305,6 @@ La música del DJ y el puente OSC ya están hechos. Falta:
 | Cartel AFK (24/10) | Aparece a los **5 minutos** sin tocar nada (también si cambiaste de pestaña) |
 | Puertas que dan afuera (24/10) | La entrada del museo y la puerta de las salas personales: al caminar hacia la puerta se abre el **Mapa** tal cual (si lo cerrás seguís adentro) |
 | Sonido de la pista del museo (24/10) | Se suman **line arrays colgados** (música principal izq./der.), **subs de piso** (solo graves), **tweeters/frontfill** en el borde del escenario y **surround** en el fondo y costados de la pista. Todos suenan de verdad. Los de piso (subs, surround) se pueden trepar; los colgados no |
+| Torres del escenario (25/10) | Siguen sonando bajito, como monitores; el sonido fuerte sale de los line arrays |
+| Beso de invitados (25/10) | Los invitados también pueden pedir y aceptar besos |
+| Diseños: quién sube (25/10) | Cualquier cuenta registrada |

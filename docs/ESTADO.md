@@ -116,11 +116,6 @@ Para volver a subir: `npm run deploy` desde la carpeta del proyecto.
 9. ✅ Animaciones achicadas: paquete JSON (`npm run empaquetar`), al entrar baja ~0,7 MB en vez de ~13 MB.
 10. **Primera prueba con gente real** (inauguración con 5–10 artistas).
 
-### Dudas para el usuario (juntadas durante el trabajo)
-- Sonido: las dos torres del escenario siguen sonando bajito como monitores (¿o solo decorado?). Los frontfill
-  (0,18 m) no tienen collider: se atraviesan caminando por el escenario.
-- Beso: hoy los invitados pueden pedir y aceptar besos (el servidor no los frena). ¿Lo pueden hacer o va con candado?
-
 ### Pendientes sueltos (consultar antes)
 Reportar, nombre y marca definitivos, AR, ajustes de cara en el avanzado.
 
