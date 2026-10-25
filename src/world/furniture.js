@@ -1,6 +1,9 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { buildLectern } from './lectern.js';
+import { loadGLTF } from '../loaders.js';
+import { designFileUrl } from '../net/api.js';
+import { cuadroSize } from '../../server/shared.js';
 
 // Muebles del editor de salas, hechos por código (después se pueden reemplazar por modelos
 // sin tocar las salas guardadas: lo guardado es solo el id del catálogo, posición, giro y color).
@@ -340,6 +343,36 @@ export function buildFurniture(piece, env = {}) {
       knot.castShadow = false;
       parts.spin = knot;
       collide(0.6, 0.6, 0.8, { climb: false, noStand: true });
+      break;
+    }
+    // Diseños de artistas: un cuadro con su imagen (1,2 m del lado más largo) o un objeto 3D a tamaño real.
+    // E abre la ficha (el cuadro, en HD).
+    case 'disenoCuadro': {
+      const d = piece.design;
+      const [w, h] = cuadroSize(d);
+      rbox(w + 0.08, h + 0.08, 0.05, mat({ roughness: 0.35 }), 0, 0, 0.025, 0.015);
+      const canvas = add(new THREE.PlaneGeometry(w, h), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.7 }), 0, 0, 0.052);
+      canvas.castShadow = false;
+      if (d) new THREE.TextureLoader().loadAsync(designFileUrl(d.id)).then((tex) => {
+        tex.colorSpace = THREE.SRGBColorSpace;
+        canvas.material.map = tex;
+        canvas.material.needsUpdate = true;
+      }).catch(() => {});
+      interact = { kind: 'design', prompt: 'Ver el cuadro', design: d, info: { title: d?.title ?? '' } };
+      break;
+    }
+    case 'disenoObjeto': {
+      const d = piece.design;
+      const [w, h, dp] = d?.dims ?? [0.5, 0.5, 0.5];
+      collide(w, dp, h);
+      if (d) loadGLTF(designFileUrl(d.id, 'model')).then((gltf) => {
+        const obj = gltf.scene.clone(true);
+        const box = new THREE.Box3().setFromObject(obj), c = box.getCenter(new THREE.Vector3());
+        obj.position.set(-c.x, -box.min.y, -c.z);
+        obj.traverse((o) => { if (o.isMesh) { o.castShadow = high; o.receiveShadow = high; } });
+        g.add(obj);
+      }).catch(() => {});
+      interact = { kind: 'design', prompt: 'Ver', design: d, info: { title: d?.title ?? '' } };
       break;
     }
     // Muebles que reparten consumibles: E y te lo tomás en el momento

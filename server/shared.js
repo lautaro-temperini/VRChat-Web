@@ -48,6 +48,15 @@ export const STAMP_PLACES = { pecho: 'Pecho', espalda: 'Espalda' };
 export const STAMP_SIZES = { chico: 0.12, mediano: 0.25, grande: 0.38 }; // ancho en metros
 export const HAND_MAX = 0.5; // m: lo más grande que se puede sostener en la mano
 export const DESIGN_IMAGE = 1024; // px: estampas y cuadros (los cuadros también en HD hasta 2048)
+// Tamaño en metros: cuadros de 1,2 m del lado más largo; objetos 3D con sus medidas reales
+export function cuadroSize(d) { const a = (d?.w || 1) / (d?.h || 1); return a >= 1 ? [1.2, 1.2 / a] : [1.2 * a, 1.2]; }
+// [ancho, profundidad] de un mueble puesto (los de diseño, según el diseño)
+export function pieceSize(p) {
+  const d = p?.design;
+  if (d?.kind === 'objeto' && d.dims) return [d.dims[0], d.dims[2]];
+  if (d?.kind === 'cuadro') return [cuadroSize(d)[0], 0.1];
+  return FURNITURE[p?.type]?.size ?? [1, 1];
+}
 export const designHoldable = (d) => d?.kind === 'objeto' && Array.isArray(d.dims) && Math.max(...d.dims) <= HAND_MAX;
 // Lo público de un diseño (lo que viaja con el objeto); null si no es válido
 export function cleanDesign(d) {

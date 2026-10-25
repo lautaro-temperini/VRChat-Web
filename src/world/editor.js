@@ -1,7 +1,8 @@
 import * as THREE from 'three';
-import { FURNITURE, FURNITURE_CATS, ROOM_TEMPLATES, ROOM_MAX_PIECES, SCREEN_WIDTH } from '../../server/shared.js';
+import { FURNITURE, FURNITURE_CATS, ROOM_TEMPLATES, ROOM_MAX_PIECES, SCREEN_WIDTH, pieceSize } from '../../server/shared.js';
+import { itemIcon } from '../ui/icons.js';
 import { buildFurniture } from './furniture.js';
-import { api, photoUrl } from '../net/api.js';
+import { api, photoUrl, designFileUrl } from '../net/api.js';
 import { createStage2 } from './stage2.js';
 import './editor.css';
 
@@ -117,7 +118,10 @@ export function createRoomEditor({ world, scene, camera, renderer, net, rtc, ctr
     $('re-count').textContent = layout ? `${layout.pieces.length}/${ROOM_MAX_PIECES}` : '';
     if (cat === 'especial') {
       if (!specials.length) grid.innerHTML = '<div class="empty">No tenés muebles especiales en el inventario. Se ganan jugando (y se pueden intercambiar).</div>';
-      for (const it of specials) grid.append(card(it.type, it.color, () => addPiece(it.type, { iid: it.iid, c: it.color })));
+      for (const it of specials) {
+        const add = () => addPiece(it.type, { iid: it.iid, c: it.color, ...(it.design ? { design: it.design } : {}) });
+        grid.append(it.design ? designCard(it.design, add) : card(it.type, it.color, add));
+      }
       return;
     }
     for (const [type, def] of Object.entries(FURNITURE)) {
@@ -137,6 +141,23 @@ export function createRoomEditor({ world, scene, camera, renderer, net, rtc, ctr
     b.append(img, label);
     const n = world.layout?.pieces.filter((p) => p.type === type).length ?? 0;
     if (def.max && n >= def.max) { b.disabled = true; b.title = `Ya ${def.max === 1 ? 'está puesto' : `hay ${def.max}`}`; }
+    b.onclick = onClick;
+    return b;
+  }
+
+  // Diseños (cuadros y objetos 3D): su imagen o un cubo, con su nombre
+  function designCard(d, onClick) {
+    const b = document.createElement('button');
+    b.className = 'item';
+    if (d.kind === 'cuadro') {
+      const img = document.createElement('img');
+      img.alt = '';
+      img.src = designFileUrl(d.id);
+      b.append(img);
+    } else b.insertAdjacentHTML('beforeend', itemIcon('disenoObjeto', '#2a2a33'));
+    const label = document.createElement('span');
+    label.textContent = d.title || FURNITURE[d.kind === 'cuadro' ? 'disenoCuadro' : 'disenoObjeto'].name;
+    b.append(label);
     b.onclick = onClick;
     return b;
   }
@@ -458,7 +479,7 @@ export function createRoomEditor({ world, scene, camera, renderer, net, rtc, ctr
   }
   // Un lugar libre en la pared (que no quede encima de otro cuadro o pantalla), empezando por el centro de la vista
   function freeWallSpot(wall, y, piece) {
-    const width = (p) => (p.type === 'pantalla' ? p.w ?? 3.6 : FURNITURE[p.type].size[0]);
+    const width = (p) => (p.type === 'pantalla' ? p.w ?? 3.6 : pieceSize(p)[0]);
     const on = [...world.pieces.values()].map((e) => e.piece)
       .filter((p) => FURNITURE[p.type].mount === 'wall' && angleDiff(p.r, Math.atan2(wall.normal.x, wall.normal.z)) < 0.01 && Math.abs((p.y ?? 0) - y) < 1.2);
     const start = wall.along === 'x' ? cam.tx : cam.tz;
@@ -487,7 +508,7 @@ export function createRoomEditor({ world, scene, camera, renderer, net, rtc, ctr
   // Que el mueble no quede afuera de la sala
   function clampFloor(p) {
     const def = ROOM_TEMPLATES[world.layout?.template ?? 'loft'];
-    const [w, d] = FURNITURE[p.type].size;
+    const [w, d] = pieceSize(p);
     const c = Math.abs(Math.cos(p.r)), s = Math.abs(Math.sin(p.r));
     const hw = Math.min(def.w / 2, (c * w + s * d) / 2), hd = Math.min(def.d / 2, (s * w + c * d) / 2);
     return { ...p, x: THREE.MathUtils.clamp(p.x, -def.w / 2 + hw, def.w / 2 - hw), z: THREE.MathUtils.clamp(p.z, -def.d / 2 + hd, def.d / 2 - hd) };

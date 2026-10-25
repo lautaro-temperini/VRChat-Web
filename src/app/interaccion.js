@@ -1,7 +1,7 @@
 // Interacción: qué tenés adelante (E / click / botón Usar), el cartel de lo que hace la E, la ficha
 // de las obras (con vista previa del link), el perfil de otros jugadores y los atajos de teclado.
 import * as THREE from 'three';
-import { api, workFileUrl } from '../net/api.js';
+import { api, workFileUrl, designFileUrl } from '../net/api.js';
 import { guestGate, lock } from '../ui/guest.js';
 import { renderGallery } from '../ui/gallery.js';
 import { toast } from '../ui/toast.js';
@@ -108,9 +108,15 @@ let previewToken = 0;
 function openInspect(item) {
   const info = item.info;
   const publicPainting = item.work?.kind === 'cuadro';
-  const isPainting = !!item.image || publicPainting;
+  const designPainting = item.design?.kind === 'cuadro';
+  const isPainting = !!item.image || publicPainting || designPainting;
   $('inspect').classList.toggle('no-frame', !isPainting);
-  if (publicPainting) {
+  if (designPainting) {
+    // Cuadro de diseño: en HD si el autor la subió (si no, la de la pared)
+    const img = $('inspect-img');
+    img.onerror = () => { img.onerror = null; img.src = designFileUrl(item.design.id); };
+    img.src = designFileUrl(item.design.id, 'hd');
+  } else if (publicPainting) {
     // Obra del público: la imagen en HD (hasta 2048 px)
     $('inspect-img').removeAttribute('src');
     workFileUrl(item.work.id, 'hd').then((url) => { if (url) $('inspect-img').src = url; });
@@ -123,7 +129,7 @@ function openInspect(item) {
     $('inspect-img').src = photo(center.clone().addScaledVector(dir, Math.max(1.6, r * 1.6)).add(new THREE.Vector3(0, r * 0.25, 0)), center);
   }
   if (item.kind === 'art') progress.viewed(item); // progresión: descubrir obras
-  $('inspect-kicker').textContent = item.kind === 'info' ? 'Info' : isPainting ? 'Obra' : 'Escultura';
+  $('inspect-kicker').textContent = item.kind === 'info' ? 'Info' : item.kind === 'design' ? 'Diseño' : isPainting ? 'Obra' : 'Escultura';
   $('inspect-title').textContent = info.title;
   $('inspect-meta').textContent = [info.author, info.year, info.technique].filter(Boolean).join(' · ');
   $('inspect-desc').textContent = info.description ?? '';
