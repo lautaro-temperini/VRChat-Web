@@ -16,7 +16,7 @@ archivo y línea) está en [`docs/hallazgos/`](hallazgos/), un archivo por agent
 
 ## Críticos
 
-- [ ] **C1. Un `.glb` de menos de 1 KB congela las cuentas de todo el mundo.** `checkGLB` recorre la jerarquía
+- [x] **C1. Un `.glb` de menos de 1 KB congela las cuentas de todo el mundo.** `checkGLB` recorre la jerarquía
   de nodos sin recordar los ya visitados: un nodo que apunta dos veces al siguiente, 24 niveles, son 16 millones
   de visitas (14,7 s; con 30 niveles, ~15 min). Corre adentro de `Accounts` (un solo hilo): mientras tanto no
   anda login, inventario, amigos ni nada. Rep. — `server/glb.js` (`visit`). *Arreglo:* conjunto de visitados y
@@ -39,17 +39,17 @@ archivo y línea) está en [`docs/hallazgos/`](hallazgos/), un archivo por agent
 - [ ] **A3. Google sin nick + `register`:** una cuenta entrada por Google y sin nick cuenta como invitado para
   `register`, se puede poner un mail ajeno con contraseña y queda `email_verified = 1`. Hip. — `accounts.js`
   (`register`, `isGuest`). [permisos H2]
-- [ ] **A4. Las esculturas del Museo no pasan por `checkGLB`:** solo se mira que pese < 2 MB y empiece con
+- [x] **A4. Las esculturas del Museo no pasan por `checkGLB`:** solo se mira que pese < 2 MB y empiece con
   `glTF` (sin triángulos, texturas, alto ni extensiones). Por código — `server/works.js` (~l. 116).
   *Arreglo:* usar el mismo `checkGLB`. [archivos #2]
-- [ ] **A5. Tamaño del modelo falseado:** `checkGLB` mide con los `min`/`max` declarados, no con los vértices:
+- [x] **A5. Tamaño del modelo falseado:** `checkGLB` mide con los `min`/`max` declarados, no con los vértices:
   declara 1 m y mide 30 m (o declara ≤ 50 cm, se sostiene en la mano y es gigante). Rep. — `server/glb.js`.
   *Arreglo:* leer las posiciones reales (float32 sin comprimir) y comparar; para Draco/meshopt acotar en el
   cliente. [archivos #3]
-- [ ] **A6. Triángulos multiplicados reusando nodos:** se cuentan por malla, no por nodo; una malla de 5.000
+- [x] **A6. Triángulos multiplicados reusando nodos:** se cuentan por malla, no por nodo; una malla de 5.000
   tris en 500 nodos pasa como 5.000 y dibuja 2,5 millones. Rep. — `server/glb.js`. *Arreglo:* contar
   dentro del recorrido de nodos. [archivos #4]
-- [ ] **A7. Texturas por `data:` URI no se miden:** una imagen enorme embebida pasa el tope de 1024 px y puede
+- [x] **A7. Texturas por `data:` URI no se miden:** una imagen enorme embebida pasa el tope de 1024 px y puede
   tumbar la pestaña de quien carga el modelo. Rep. (el paso) — `server/glb.js`. *Arreglo:* medir también las
   `data:` o prohibirlas. [archivos #5]
 - [ ] **A8. Cambiazo en el intercambio:** el "Estoy listo" no queda atado a la oferta vista; si el otro cambia
@@ -124,7 +124,7 @@ archivo y línea) está en [`docs/hallazgos/`](hallazgos/), un archivo por agent
   actual; ¿alcanza?). [acoso #13]
 - [ ] **M22. Curadores: `reviewvote` acepta cualquier obra pendiente por id**, no solo la que les tocó al azar.
   Hip. — `server/works.js`. [permisos H6]
-- [ ] **M23. Mallas comprimidas (Draco/meshopt): el conteo de triángulos cree en `count`.** Hip. —
+- [x] **M23. Mallas comprimidas (Draco/meshopt): el conteo de triángulos cree en `count`.** Hip. —
   `server/glb.js`. [archivos #6]
 
 ## Bajos

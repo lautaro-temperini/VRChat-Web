@@ -4,6 +4,7 @@ import { buildAccessory } from '../player/accessories.js';
 import { ITEMS, FURNITURE, CONSUMABLES } from '../../server/shared.js';
 import { miniFurniture } from './furniture.js';
 import { loadGLTF } from '../loaders.js';
+import { fitDesignModel } from './designModel.js';
 import { designFileUrl } from '../net/api.js';
 
 // Objetos soltados en el suelo. Giran sobre un aro; otro jugador puede juntarlos
@@ -97,7 +98,7 @@ function designMini(d) {
     return g;
   }
   loadGLTF(designFileUrl(d.id, 'model')).then((gltf) => {
-    const obj = gltf.scene.clone(true);
+    const obj = fitDesignModel(gltf.scene, d);
     const box = new THREE.Box3().setFromObject(obj);
     const size = box.getSize(new THREE.Vector3()), c = box.getCenter(new THREE.Vector3());
     const k = MINI / Math.max(size.x, size.y, size.z, 0.01);

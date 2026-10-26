@@ -5,6 +5,7 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 import { buildAccessory } from './accessories.js';
 import { ITEMS, EMOTES, STAMP_SIZES } from '../../server/shared.js';
 import { loadGLTF } from '../loaders.js';
+import { fitDesignModel } from '../world/designModel.js';
 import { designFileUrl } from '../net/api.js';
 import { LOCO, locomotionClips, gestureClip } from './anims.js';
 
@@ -359,7 +360,7 @@ export class Avatar {
     if (!design) return;
     const held = { design, group: new THREE.Group() };
     this.held = held;
-    heldModel(design.id).then((obj) => {
+    heldModel(design).then((obj) => {
       if (this.held !== held) return;
       obj.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.raycast = noRaycast; } });
       held.group.add(obj);
@@ -848,17 +849,10 @@ function stampTexture(id) {
 }
 const modelCache = new Map();
 // Copia del modelo, con la base en el piso y centrado (cada avatar tiene la suya)
-function heldModel(id) {
+function heldModel(design) {
+  const id = design.id;
   if (!modelCache.has(id)) modelCache.set(id, loadGLTF(designFileUrl(id, 'model')).catch((e) => { modelCache.delete(id); throw e; }));
-  return modelCache.get(id).then((gltf) => {
-    const obj = gltf.scene.clone(true);
-    const box = new THREE.Box3().setFromObject(obj);
-    const c = box.getCenter(new THREE.Vector3());
-    obj.position.set(-c.x, -box.min.y, -c.z);
-    const g = new THREE.Group();
-    g.add(obj);
-    return g;
-  });
+  return modelCache.get(id).then((gltf) => fitDesignModel(gltf.scene, design));
 }
 // La estampa se proyecta sobre la prenda en su pose de reposo (antes de animar), mirando de frente
 // (pecho, +Z) o de atrás (espalda): así se deforma con la ropa sin depender de cómo está su textura

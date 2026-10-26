@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { buildLectern } from './lectern.js';
 import { loadGLTF } from '../loaders.js';
+import { fitDesignModel } from './designModel.js';
 import { designFileUrl } from '../net/api.js';
 import { cuadroSize } from '../../server/shared.js';
 
@@ -432,9 +433,7 @@ export function buildFurniture(piece, env = {}) {
       const [w, h, dp] = d?.dims ?? [0.5, 0.5, 0.5];
       collide(w, dp, h);
       if (d) loadGLTF(designFileUrl(d.id, 'model')).then((gltf) => {
-        const obj = gltf.scene.clone(true);
-        const box = new THREE.Box3().setFromObject(obj), c = box.getCenter(new THREE.Vector3());
-        obj.position.set(-c.x, -box.min.y, -c.z);
+        const obj = fitDesignModel(gltf.scene, d);
         obj.traverse((o) => { if (o.isMesh) { o.castShadow = high; o.receiveShadow = high; } });
         g.add(obj);
       }).catch(() => {});

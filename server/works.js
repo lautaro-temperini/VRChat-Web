@@ -1,4 +1,5 @@
 import { isImage } from './shared.js';
+import { checkGLB } from './glb.js';
 
 // Museo rotativo: obras del público que se postulan en el atril de la entrada del Museo.
 // Se suman a la clase Accounts (comparten la base SQLite); los archivos van a R2 (binding ART).
@@ -116,10 +117,9 @@ export const worksMethods = {
     } else {
       const file = f.model;
       if (!file || !(file.data instanceof ArrayBuffer)) return { ok: false, error: 'Falta el modelo 3D (GLB).' };
-      if (file.data.byteLength > LIMITS.model) return { ok: false, error: 'El modelo pesa más de 2 MB.' };
-      if (file.data.byteLength < 12) return { ok: false, error: 'El modelo tiene que ser un archivo .glb.' };
-      const magic = new TextDecoder().decode(new Uint8Array(file.data, 0, 4));
-      if (magic !== 'glTF') return { ok: false, error: 'El modelo tiene que ser un archivo .glb.' };
+      // Mismo control automático que los objetos 3D de diseño (triángulos, texturas, tamaño, extensiones)
+      const check = checkGLB(file.data);
+      if (!check.ok) return check;
       files.push(['model', { mime: 'model/gltf-binary', data: file.data }]);
     }
     const id = randomHex(8);

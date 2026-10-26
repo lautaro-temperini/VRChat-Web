@@ -24,33 +24,73 @@ export function checkGLB(buf) {
     off += 8 + len + ((4 - (len % 4)) % 4);
   }
   if (!json || typeof json !== 'object') return fail('El archivo .glb está dañado.');
-  const bad = (json.extensionsUsed ?? []).find((e) => !OK_EXT.test(String(e)));
-  if (bad) return fail(`El modelo usa algo que el juego no lee (${String(bad).slice(0, 40)}).`);
-  const acc = json.accessors ?? [], meshes = json.meshes ?? [], nodes = json.nodes ?? [];
+  // Extensiones: las declaradas y también las que aparecen adentro de cada parte sin declarar
+  const used = new Set((json.extensionsUsed ?? []).map(String));
+  for (const list of [json.meshes, json.nodes, json.materials, json.textures, json.images, json.bufferViews, json.accessors]) {
+    for (const o of list ?? []) {
+      for (const k of Object.keys(o?.extensions ?? {})) used.add(k);
+      for (const p of o?.primitives ?? []) for (const k of Object.keys(p?.extensions ?? {})) used.add(k);
+    }
+  }
+  const bad = [...used].find((e) => !OK_EXT.test(e));
+  if (bad) return fail(`El modelo usa algo que el juego no lee (${bad.slice(0, 40)}).`);
+  const acc = json.accessors ?? [], meshes = json.meshes ?? [], nodes = json.nodes ?? [], views = json.bufferViews ?? [];
 
-  // Triángulos
-  let tris = 0;
-  for (const m of meshes) {
-    for (const p of m?.primitives ?? []) {
+  // Caja real de las posiciones (float32 sin comprimir): se lee del binario. Si no coincide con la declarada,
+  // el modelo miente su tamaño. Comprimidas (Draco/meshopt): se usa la declarada y el cliente la acota.
+  const boxes = new Map();
+  const boxOf = (p) => {
+    const ai = p.attributes?.POSITION, a = acc[ai];
+    if (!a || !Array.isArray(a.min) || !Array.isArray(a.max)) return null;
+    if (boxes.has(ai)) return boxes.get(ai);
+    let box = { min: a.min.map(Number), max: a.max.map(Number) };
+    const view = views[a.bufferView];
+    const compressed = p.extensions?.KHR_draco_mesh_compression || view?.extensions?.EXT_meshopt_compression;
+    if (!compressed && view && bin && a.componentType === 5126 && a.type === 'VEC3' && !a.sparse) {
+      const stride = view.byteStride || 12, base = bin.off + (view.byteOffset ?? 0) + (a.byteOffset ?? 0);
+      if (base + stride * (a.count - 1) + 12 > bin.off + bin.len) return 'roto';
+      const real = { min: [Infinity, Infinity, Infinity], max: [-Infinity, -Infinity, -Infinity] };
+      for (let i = 0; i < a.count; i++) {
+        for (let k = 0; k < 3; k++) {
+          const v = dv.getFloat32(base + i * stride + k * 4, true);
+          if (!Number.isFinite(v)) return 'roto';
+          if (v < real.min[k]) real.min[k] = v;
+          if (v > real.max[k]) real.max[k] = v;
+        }
+      }
+      const tol = (k) => 0.001 + Math.abs(box.max[k] - box.min[k]) * 0.01;
+      for (let k = 0; k < 3; k++) if (real.min[k] < box.min[k] - tol(k) || real.max[k] > box.max[k] + tol(k)) return 'miente';
+      box = real;
+    }
+    boxes.set(ai, box);
+    return box;
+  };
+
+  // Recorrido de la escena: cada nodo una sola vez (en glTF válido un nodo tiene un solo padre). Así no hay
+  // forma de multiplicar el trabajo ni los triángulos reusando nodos. Triángulos por cada vez que se dibuja
+  // una malla; tamaño con las cajas llevadas por las transformaciones de los nodos.
+  const min = [Infinity, Infinity, Infinity], max = [-Infinity, -Infinity, -Infinity];
+  const seen = new Set();
+  let tris = 0, problem = null;
+  const visit = (i, parent, depth) => {
+    if (problem) return;
+    const n = nodes[i];
+    if (!n || depth > 64) return;
+    if (seen.has(i)) { problem = 'El modelo repite partes (un mismo nodo en dos lugares).'; return; }
+    seen.add(i);
+    const m = mul(parent, nodeMatrix(n));
+    if (m.some((v) => !Number.isFinite(v))) { problem = 'El modelo tiene transformaciones inválidas.'; return; }
+    for (const p of meshes[n.mesh]?.primitives ?? []) {
       const mode = p.mode ?? 4;
       const count = acc[p.indices]?.count ?? acc[p.attributes?.POSITION]?.count ?? 0;
       if (mode === 4) tris += Math.floor(count / 3);
       else if (mode === 5 || mode === 6) tris += Math.max(0, count - 2);
-    }
-  }
-  if (tris > MODEL_RULES.tris) return fail(`El modelo tiene ${tris} triángulos: el máximo es ${MODEL_RULES.tris}.`);
-
-  // Tamaño: las cajas de cada malla llevadas por la jerarquía de nodos
-  const min = [Infinity, Infinity, Infinity], max = [-Infinity, -Infinity, -Infinity];
-  const visit = (i, parent, depth) => {
-    const n = nodes[i];
-    if (!n || depth > 64) return;
-    const m = mul(parent, nodeMatrix(n));
-    for (const p of meshes[n.mesh]?.primitives ?? []) {
-      const a = acc[p.attributes?.POSITION];
-      if (!Array.isArray(a?.min) || !Array.isArray(a?.max)) continue;
+      const b = boxOf(p);
+      if (b === 'roto') { problem = 'El archivo .glb está dañado.'; return; }
+      if (b === 'miente') { problem = 'El tamaño que declara el modelo no coincide con su geometría.'; return; }
+      if (!b) continue;
       for (let c = 0; c < 8; c++) {
-        const v = [c & 1 ? a.max[0] : a.min[0], c & 2 ? a.max[1] : a.min[1], c & 4 ? a.max[2] : a.min[2]];
+        const v = [c & 1 ? b.max[0] : b.min[0], c & 2 ? b.max[1] : b.min[1], c & 4 ? b.max[2] : b.min[2]];
         const w = apply(m, v);
         for (let k = 0; k < 3; k++) { min[k] = Math.min(min[k], w[k]); max[k] = Math.max(max[k], w[k]); }
       }
@@ -59,20 +99,24 @@ export function checkGLB(buf) {
   };
   const scene = json.scenes?.[json.scene ?? 0];
   for (const r of scene?.nodes ?? nodes.map((_, i) => i)) visit(r, IDENT, 0);
+  if (problem) return fail(problem);
+  if (tris > MODEL_RULES.tris) return fail(`El modelo tiene ${tris} triángulos: el máximo es ${MODEL_RULES.tris}.`);
   if (!Number.isFinite(min[0])) return fail('El modelo no tiene nada para mostrar.');
   const size = max.map((v, k) => Math.round((v - min[k]) * 1000) / 1000);
   if (size[1] > MODEL_RULES.height) return fail(`El modelo mide ${size[1].toFixed(2)} m de alto: el máximo es ${MODEL_RULES.height} m (está en metros).`);
+  if (Math.max(...size) > MODEL_RULES.height * 2) return fail(`El modelo mide ${Math.max(...size).toFixed(2)} m de largo: es demasiado grande.`);
   if (Math.max(...size) < 0.02) return fail('El modelo es demasiado chico (¿está en metros?).');
 
-  // Texturas: todas adentro del .glb y de hasta 1024 px
+  // Texturas: todas adentro del binario del .glb (ni links ni data:) y de hasta 1024 px
   let tex = 0;
   for (const img of json.images ?? []) {
-    if (img.uri && !String(img.uri).startsWith('data:')) return fail('Las texturas tienen que estar adentro del .glb.');
-    const view = json.bufferViews?.[img.bufferView];
-    if (!view || !bin) continue;
-    const bytes = new Uint8Array(buf, bin.off + (view.byteOffset ?? 0), Math.min(view.byteLength ?? 0, 65536));
+    if (img.uri) return fail('Las texturas tienen que estar adentro del .glb.');
+    const view = views[img.bufferView];
+    if (!view || !bin) return fail('El archivo .glb está dañado.');
+    const bytes = new Uint8Array(buf, bin.off + (view.byteOffset ?? 0), Math.max(0, Math.min(view.byteLength ?? 0, 65536, bin.len - (view.byteOffset ?? 0))));
     const dims = imageSize(bytes);
-    if (dims) tex = Math.max(tex, dims[0], dims[1]);
+    if (!dims) return fail('Hay una textura en un formato que el juego no lee (PNG, JPG, WebP o KTX2).');
+    tex = Math.max(tex, dims[0], dims[1]);
   }
   if (tex > MODEL_RULES.tex) return fail(`Las texturas miden ${tex} px: el máximo es ${MODEL_RULES.tex} px.`);
   return { ok: true, tris, size, tex };
