@@ -2,6 +2,7 @@ import { DurableObject } from 'cloudflare:workers';
 import { cleanName, cleanLook, isImage, ITEMS, STARTER_ITEMS, FURNITURE, SPECIAL_FURNITURE, CONSUMABLES, HAND_MAX, designHoldable, PUBLIC_MAPS } from './shared.js';
 import { setupWorks, worksMethods } from './works.js';
 import { setupDesigns, designsMethods } from './designs.js';
+import { sessionState } from './sessions.js';
 import { setupMessages, messagesMethods } from './messages.js';
 import { setupProgress, progressMethods } from './progress.js';
 import { accountsEditorMethods } from './editor.js';
@@ -122,6 +123,9 @@ export class Accounts extends DurableObject {
       );
     `);
     // Columnas agregadas después de la primera versión
+    // Último uso de cada sesión (vencen a los 30 días sin entrar, ver sessions.js)
+    const scols = this.sql.exec('PRAGMA table_info(sessions)').toArray().map((c) => c.name);
+    if (!scols.includes('last_seen')) this.sql.exec('ALTER TABLE sessions ADD COLUMN last_seen INTEGER');
     const cols = this.sql.exec('PRAGMA table_info(users)').toArray().map((c) => c.name);
     const addCol = (name, def) => { if (!cols.includes(name)) this.sql.exec(`ALTER TABLE users ADD COLUMN ${name} ${def}`); };
     addCol('bio', "TEXT NOT NULL DEFAULT ''");
@@ -230,15 +234,20 @@ export class Accounts extends DurableObject {
 
   async newSession(userId) {
     const token = randomHex(32);
-    this.sql.exec('INSERT INTO sessions (token, user_id, created) VALUES (?, ?, ?)', await sha256(token), userId, Date.now());
+    this.sql.exec('INSERT INTO sessions (token, user_id, created, last_seen) VALUES (?, ?, ?, ?)', await sha256(token), userId, Date.now(), Date.now());
     return token;
   }
 
   async userFromToken(token) {
     if (typeof token !== 'string' || token.length !== 64) return null;
-    const rows = this.sql.exec(
-      'SELECT u.* FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token = ?', await sha256(token),
-    ).toArray();
+    const hash = await sha256(token);
+    const s = this.sql.exec('SELECT created, last_seen FROM sessions WHERE token = ?', hash).toArray()[0];
+    if (!s) return null;
+    // A los 30 días sin usarla, la sesión se cierra; si se usa, se corre la fecha
+    const state = sessionState(s.created, s.last_seen);
+    if (state === 'expired') { this.sql.exec('DELETE FROM sessions WHERE token = ?', hash); return null; }
+    if (state === 'refresh') this.sql.exec('UPDATE sessions SET last_seen = ? WHERE token = ?', Date.now(), hash);
+    const rows = this.sql.exec('SELECT u.* FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token = ?', hash).toArray();
     return rows[0] ?? null;
   }
 

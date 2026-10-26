@@ -23,6 +23,10 @@ const MIC_STATES = ['off', 'on'];
 const PICKUP_LOCK = 5_000, GROUND_LIFE = 60_000;
 // Antiflood del chat
 const FLOOD_MAX = 5, FLOOD_WINDOW = 10_000, REPEAT_WINDOW = 30_000;
+// Control de velocidad (posiciones falsas): cada jugador tiene un saldo de metros que se recarga a MAX_SPEED
+// (trotar es 3,2 m/s) hasta MOVE_CAP, y cada movimiento lo gasta. El tope cubre unos 3 s de lag trotando,
+// saltos y sentarse; mandar muchos mensajes seguidos no sirve para ir más rápido
+const MAX_SPEED = 8, MOVE_CAP = 10;
 const DEFAULT_SETTINGS = { chat: true, voice: true, screen: true, items: true, dj: true, artists: true };
 // Partes que toman los artistas en la consola (además de la pantalla del hall, que es this.screen)
 const PARTS = ['luces', 'escenario', 'escenario2']; // escenario2: la segunda pantalla de una sala personal (editor)
@@ -69,6 +73,8 @@ export class Room extends DurableObject {
   constructor(ctx, env) {
     super(ctx, env);
     this.states = new Map();   // últimas posiciones (en memoria)
+    this.moveBudget = new Map(); // metros que le quedan a cada uno para moverse (control de velocidad)
+    this.freeMove = new Set(); // a quién movió el servidor (su próxima posición no se controla)
     this.chatTimes = new Map(); // antiflood: horarios de los últimos mensajes de cada uno
     this.lastText = new Map();  // antiflood: último mensaje de cada uno
     this.lastSeen = new Map(); // última señal de cada conexión
@@ -318,6 +324,21 @@ export class Room extends DurableObject {
       case 's': {
         const s = cleanState(msg.s);
         if (!s) return;
+        // Posiciones falsas (teletransporte): un salto más rápido de lo posible no se acepta y se lo devuelve
+        // a su última posición válida. Margen amplio por el lag; los movimientos del servidor no cuentan
+        const prev = this.states.get(meta.id), now = Date.now();
+        const budget = this.moveBudget.get(meta.id) ?? { m: MOVE_CAP, at: now };
+        budget.m = Math.min(MOVE_CAP, budget.m + (MAX_SPEED * (now - budget.at)) / 1000);
+        budget.at = now;
+        this.moveBudget.set(meta.id, budget);
+        if (prev && !this.freeMove.delete(meta.id)) {
+          const d = Math.hypot(s[0] - prev[0], s[2] - prev[2]);
+          if (d > budget.m) {
+            this.send(ws, { t: 'pos-fix', x: prev[0], y: prev[1], z: prev[2] });
+            return;
+          }
+          budget.m -= d;
+        }
         this.states.set(meta.id, s);
         this.broadcast({ t: 's', id: meta.id, s }, ws);
         break;
@@ -581,12 +602,14 @@ export class Room extends DurableObject {
         // Traer al jugador al lado del moderador
         const s = this.states.get(meta.id);
         if (!s) return;
+        this.freeMove.add(tm.id);
         this.send(target, { t: 'teleport', x: s[0] + 1, y: s[1], z: s[2] + 0.5, by: meta.name });
         break;
       }
       case 'spawn': {
         // Las salas personales y los mapas públicos tienen su propia entrada
         const sp = (await this.ownerId()) ? ROOM_SPAWN : PUBLIC_MAPS[await this.roomName()]?.spawn ?? SPAWN;
+        this.freeMove.add(tm.id);
         this.send(target, { t: 'teleport', x: sp.x, y: 0, z: sp.z, by: meta.name });
         break;
       }
@@ -1112,6 +1135,8 @@ export class Room extends DurableObject {
     meta.left = true;
     ws.serializeAttachment(meta);
     this.states.delete(meta.id);
+    this.moveBudget.delete(meta.id);
+    this.freeMove.delete(meta.id);
     this.lastSeen.delete(meta.id);
     this.rates.delete(meta.id);
     this.chatTimes.delete(meta.id);

@@ -91,6 +91,7 @@ export class Client {
   since(i) { return this.msgs.slice(i); }
 
   async join(s = [0, 0, 0, 0, 0, 0], extra = {}) {
+    this.joinedAt = s.slice(0, 3);
     if (!this.ws) await this.open();
     this.mark = this.msgs.length;
     this.send({ t: 'join', token: this.token, s, ...extra });
@@ -116,7 +117,15 @@ export async function joined(token, room = 'museo', s) {
 }
 
 // Entra y espera a que la sala de "c" sepa la posición (algunas acciones se miden desde ahí)
+// La sala controla la velocidad (saldo de 10 m que se recarga a 8 m/s): se camina por tramos
 export async function moveTo(c, x, y, z) {
-  c.send({ t: 's', s: [x, y, z, 0, 0, 0] });
-  await sleep(80);
+  const from = c.at ?? c.joinedAt ?? [0, 0, 0];
+  const d = Math.hypot(x - from[0], z - from[2]);
+  const steps = Math.max(1, Math.ceil(d / 6));
+  for (let i = 1; i <= steps; i++) {
+    const k = i / steps;
+    c.send({ t: 's', s: [from[0] + (x - from[0]) * k, y, from[2] + (z - from[2]) * k, 0, 0, 0] });
+    await sleep(i < steps ? 800 : 80);
+  }
+  c.at = [x, y, z];
 }

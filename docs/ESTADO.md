@@ -122,8 +122,7 @@ Para volver a subir: `npm run deploy` desde la carpeta del proyecto.
    con el video del VJ; sin VJ, un dibujo que late con la música; consola, cabina y 4 parlantes con sonido envolvente,
    pufs). ✅ Galpón (32 × 22 × 10 m: escenario con cabina y pantalla de 8 m, consola al fondo con otra pantalla,
    truss con 12 focos y haces en el humo, LED, 6 parlantes envolventes).
-8. **Seguridad, lo que quedó para decidir** (ver `docs/ramas/seguridad.md`): teletransporte (posiciones falsas)
-   y vencimiento de sesiones.
+8. ✅ **Seguridad**: control de velocidad (posiciones falsas) y sesiones que vencen a los 30 días sin entrar.
 9. ✅ Animaciones achicadas: paquete JSON (`npm run empaquetar`), al entrar baja ~0,7 MB en vez de ~13 MB.
 10. **Primera prueba con gente real** (inauguración con 5–10 artistas).
 

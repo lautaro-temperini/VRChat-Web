@@ -86,12 +86,12 @@ test('antiflood: los gestos en ráfaga no le llegan todos a los demás', async (
 
 test('posiciones: números raros se rechazan y las enormes se acotan', async () => {
   const a = await account('po'), b = await account('po');
-  const ca = await joined(a.token), cb = await joined(b.token);
+  // Al entrar, la posición enorme se acota (después, saltar hasta ahí sería un teletransporte: ver movimiento.test.mjs)
+  const ca = await joined(a.token, 'museo', [1e300, -1e300, 0, 0, 0, 99]), cb = await joined(b.token);
+  assert.deepEqual(cb.welcome.players.find((p) => p.id === ca.id)?.s, [500, -500, 0, 0, 0, 5]);
   for (const s of [[1, 2, 3], ['1', 0, 0, 0, 0, 0], [null, 0, 0, 0, 0, 0], [1e400, 0, 0, 0, 0, 0], 'hola', { 0: 1 }]) ca.send({ t: 's', s });
   ca.send('{"t":"s","s":[NaN,0,0,0,0,0]}');
-  ca.send({ t: 's', s: [1e300, -1e300, 0, 0, 0, 99] });
-  const m = await cb.wait((x) => x.t === 's' && x.id === ca.id);
-  assert.deepEqual(m.s, [500, -500, 0, 0, 0, 5]);
+  assert.ok(await cb.none((x) => x.t === 's' && x.id === ca.id, 600), 'pasó una posición inválida');
   await ca.close(); await cb.close();
 });
 

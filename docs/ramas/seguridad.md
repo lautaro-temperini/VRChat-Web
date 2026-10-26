@@ -43,12 +43,15 @@ Todos los arreglos tienen su prueba en `test/` (`npm test`). Todo se probó cont
 - Fotos privadas, obras pendientes, progreso y avisos solo para quien corresponde.
 - Tokens de sesión guardados como hash; contraseñas con PBKDF2.
 
+## Resuelto después (26/10, decisión del usuario)
+- **Posiciones falsas (teletransporte):** la sala lleva un saldo de metros por jugador que se recarga a 8 m/s
+  hasta 10 m (trotar es 3,2 m/s; el tope cubre unos 3 s de lag) y cada movimiento lo gasta. Si no alcanza, no
+  se acepta y le llega `pos-fix` con su última posición válida. Lo que mueve el servidor (moderador: traer,
+  mandar a la entrada) no cuenta. `room.js` → `MAX_SPEED`, `MOVE_CAP`; pruebas en `test/movimiento.test.mjs`.
+- **Sesiones:** vencen a los 30 días sin usarse (`server/sessions.js`, columna `sessions.last_seen`, que se
+  corre como mucho una vez por hora).
+
 ## Queda para decidir / a futuro
-- **El alcance de 3 m se mide desde la posición que manda el cliente**: alguien puede "teletransportarse"
-  mandando posiciones falsas. Controlar la velocidad (rechazar saltos imposibles) cambia cómo se juega
-  con lag y teletransportes de mods: consultar antes.
-- **Las sesiones no vencen nunca** (se borran solo al salir). Ponerles vencimiento es una decisión de diseño
-  ("no pedir datos al recargar").
 - **Login CSRF**: el `state` del ingreso con Google no está atado al navegador (alguien podría hacerte
   entrar a su cuenta). Riesgo bajo.
 - **Obras de base del Museo** (`progressview` con `fixed`): el título no se valida contra la lista de obras
