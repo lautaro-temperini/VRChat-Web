@@ -21,9 +21,10 @@ archivo y línea) está en [`docs/hallazgos/`](hallazgos/), un archivo por agent
   de visitas (14,7 s; con 30 niveles, ~15 min). Corre adentro de `Accounts` (un solo hilo): mientras tanto no
   anda login, inventario, amigos ni nada. Rep. — `server/glb.js` (`visit`). *Arreglo:* conjunto de visitados y
   rechazar nodos usados más de una vez (en glTF válido cada nodo tiene un solo padre). [archivos #1]
-- [ ] **C2. Cualquiera ve en vivo en qué sala estás con solo mandarte una solicitud de amistad**, aunque sea un
-  invitado descartable y aunque lo restrinjas o ignores: la lista de solicitudes pendientes trae la sala.
-  Rep. — `server/accounts.js` (`friends`, ~l. 611). *Arreglo:* mostrar la sala solo a amigos aceptados. [acoso #1]
+- [ ] **C2. Quien te restringe ve en vivo en qué sala estás con solo mandarte una solicitud de amistad**: la lista
+  de solicitudes pendientes trae la sala aunque lo hayas restringido. (Ignorar no cuenta acá: solo silencia voz y
+  texto dentro de la misma sala.)
+  Rep. — `server/accounts.js` (`friends`, ~l. 611). *Arreglo:* mostrar la sala solo a amigos aceptados y nunca a quien te restringió. [acoso #1]
 
 ## Altos
 

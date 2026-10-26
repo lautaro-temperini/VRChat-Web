@@ -36,13 +36,13 @@ Los 2 y 8 están reproducidos sobre la lógica real de la sala, sin el SFU real.
   f.outgoing.find((x) => x.id === V).room;   // → "cafeteria"; después "azotea" cuando se mueve
   ```
   Salida: `outgoing={"id":"92b5…","name":"vic…","room":"cafeteria"}` → `"room":"azotea"` cuando la víctima cambió
-  de sala. **Sigue andando después de que la víctima lo restringe y lo ignora.** Con un **invitado** recién creado
+  de sala. **Sigue andando después de que la víctima lo restringe.** Con un **invitado** recién creado
   (`POST guest`, sin mail) pasa lo mismo: `invitado ve en outgoing: {…"room":"azotea"}`.
 - **Qué pasa:** `friends()` calcula `room: this.where(other.id)` para *todas* las filas (pendientes salientes y
   entrantes incluidas), no solo para las amistades aceptadas. El buscador sí lo limita ("en qué sala está, solo
   sus amigos"), pero la lista de amigos no.
-- **Qué debería pasar:** la sala solo se ve en amistades aceptadas (igual que en `search`). Y quien te ignoró o
-  restringió no debería verla nunca (ver hallazgo 9).
+- **Qué debería pasar:** la sala solo se ve en amistades aceptadas (igual que en `search`). Y quien te restringió no debería
+  verla nunca (ver hallazgo 9). Ignorar no oculta la ubicación: solo silencia voz y texto dentro de la misma sala.
 - **Dónde:** `server/accounts.js:611` (`const info = { …, room: this.where(other.id) }`).
 - **Arreglo sugerido:** `room: r.status === 'accepted' && !this.shields(other.id, me.id) ? this.where(other.id) : null`.
   Además frenar las solicitudes de invitados (hallazgo 3).

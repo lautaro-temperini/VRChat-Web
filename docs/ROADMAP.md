@@ -103,7 +103,7 @@ La música del DJ y el puente OSC ya están hechos. Falta:
 | DJ: dónde suena | Desde los dos parlantes del escenario (canal izq./der.), más fuerte cerca, se oye en toda la sala. La M la silencia |
 | DJ: cabina | Se arranca con E en la cabina; el DJ queda fijo ahí. Para salir, E de nuevo y confirma "Terminar mi set" |
 | DJ: ritmo | Focos, luz del escenario, LEDs y pista de baile laten con los graves (cada uno lo calcula en su PC) |
-| DJ + pantalla | Pueden estar las dos a la vez |
+| DJ + pantalla | Pueden estar las dos a la vez, pero no las ocupa la misma persona (26/10) |
 | DJ: cartel y avisos | Cartel "DJ: nombre" + track. En el chat: arranque, fin y "Ahora suena". El track se lee solo de un archivo de texto (Chrome/Edge); si no se configura, no se muestra |
 | Artistas: qué | Luces por OSC (focos, luz del escenario, LEDs: una sola parte) y visuales como video desde su PC (pantalla compartida) |
 | Artistas: quién y cuántos | Cualquiera (el dueño/mods pueden deshabilitar la consola). Varios a la vez, una parte cada uno: luces y pantalla → 1 VJ + 1 DJ + 1 de luces |
@@ -136,7 +136,7 @@ La música del DJ y el puente OSC ya están hechos. Falta:
 | Bailes | 10 bailes: /bailar = uno al azar, /bailar N = ese; en el menú de la R cada uno con su nombre |
 | Aplaudir / festejar | Como no hay Clapping, se agregó /festejar (Cheering); aplaudir sigue hecho por código |
 | Hablar | Con el micrófono abierto y quieto, el personaje usa la animación de hablar |
-| Mutear / ignorar / restringir | Tres acciones distintas, solo para uno. Mutear = silenciar su voz. Ignorar = silenciar voz y texto en la sala. Restringir = que no aparezcan sus publicaciones (muro y fotos) |
+| Mutear / ignorar / restringir | Tres acciones distintas, solo para uno. Mutear = silenciar su voz. Ignorar = silenciar voz y texto en la sala. Restringir = que no aparezcan sus publicaciones (muro y fotos), que no vea tu sala en vivo ni tu ubicación, y que no pueda entrar a tus salas de amigos (26/10) |
 | Reportar | Postergado: por ahora no hay botón (el código del servidor queda guardado) |
 | Moderación | Dueño de cada sala personal; el usuario "xvvave" es admin del Museo y de todas las salas. Expulsar, banear, silenciar, traer, mandar a la entrada, habilitar/deshabilitar chat/voz/pantalla/objetos |
 | Mapas | Botón "Mapa" (antes Mundi) + comandos en el chat (`/ir`, `/salas`) |
@@ -164,13 +164,13 @@ La música del DJ y el puente OSC ya están hechos. Falta:
 | Agregar amigos | Desde el perfil (E sobre alguien) y desde el buscador del celular |
 | Mi sala | En el Mapa: nombre, descripción y quién puede entrar (abierta / solo amigos / cerrada) |
 | Salas de jugadores | Plantillas primero (loft, galería, club, depto, terraza…), caja editable después. Modo edición con muebles, colores y materiales |
-| Paquete inicial | 15 objetos al azar entre muebles e indumentaria (cuando existan los muebles) |
+| Paquete inicial | 15 objetos al azar entre muebles e indumentaria (cuando existan los muebles). ~~Con muebles especiales~~ → solo básicos, sin especiales ni exóticos (26/10; la cantidad queda igual) |
 | Sala de xvvave | La plantilla club, la misma que todo el mundo |
 | Muro del celular | Reemplaza "Mis notas" (cuadro para escribir arriba). Muestra notas y fotos tuyas y de amigos; abajo "Destacados" con lo más nuevo del resto |
 | Me gusta en el muro | Corazón en cada nota y cada foto (uno por persona, se puede sacar). No genera aviso |
 | Fotos en el muro | Cada foto aparece solo para quien puede ver la galería de su dueño |
 | Visión y público | Público, artistas de 20 a 40 años, +18. "Exposición artística digital gamificada" |
-| Obras del Museo | Del público (el admin puede cargar algunas). Cada obra 24 h; postulaciones en cola con prioridad para usuarios |
+| Obras del Museo | Del público (el admin puede cargar algunas). Cada obra 24 h; postulaciones en cola ~~con prioridad para usuarios~~ en orden por fecha (26/10) |
 | Salas | Todas distintas; solo el Museo (home de todos) es igual para todos |
 | Economía | Sí. Fuentes: misiones/niveles y diseños subidos por artistas, que pasan a ser objetos intercambiables |
 | Registro | Con mail (frena las cuentas múltiples; 3–4 por persona no rompen nada) y nickname único |
@@ -187,10 +187,10 @@ La música del DJ y el puente OSC ya están hechos. Falta:
 | Exploradores | Más mapas públicos |
 | Museo rotativo: lugares | Rotan los 9 cuadros y las 5 esculturas que ya hay; cada lugar rota por su cuenta cada 24 h. Mientras no haya obras del público, se ven las de ahora |
 | Museo rotativo: cola vacía | Si no hay nadie esperando, la obra actual se queda otras 24 h |
-| Museo rotativo: postular | Abierto: cualquiera postula. La cola tiene orden fijo (fecha de postulación, con prioridad para usuarios); verificar NO adelanta una obra, solo la deja lista para presentarse en su turno |
+| Museo rotativo: postular | Abierto: cualquiera postula. La cola tiene orden fijo (fecha de postulación, ~~con prioridad para usuarios~~ sin prioridad, 26/10); verificar NO adelanta una obra, solo la deja lista para presentarse en su turno |
 | Museo rotativo: verificación | Las obras sin verificar quedan en la cola hasta que alguien las verifique o deniegue (no vencen). Si le llega el turno a una sin verificar, se presenta la siguiente verificada y la otra conserva el primer lugar |
 | Museo rotativo: votos | Verificar = 1 curador. Denegar = 2 curadores distintos; si no coinciden, decide un admin. Para denegar hay que elegir un motivo, que le llega al autor |
-| Curadores | Título que se gana automáticamente por méritos (antigüedad, participación, reputación; los números se definen con la progresión). Revisan obras que les tocan **al azar** (no eligen ni ven la lista) y **nunca de sus amigos**. No pueden aprobar las propias (salvo que también sean Creadores). No bajan obras |
+| Curadores | Título que se gana automáticamente por méritos (antigüedad, participación, reputación; los números se definen con la progresión). Revisan obras que les tocan **al azar** (no eligen ni ven la lista) y **nunca de sus amigos**. No pueden aprobar las propias (salvo que también sean Creadores). No bajan obras. Al mostrar obras para votar, se priorizan las de personas que no son amigas ni de la misma IP (26/10) |
 | Creadores | Título que se gana con **3 obras aceptadas seguidas** (un rechazo vuelve el contador a cero). Sus obras entran a la cola ya verificadas |
 | Títulos: perderlos | Solo un admin quita el título de Creador o Curador, a mano |
 | Bajar obras | Solo los admins pueden sacar una obra que ya entró (de la cola o del Museo) |
@@ -224,17 +224,17 @@ La música del DJ y el puente OSC ya están hechos. Falta:
 | Editor: qué ven los visitantes | Los cambios aparecen al soltar el click (no se ve el trayecto mientras arrastrás). Con Esc se cancela y el objeto vuelve a su lugar |
 | Editor: máximo | 100 objetos por sala |
 | Editor: muebles | Catálogo libre de muebles básicos para todos; los especiales salen del inventario (y vuelven si los levantás) |
-| Editor: cambiar de plantilla | Se puede; los muebles especiales puestos vuelven al inventario |
+| Editor: cambiar de plantilla | ~~Se puede; los muebles especiales puestos vuelven al inventario~~ → ya no se cambia (26/10, ver "Salas: plantilla fija") |
 | Editor: visitantes | Pueden usar los muebles (sentarse, ver cuadros con E), no moverlos |
 | Diseños: qué | Estampas para ropa, cuadros y objetos 3D |
-| Diseños: copias | El artista puede regalar copias ilimitadas; los demás las intercambian |
+| Diseños: copias | ~~El artista puede regalar copias ilimitadas~~ → máximo 2 copias por día por cuenta (26/10); los demás las intercambian |
 | Diseños: verificación | Nadie verifica el contenido; solo un control automático de que funcione en el juego |
 | Diseños: reglas 3D | GLB, hasta 2 MB, hasta 10.000 triángulos, texturas hasta 1K, máximo 3 m de alto (se pueden ajustar) |
 | Diseños: imágenes | Estampas a 1024 px. Cuadros y obras del Museo: 1024 px en la pared y hasta 2048 px (HD) al abrir la ficha con E |
 | Diseños: crédito | "Diseño de X" solo en el inventario |
 | Diseñadores | Título que se gana al subir 3 modelos que pasen el control automático. Solo reconocimiento (no da poderes). No se pierde |
 | Orden del plan | El editor de salas va **antes** que la progresión (las recompensas necesitan muebles) |
-| Eventos | Cualquier set de DJ o show de la consola, en cualquier sala, con **más de 5 personas** presentes. Cuenta haber estado **5 minutos** (aunque estés AFK) |
+| Eventos | Cualquier set de DJ o show de la consola, en cualquier sala, con **más de 5 personas** presentes. Cuenta haber estado **5 minutos** (aunque estés AFK). Los invitados cuentan para las 5 personas. Hace falta música real (audio del DJ publicado; sin sync ni tracklist). Máximo **un evento por sala por día** (26/10) |
 | Voz: servidor | Servidor de audio (Cloudflare Realtime SFU) para que nadie vea la IP de otro |
 | Voz: a quién escuchás | Los 4 más cercanos **que estén hablando**, dentro de 10 m. Si uno se calla, entra el siguiente |
 | Voz: grupos | Se invita con E desde el perfil. Hasta 4 personas. Solo en la misma sala (si alguien se va, deja de escucharse) |
@@ -257,7 +257,7 @@ La música del DJ y el puente OSC ya están hechos. Falta:
 | Camino inicial | En orden: ver una obra con E · visitar otra sala · hacer un gesto · agregar un amigo · publicar en el muro · postular una obra · asistir a un evento. Cada paso da un objeto básico y 20 puntos; terminarlo da uno raro |
 | Misiones diarias | 3 al azar por día (00:00 GMT-3): ver 3 obras · visitar 2 salas · dar 3 me gusta · dejar un corazón · escribir en el muro · hacer 2 gestos · estar en un evento · curar 1 obra (solo curadores). Cada una da un objeto básico; las 3 juntas, 25% de chance de uno raro. Las diarias no dan puntos de nivel |
 | Recompensas por nivel | Objeto básico en cada nivel; raro cada 5 (5, 15, 25…); exótico cada 10 (10, 20…) |
-| Eventos: cómo cuenta | Estar al menos 5 minutos en la sala mientras el DJ pasa música (o hay show en la consola), aunque estés AFK. Cada set es un evento |
+| Eventos: cómo cuenta | Estar al menos 5 minutos en la sala mientras el DJ pasa música (o hay show en la consola), aunque estés AFK. ~~Cada set es un evento~~ → un evento por sala por día (26/10) |
 | Progresión: salas que cuentan | Las salas de otros (ni la propia ni el Museo) |
 | Progresión: dónde se ve | App **Progreso** en el celular + **barrita de nivel** chica en pantalla (junto al nombre de la sala) |
 | Editor: plantilla club | Un club nuevo y más chico: la parte de la pista (sin hall ni 2º piso). Luces y parlantes básicos por defecto. La cabina, los sillones, los parlantes y las pantallas son muebles que se pueden mover o cambiar |
@@ -273,8 +273,8 @@ La música del DJ y el puente OSC ya están hechos. Falta:
 | Editor: tamaño de las plantillas | Chicas, alrededor de 12 × 10 m |
 | Editor: superponer | Los muebles se pueden superponer; solo no se pueden sacar de la sala |
 | Editor: especiales de ejemplo | Trono dorado, bola de espejos, sillón de terciopelo con neón y escultura de neón |
-| Paquete inicial (activado) | Las cuentas nuevas reciben 15 objetos al azar entre prendas y muebles especiales |
-| Editor: cambiar de plantilla (muebles básicos) | Se borran (con confirmación); arrancás con lo que trae la plantilla nueva |
+| Paquete inicial (activado) | Las cuentas nuevas reciben 15 objetos al azar entre prendas y ~~muebles especiales~~ solo básicos (26/10) |
+| Editor: cambiar de plantilla (muebles básicos) | ~~Se borran (con confirmación); arrancás con lo que trae la plantilla nueva~~ → ya no se cambia (26/10, ver "Salas: plantilla fija") |
 | Ingreso: mail sin confirmar (24/10) | Si alguien entra con Google/Discord a una cuenta con contraseña cuyo mail nunca se confirmó, **manda Google**: la contraseña deja de valer y se cierran las otras sesiones (evita que otro registre tu mail antes que vos) |
 | Frenos por IP (24/10) | Hasta 10 contraseñas mal cada 15 min por cuenta + IP ("Demasiados intentos. Probá de nuevo en unos minutos"). Hasta 20 invitados/cuentas nuevas por IP por hora |
 | Invitados: cabina y consola (24/10) | No pasan música ni toman luces o pantallas: candado y "Para pasar música tenés que crear una cuenta" |
@@ -286,7 +286,7 @@ La música del DJ y el puente OSC ya están hechos. Falta:
 | Modelos 3D de usuarios | Mismas reglas que los diseños de artistas: GLB, hasta 2 MB, 10.000 triángulos, texturas 1K, máximo 3 m, sin scripts; control automático, sin revisar el contenido |
 | Consumibles: cuáles | Para empezar: trago y café |
 | Consumibles: cómo se consiguen | En la barra del hall (E, sin límite), como recompensa de misiones y niveles (van al inventario), regalándolos o intercambiándolos, y con muebles especiales que el dueño pone en su sala y dan consumibles a los visitantes |
-| Consumibles: efecto | 2 minutos sin gastar stamina. Mientras el efecto está activo no se puede tomar otro |
+| Consumibles: efecto | 2 minutos sin gastar stamina. Mientras el efecto está activo no se puede tomar otro. Excepción: el beso reinicia los 2 min (26/10) |
 | Beso | E sobre alguien → "Beso": al otro le llega el pedido con Aceptar / Rechazar. Si acepta, los dos hacen el gesto y los dos reciben el efecto de stamina. Rechazar usa el mismo bloqueo creciente que las invitaciones a grupos |
 | Cuerpo: base MakeHuman (24/10) | Peso y músculo se combinan como en MakeHuman (mucho peso + poco músculo = gordo; mucho peso + mucho músculo = grande). Tipos del básico: **flaco** = peso 0 y músculo 0; **promedio** = 0,5 y 0,5; **gordo** = peso 1 y músculo 0; **musculoso** = peso 0,75 y músculo 1 |
 | Peinados MakeHuman (24/10) | corto = short01 (prolijo), largo = long01, rapado = short04, rulos = afro01, coleta = ponytail01. Nuevos: **trenza** (braid01), **bob** (bob02) y **corto con flequillo** (short03). El rodete sale: las cuentas que lo tenían se ven con trenza |
@@ -308,7 +308,7 @@ La música del DJ y el puente OSC ya están hechos. Falta:
 | Torres del escenario (25/10) | Siguen sonando bajito, como monitores; el sonido fuerte sale de los line arrays |
 | Beso de invitados (25/10) | Los invitados también pueden pedir y aceptar besos |
 | Diseños: quién sube (25/10) | Cualquier cuenta registrada |
-| Diseños: dónde se suben (25/10) | En la Mochila: botón "Subir diseño" (estampa, cuadro u objeto 3D). Sin límite por día (solo el control automático) |
+| Diseños: dónde se suben (25/10) | En la Mochila: botón "Subir diseño" (estampa, cuadro u objeto 3D). ~~Sin límite por día (solo el control automático)~~ → máximo 5 subidas por día por cuenta, más el control automático (26/10) |
 | Diseños: copia propia (25/10) | El que lo sube recibe una copia. Con "Hacer copia" (solo el autor) genera más; soltar o intercambiar le saca esa copia, como cualquier objeto |
 | Diseños: regalar (25/10) | Las copias se regalan intercambiando o soltándolas al piso |
 | Estampas (25/10) | Van en la parte de arriba de la ropa, en el pecho o en la espalda, y con tamaño chico/mediano/grande: las dos cosas las elige quien la sube |
@@ -322,3 +322,12 @@ La música del DJ y el puente OSC ya están hechos. Falta:
 | Sesiones (26/10) | Vencen a los 30 días sin entrar (quien juega seguido no lo nota) |
 | Cafetería: detalles (25/10) | Café de barrio porteño (madera oscura, baldosas blanco y negro, espejos, luz cálida, ventanales a la calle), chica (14 × 10 m). El atril muestra las últimas notas del muro de todos |
 | Azotea (25/10) | Mediana (24 × 18 m) con baranda de vidrio (no se trepa) y la ciudad alrededor; cabina de DJ y parlantes; con la hora real (de día sol, de noche luces) |
+| Salas: plantilla fija (26/10) | La plantilla se elige al crear la sala y no se puede cambiar después. Para cambiarla hay que borrar la sala y crear una nueva (el juego avisa y pide confirmar antes de borrar), o crear otra sala. **Máximo 3 salas por persona** |
+| Invitados: amistad (26/10) | Un invitado no tiene amigos: no puede mandar solicitudes de amistad |
+| Baneo (26/10) | Al banear a alguien, se bloquea también su IP por 24 h (los invitados de esa IP no entran a esa sala ese día) |
+| Silenciar (26/10) | El dueño o un mod que silencia a alguien le frena el chat y la voz. Besos, intercambios, grupos y gestos siguen llegando |
+| Cerrar sala o sacar de amigos (26/10) | Si cierra la sala o saca a alguien de amigos con esa persona adentro, se la echa con aviso |
+| Buscador y sala cerrada (26/10) | Como hoy: cualquiera ve si estás conectado; la sala cerrada muestra nombre, descripción y dueño sin sesión |
+| Altura (26/10) | Cada sala tiene un techo de altura según su plantilla. No se suma al saldo de movimiento |
+| Track del DJ (26/10) | Como máximo un cambio de tema cada 20 s |
+| Intercambio (26/10) | Al rechazar una invitación, mismo bloqueo creciente que los grupos. Para invitar hace falta estar a unos 3,5 m |
