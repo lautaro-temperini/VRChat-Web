@@ -21,7 +21,7 @@ archivo y línea) está en [`docs/hallazgos/`](hallazgos/), un archivo por agent
   de visitas (14,7 s; con 30 niveles, ~15 min). Corre adentro de `Accounts` (un solo hilo): mientras tanto no
   anda login, inventario, amigos ni nada. Rep. — `server/glb.js` (`visit`). *Arreglo:* conjunto de visitados y
   rechazar nodos usados más de una vez (en glTF válido cada nodo tiene un solo padre). [archivos #1]
-- [ ] **C2. Quien te restringe ve en vivo en qué sala estás con solo mandarte una solicitud de amistad**: la lista
+- [x] **C2. Quien te restringe ve en vivo en qué sala estás con solo mandarte una solicitud de amistad**: la lista
   de solicitudes pendientes trae la sala aunque lo hayas restringido. (Ignorar no cuenta acá: solo silencia voz y
   texto dentro de la misma sala.)
   Rep. — `server/accounts.js` (`friends`, ~l. 611). *Arreglo:* mostrar la sala solo a amigos aceptados y nunca a quien te restringió. [acoso #1]
@@ -32,11 +32,11 @@ archivo y línea) está en [`docs/hallazgos/`](hallazgos/), un archivo por agent
   escuchando desde cualquier punto de la sala (probado a 195 m). `enforce` no corre al moverse.
   Rep. (lógica de la sala con SFU simulado) — `server/room.js` (`pullBlocked`/`enforce`). *Arreglo:* correr
   `enforce` periódicamente o cuando cambian las posiciones. [acoso #2, permisos H5]
-- [ ] **A2. OAuth: el `state` no está atado al navegador.** Si alguien sin cuenta entra con Google desde un
+- [x] **A2. OAuth: el `state` no está atado al navegador.** Si alguien sin cuenta entra con Google desde un
   link armado por otro, queda dentro del invitado del atacante, que conserva la sesión (toma de cuenta).
   Hip. — `server/accounts.js` (`oauthStart`/`oauthCallback`). *Arreglo:* cookie o valor en el navegador que
   se compare al volver. [permisos H1]
-- [ ] **A3. Google sin nick + `register`:** una cuenta entrada por Google y sin nick cuenta como invitado para
+- [x] **A3. Google sin nick + `register`:** una cuenta entrada por Google y sin nick cuenta como invitado para
   `register`, se puede poner un mail ajeno con contraseña y queda `email_verified = 1`. Hip. — `accounts.js`
   (`register`, `isGuest`). [permisos H2]
 - [x] **A4. Las esculturas del Museo no pasan por `checkGLB`:** solo se mira que pese < 2 MB y empiece con
@@ -62,7 +62,7 @@ archivo y línea) está en [`docs/hallazgos/`](hallazgos/), un archivo por agent
 - [ ] **A10. Cientos de conexiones bloquean una sala ~10 s:** 300 WebSocket con joins falsos llevan la
   latencia de 17 ms a 10 s; no hay tope por sala ni freno por IP en `/ws/`. Rep. — `server/worker.js`,
   `room.js`. *Arreglo:* tope de conexiones sin entrar por sala/IP y cerrar antes las mudas. [saturación #1]
-- [ ] **A11. Spam de avisos de amistad:** cancelar y reenviar la solicitud en bucle llena los avisos de la víctima
+- [x] **A11. Spam de avisos de amistad:** cancelar y reenviar la solicitud en bucle llena los avisos de la víctima
   (aunque te haya restringido o ignorado, y desde invitados); el bloqueo de 24 h solo se arma si rechaza.
   Rep. — `server/accounts.js` (~l. 620, 651). [acoso #3, permisos H14]
 - [ ] **A12. El antiflood del chat se reinicia al reconectar** (va por conexión, no por cuenta): 20 mensajes en
@@ -112,9 +112,9 @@ archivo y línea) está en [`docs/hallazgos/`](hallazgos/), un archivo por agent
   Rep. *Decidir:* ¿se banea por IP/navegador?, ¿invitados sin ciertas interacciones? [acoso #7, permisos H12]
 - [ ] **M16. "Ignorar" no impide que el ignorado escuche tu voz** (la sala no consulta los ignorados al
   suscribir). Rep. (lógica) — `room.js` (`pullBlocked`). [acoso #8]
-- [ ] **M17. Restringir o ignorar a un amigo no le saca nada 🗳️:** sigue viendo tu sala en vivo, entra a tu
+- [x] **M17. Restringir o ignorar a un amigo no le saca nada 🗳️:** sigue viendo tu sala en vivo, entra a tu
   sala "solo amigos", ve y le da me gusta a tus fotos (hoy es coherente con la regla actual). [acoso #9]
-- [ ] **M18. Cerrar la sala o sacar a alguien de amigos no echa a quien ya está adentro 🗳️.** Rep. [acoso #10, permisos H11]
+- [x] **M18. Cerrar la sala o sacar a alguien de amigos no echa a quien ya está adentro 🗳️.** Rep. [acoso #10, permisos H11]
 - [ ] **M19. Suplantación de nombres:** un invitado se llama igual que una cuenta con letras cirílicas o un
   espacio invisible (U+200B), o con un nombre invisible. Rep. — `shared.js` (`cleanName`). *Arreglo:* sacar
   invisibles/bidi y comparar con nicks registrados (normalizado). [acoso #11, permisos H7]
@@ -130,7 +130,7 @@ archivo y línea) está en [`docs/hallazgos/`](hallazgos/), un archivo por agent
 ## Bajos
 
 - [ ] **B1.** Todos los de la sala ven quién está en un grupo privado con quién (llegan los ids). [acoso #14]
-- [ ] **B2.** Solicitudes de amistad sin tope (6 en 75 ms) y mandarlas ya suma progresión. [acoso #15]
+- [x] **B2.** Solicitudes de amistad sin tope (6 en 75 ms) y mandarlas ya suma progresión. [acoso #15]
 - [ ] **B3.** El buscador le muestra a cualquiera si estás conectado. [acoso #16]
 - [ ] **B4.** Gestos: 5 por segundo a toda la sala (también silenciado). [acoso #17]
 - [ ] **B5.** Una sala cerrada muestra nombre, descripción y dueño a cualquiera sin sesión. [acoso #18]
@@ -139,14 +139,14 @@ archivo y línea) está en [`docs/hallazgos/`](hallazgos/), un archivo por agent
 - [ ] **B8. 🗳️** El beso renueva el efecto aunque esté activo; su distancia no mira la altura. [mecánicas #13]
 - [ ] **B9.** `consume` (barra) usa `CONSUMABLES[kind]` sin `Object.hasOwn`: `'constructor'` se acepta y se
   reparte a la sala. Rep. — `room.js`. [saturación #6, mecánicas #14]
-- [ ] **B10.** Las salas favoritas aceptan salas que no existen (falta `isRoomName`). [mecánicas #15]
+- [x] **B10.** Las salas favoritas aceptan salas que no existen (falta `isRoomName`). [mecánicas #15]
 - [ ] **B11.** Si los dos ofrecen a la vez en un intercambio, una oferta se descarta en silencio (contador de
   versión compartido). [economía #6]
 - [ ] **B12.** Dos consumibles a la vez: se gastan los dos y el efecto es uno. [economía #7]
 - [ ] **B13.** Se dejan corazones en una sala sin atril. [permisos H9]
-- [ ] **B14. 🗳️** Los invitados pueden tener amigos y con eso entran a salas "solo amigos". [permisos H13]
-- [ ] **B15. 🗳️** Los invitados pueden reportar, leer el muro y guardar favoritas (no están en la lista de vedadas). [permisos H17]
-- [ ] **B16.** `PUT me` sin `look` borra el personaje; `oauthstart` acepta cualquier origen https (no explotable:
+- [x] **B14. 🗳️** Los invitados pueden tener amigos y con eso entran a salas "solo amigos". [permisos H13]
+- [x] **B15. 🗳️** Los invitados pueden reportar, leer el muro y guardar favoritas (no están en la lista de vedadas). [permisos H17]
+- [x] **B16.** `PUT me` sin `look` borra el personaje; `oauthstart` acepta cualquier origen https (no explotable:
   Google/Discord validan la vuelta). [permisos H18]
 
 ---

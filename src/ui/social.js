@@ -278,6 +278,8 @@ export function createSocial({ net, ui, me, room, onEquip, onDrop }) {
     };
     setRel(profile.relation);
     fb.onclick = async () => {
+      if (me()?.guest) return guestGate('tener amigos');
+      if (player.guest) return toast(`${player.name} entró como invitado: los invitados no tienen amigos.`);
       if (profile.relation === 'friends') {
         toast(`¿Dejar de ser amigo de ${profile.name}?`, { actions: [
           { label: 'Sí, quitar', onClick: async () => { const r = await api('friendremove', { method: 'POST', body: { id: profile.id } }); if (r.ok) setRel('none'); refreshFriends(); } },

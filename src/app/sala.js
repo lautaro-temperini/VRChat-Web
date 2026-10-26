@@ -113,7 +113,9 @@ net
     roomPanel.render();
   })
   .on('elsewhere', () => showElsewhere())
-  .on('kicked', ({ ban, by }) => showKicked(ban ? 'Te banearon de esta sala' : 'Te sacaron de la sala', `${by} ${ban ? 'te baneó: no vas a poder volver a entrar a esta sala.' : 'te expulsó. Podés volver a entrar más tarde.'}`))
+  .on('kicked', ({ ban, by, access }) => (access
+    ? showKicked('Ya no podés estar en esta sala', 'El dueño cambió quién puede entrar (cerró la sala o cambió sus amistades).')
+    : showKicked(ban ? 'Te banearon de esta sala' : 'Te sacaron de la sala', `${by} ${ban ? 'te baneó: no vas a poder volver a entrar a esta sala.' : 'te expulsó. Podés volver a entrar más tarde.'}`)))
   // La sala no aceptó un movimiento imposible (o llegó todo junto por el lag): volver a la última posición válida
   .on('pos-fix', ({ x, y, z }) => {
     ctrl.pos.set(x, y, z);

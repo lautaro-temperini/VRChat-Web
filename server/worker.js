@@ -137,6 +137,12 @@ async function api(request, env, path) {
   // (el token de sesión nunca viaja en la dirección)
   const cb = path.match(/^oauth\/(google|discord)\/callback$/);
   if (cb && request.method === 'GET') {
+    // El ingreso tiene que terminar en el mismo navegador que lo empezó (cookie puesta en oauthstart):
+    // si no, alguien podría mandarte un link armado por él y quedarse con tu cuenta
+    const cookie = (request.headers.get('Cookie') ?? '').match(/(?:^|;\s*)g_oauth=([0-9a-f]{32})/)?.[1];
+    if (!cookie || cookie !== q.get('state')) {
+      return Response.redirect(`${new URL(request.url).origin}/#loginerror=${encodeURIComponent('El ingreso venció o se abrió en otro navegador. Probá de nuevo.')}`, 302);
+    }
     const r = await accounts.oauthCallback(cb[1], q.get('code'), q.get('state'), q.get('error'));
     const back = r.origin ?? new URL(request.url).origin;
     const hash = r.ok ? `login=${r.code}` : `loginerror=${encodeURIComponent(r.error)}`;
@@ -157,10 +163,21 @@ async function api(request, env, path) {
     case 'GET blocks': result = await accounts.blocks(token); break;
     case 'POST block': result = await accounts.setBlock(token, String(body.id ?? ''), !!body.on); break;
     case 'POST oauthstart': {
-      // Solo se vuelve al mismo sitio desde el que se pidió (el navegador manda Origin y no se puede falsear)
+      // Solo se vuelve a este mismo sitio (o a la página local de desarrollo, que habla por el proxy de Vite)
       const origin = String(body.origin ?? '');
-      if (origin !== request.headers.get('Origin')) { result = { ok: false, error: 'Origen no válido.' }; break; }
+      const self = new URL(request.url);
+      const local = /^(localhost|127\.0\.0\.1)$/.test(self.hostname) && /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin);
+      if (origin !== request.headers.get('Origin') || (origin !== self.origin && !local)) { result = { ok: false, error: 'Origen no válido.' }; break; }
       result = await accounts.oauthStart(token, String(body.provider ?? ''), origin);
+      if (result.ok) {
+        // Ata el ingreso a este navegador: la vuelta de Google/Discord tiene que traer la misma cookie
+        const state = new URL(result.url).searchParams.get('state');
+        const secure = self.protocol === 'https:' ? '; Secure' : '';
+        return new Response(JSON.stringify(result), { headers: {
+          'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store',
+          'set-cookie': `g_oauth=${state}; HttpOnly; SameSite=Lax; Path=/api/oauth; Max-Age=600${secure}`,
+        } });
+      }
       break;
     }
     case 'POST oauthfinish': result = await accounts.oauthFinish(String(body.code ?? '')); break;

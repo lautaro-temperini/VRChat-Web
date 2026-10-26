@@ -816,6 +816,21 @@ export class Room extends DurableObject {
   // Anti-acoso (en la cuenta): si rechazás, esa persona no te puede reinvitar por un tiempo
   // que crece, y quien está ignorado o restringido no te puede invitar (no se entera).
 
+  // La cuenta del dueño cambió algo (cerró la sala, sacó a alguien de amigos, lo restringió): a quien ya
+  // no puede estar adentro se lo echa con aviso (los mods y admins se quedan)
+  async recheckAccess() {
+    const owner = await this.ownerId();
+    if (!owner) return;
+    for (const ws of this.joined()) {
+      const m = ws.deserializeAttachment();
+      if (m.mod || m.userId === owner) continue;
+      if (await this.accounts().canEnter(owner, m.userId)) continue;
+      this.send(ws, { t: 'kicked', access: true });
+      await this.leave(ws);
+      try { ws.close(4002, 'acceso'); } catch { /* ya cerrada */ }
+    }
+  }
+
   // Mensaje para alguien de esta sala que manda Accounts (p. ej. un mensaje privado de un amigo)
   async pushToUser(userId, data) {
     const ws = this.connOfUser(String(userId));

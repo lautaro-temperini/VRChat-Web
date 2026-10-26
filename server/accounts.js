@@ -1,5 +1,5 @@
 import { DurableObject } from 'cloudflare:workers';
-import { cleanName, cleanLook, isImage, ITEMS, STARTER_ITEMS, FURNITURE, SPECIAL_FURNITURE, CONSUMABLES, HAND_MAX, designHoldable, PUBLIC_MAPS } from './shared.js';
+import { cleanName, cleanLook, isImage, ITEMS, STARTER_ITEMS, FURNITURE, SPECIAL_FURNITURE, CONSUMABLES, HAND_MAX, designHoldable, PUBLIC_MAPS, isRoomName } from './shared.js';
 import { setupWorks, worksMethods } from './works.js';
 import { setupDesigns, designsMethods } from './designs.js';
 import { sessionState } from './sessions.js';
@@ -284,6 +284,11 @@ export class Accounts extends DurableObject {
     // Mientras se calculaba la contraseña otro pudo registrar el mismo nickname o mail
     if (this.sql.exec('SELECT 1 FROM users WHERE username = ? OR email = ?', username, email).toArray().length) return { ok: false, error: 'Ese nickname o mail ya está en uso.' };
     let id;
+    // Cuenta entrada con Google/Discord que todavía no eligió nick: no se le pone otro mail ni contraseña
+    // (quedaría con un mail ajeno marcado como confirmado); termina eligiendo el nick (oauthNick)
+    if (current && this.isGuest(current) && this.sql.exec('SELECT 1 FROM oauth_links WHERE user_id = ?', current.id).toArray().length) {
+      return { ok: false, error: 'Tu cuenta ya está vinculada a Google o Discord: elegí tu nick para terminar.' };
+    }
     if (current && this.isGuest(current)) {
       id = current.id;
       this.sql.exec('UPDATE users SET username = ?, name = ?, email = ?, pass = ?, salt = ?, terms = ? WHERE id = ?', username, nick, email, pass, salt, Date.now(), id);
@@ -436,7 +441,7 @@ export class Accounts extends DurableObject {
     let newName = cleanName(name ?? row.name);
     if (this.isGuest(row)) {
       if (newName !== row.name && this.nameTaken(newName)) return { ok: false, error: 'Ese nombre es de una cuenta registrada.' };
-      this.sql.exec('UPDATE users SET name = ?, look = ?, bio = ? WHERE id = ?', newName, JSON.stringify(cleanLook(look)), cleanBio, row.id);
+      this.sql.exec('UPDATE users SET name = ?, look = ?, bio = ? WHERE id = ?', newName, JSON.stringify(cleanLook(look ?? JSON.parse(row.look ?? 'null'))), cleanBio, row.id);
     } else {
       // Cuenta registrada: el nombre visible es el nickname (único); cambiarlo cambia el nickname
       // (cuentas viejas pueden tener nombre ≠ usuario: si no cambia el nombre, no se toca el usuario)
@@ -446,7 +451,7 @@ export class Accounts extends DurableObject {
         if (this.nameTaken(newName, row.id)) return { ok: false, error: 'Ese nickname ya está en uso.' };
         username = newName.toLowerCase();
       }
-      this.sql.exec('UPDATE users SET name = ?, username = ?, look = ?, bio = ? WHERE id = ?', newName, username, JSON.stringify(cleanLook(look)), cleanBio, row.id);
+      this.sql.exec('UPDATE users SET name = ?, username = ?, look = ?, bio = ? WHERE id = ?', newName, username, JSON.stringify(cleanLook(look ?? JSON.parse(row.look ?? 'null'))), cleanBio, row.id);
     }
     return { ok: true, user: this.publicUser(this.row(row.id)) };
   }
@@ -599,16 +604,24 @@ export class Accounts extends DurableObject {
     return p && Date.now() - p.updated < ONLINE_WINDOW ? p.room : null;
   }
 
+  // ¿ownerId restringió a viewerId? (restringir oculta tu ubicación y tu sala, y no entra a tus salas de amigos)
+  restrictedBy(ownerId, viewerId) {
+    return this.sql.exec('SELECT 1 FROM blocks WHERE user_id = ? AND blocked_id = ?', ownerId, viewerId).toArray().length > 0;
+  }
+
   async friends(token) {
     const me = await this.userFromToken(token);
     if (!me) return { ok: false, error: 'Sesión vencida.' };
-    const rows = this.sql.exec('SELECT * FROM friends WHERE a = ? OR b = ?', me.id, me.id).toArray();
     const out = { friends: [], incoming: [], outgoing: [] };
+    if (this.isGuest(me)) return { ok: true, guest: true, ...out }; // los invitados no tienen amigos
+    const rows = this.sql.exec('SELECT * FROM friends WHERE a = ? OR b = ?', me.id, me.id).toArray();
     for (const r of rows) {
       const otherId = r.a === me.id ? r.b : r.a;
       const other = this.row(otherId);
       if (!other) continue;
-      const info = { id: other.id, name: other.name, username: other.username ?? null, room: this.where(other.id) };
+      // En qué sala está: solo entre amigos, y nunca a quien te restringió
+      const room = r.status === 'accepted' && !this.restrictedBy(other.id, me.id) ? this.where(other.id) : null;
+      const info = { id: other.id, name: other.name, username: other.username ?? null, room };
       if (r.status === 'accepted') out.friends.push(info);
       else if (r.a === me.id) out.outgoing.push(info);
       else out.incoming.push(info);
@@ -620,15 +633,19 @@ export class Accounts extends DurableObject {
   async friendRequest(token, otherId) {
     const me = await this.userFromToken(token);
     if (!me) return { ok: false, error: 'Sesión vencida.' };
-    if (!this.row(otherId) || otherId === me.id) return { ok: false, error: 'No existe ese perfil.' };
+    if (this.isGuest(me)) return this.guestError(); // los invitados no tienen amigos (decisión 26/10)
+    const other = this.row(otherId);
+    if (!other || otherId === me.id || this.isGuest(other)) return { ok: false, error: 'No existe ese perfil.' };
     const rel = this.relation(me.id, otherId);
     if (rel === 'incoming') return this.friendRespond(token, otherId, true); // ya te había invitado: aceptar
     if (rel === 'none') {
       const rej = this.sql.exec('SELECT until FROM friend_rejects WHERE from_id = ? AND to_id = ?', me.id, otherId).toArray()[0];
       if (rej && rej.until > Date.now()) return { ok: false, error: 'Ya le mandaste una solicitud hace poco. Probá de nuevo mañana.' };
       this.sql.exec("INSERT INTO friends (a, b, status, created) VALUES (?, ?, 'pending', ?)", me.id, otherId, Date.now());
-      this.notify(otherId, 'friend_request', me.id);
-      this.progressTrack(me.id, 'amigo');
+      // Un solo aviso por persona por día (cancelar y reenviar no llena los avisos), y ninguno si te restringió
+      const recent = this.sql.exec("SELECT 1 FROM notifications WHERE user_id = ? AND type = 'friend_request' AND from_user = ? AND created > ?",
+        otherId, me.id, Date.now() - FRIEND_RETRY).toArray().length;
+      if (!recent && !this.restrictedBy(otherId, me.id)) this.notify(otherId, 'friend_request', me.id);
     }
     return { ok: true, relation: this.relation(me.id, otherId) };
   }
@@ -636,9 +653,11 @@ export class Accounts extends DurableObject {
   async friendRespond(token, otherId, accept) {
     const me = await this.userFromToken(token);
     if (!me) return { ok: false, error: 'Sesión vencida.' };
+    if (this.isGuest(me)) return this.guestError();
     if (accept) {
       const changed = this.sql.exec("UPDATE friends SET status = 'accepted' WHERE a = ? AND b = ? AND status = 'pending'", otherId, me.id).rowsWritten;
-      if (changed) { this.notify(otherId, 'friend_accepted', me.id); this.progressTrack(me.id, 'amigo'); }
+      // "Agregar un amigo" cuenta cuando la amistad queda hecha (para los dos), no al mandar la solicitud
+      if (changed) { this.notify(otherId, 'friend_accepted', me.id); this.progressTrack(me.id, 'amigo'); this.progressTrack(otherId, 'amigo'); }
     } else {
       // Rechazar una solicitud pendiente: esa persona no te la puede volver a mandar por 24 h
       const gone = this.sql.exec("DELETE FROM friends WHERE a = ? AND b = ? AND status = 'pending'", otherId, me.id).rowsWritten;
@@ -652,7 +671,17 @@ export class Accounts extends DurableObject {
     const me = await this.userFromToken(token);
     if (!me) return { ok: false, error: 'Sesión vencida.' };
     this.sql.exec('DELETE FROM friends WHERE (a = ? AND b = ?) OR (a = ? AND b = ?)', me.id, otherId, otherId, me.id);
+    // Si estaba en la sala del otro y era "solo amigos", se lo echa (con aviso)
+    await this.roomRecheck(me.id);
+    await this.roomRecheck(String(otherId ?? ''));
     return { ok: true, relation: 'none' };
+  }
+
+  // Le pide a la sala personal de ownerId que vuelva a mirar quién puede estar adentro (cerró la sala,
+  // sacó a alguien de amigos o lo restringió): a quien ya no puede entrar se lo echa con aviso
+  async roomRecheck(ownerId) {
+    if (!/^[0-9a-f]{16}$/.test(ownerId)) return;
+    try { await this.env.ROOMS.get(this.env.ROOMS.idFromName(`u-${ownerId}`)).recheckAccess(); } catch { /* sala dormida o vacía */ }
   }
 
   // ---------- Privacidad ----------
@@ -661,7 +690,7 @@ export class Accounts extends DurableObject {
   allowed(viewerId, ownerId, privacy) {
     if (viewerId && viewerId === ownerId) return true;
     if (privacy === 'todos') return true;
-    if (privacy === 'amigos') return !!viewerId && this.relation(viewerId, ownerId) === 'friends';
+    if (privacy === 'amigos') return !!viewerId && this.relation(viewerId, ownerId) === 'friends' && !this.restrictedBy(ownerId, viewerId);
     return false;
   }
 
@@ -879,6 +908,7 @@ export class Accounts extends DurableObject {
       name !== undefined ? clean(name, 32) : me.room_name,
       desc !== undefined ? clean(desc, 140) : me.room_desc,
       privacy ?? me.room_privacy, me.id);
+    if (privacy !== undefined && privacy !== me.room_privacy) await this.roomRecheck(me.id);
     return this.roomInfo(me.id);
   }
 
@@ -904,8 +934,9 @@ export class Accounts extends DurableObject {
   async setFavorite(token, room, on) {
     const me = await this.userFromToken(token);
     if (!me) return { ok: false, error: 'Sesión vencida.' };
+    if (this.isGuest(me)) return this.guestError(); // los invitados solo leen (decisión 26/10)
     room = String(room ?? '').toLowerCase();
-    if (!/^[a-z0-9-]{1,32}$/.test(room)) return { ok: false, error: 'Sala no válida.' };
+    if (!isRoomName(room)) return { ok: false, error: 'Sala no válida.' };
     if (on && this.sql.exec('SELECT COUNT(*) AS n FROM favorites WHERE user_id = ?', me.id).one().n >= FAVORITES_MAX) return { ok: false, error: `Podés guardar hasta ${FAVORITES_MAX} salas favoritas.` };
     if (on) this.sql.exec('INSERT OR IGNORE INTO favorites (user_id, room, created) VALUES (?, ?, ?)', me.id, room, Date.now());
     else this.sql.exec('DELETE FROM favorites WHERE user_id = ? AND room = ?', me.id, room);
@@ -929,7 +960,7 @@ export class Accounts extends DurableObject {
       ok: true,
       results: rows.map((r) => {
         const relation = this.relation(me.id, r.id), room = this.where(r.id);
-        return { id: r.id, name: r.name, username: r.username ?? null, relation, online: !!room, room: relation === 'friends' ? room : null };
+        return { id: r.id, name: r.name, username: r.username ?? null, relation, online: !!room, room: relation === 'friends' && !this.restrictedBy(r.id, me.id) ? room : null };
       }),
     };
   }
@@ -982,6 +1013,7 @@ export class Accounts extends DurableObject {
     if (!otherId || otherId === me.id || (on && !this.row(otherId))) return { ok: false, error: 'No válido.' };
     if (on) this.sql.exec('INSERT OR IGNORE INTO blocks (user_id, blocked_id, created) VALUES (?, ?, ?)', me.id, otherId, Date.now());
     else this.sql.exec('DELETE FROM blocks WHERE user_id = ? AND blocked_id = ?', me.id, otherId);
+    if (on) await this.roomRecheck(me.id);
     return this.blocks(token);
   }
 
@@ -1051,6 +1083,7 @@ export class Accounts extends DurableObject {
   async report(token, { target, reason, detail, room } = {}) {
     const me = await this.userFromToken(token);
     if (!me) return { ok: false, error: 'Sesión vencida.' };
+    if (this.isGuest(me)) return this.guestError(); // los invitados solo leen (decisión 26/10)
     if (typeof target !== 'string' || !this.row(target) || target === me.id) return { ok: false, error: 'No válido.' };
     if (!REPORT_REASONS.includes(reason)) return { ok: false, error: 'Elegí un motivo.' };
     const today = this.sql.exec('SELECT COUNT(*) AS n FROM reports WHERE reporter = ? AND created > ?', me.id, Date.now() - 86_400_000).one().n;
