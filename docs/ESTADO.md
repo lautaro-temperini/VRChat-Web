@@ -134,6 +134,10 @@ Para volver a subir: `npm run deploy` desde la carpeta del proyecto.
 - Con 3 parlantes o más en una sala (también las personales), la música sale por todos (sonido envolvente).
 - Faltan deployar los mapas nuevos y los diseños de la parte del servidor nueva (`npm run deploy`).
 
+### Hallazgos de las pruebas con agentes (26/10)
+Ver [docs/hallazgos.md](hallazgos.md): 2 críticos, 14 altos, 23 medios y 16 bajos, con lo que hay que decidir
+marcado con 🗳️. Ir tachando ahí a medida que se arreglan (cada arreglo con su prueba en `test/`).
+
 ### Pendientes sueltos (consultar antes)
 Reportar, nombre y marca definitivos, AR, ajustes de cara en el avanzado.
 
