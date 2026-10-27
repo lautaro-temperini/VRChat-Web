@@ -109,9 +109,29 @@ export const BODY_TYPES = {
 };
 const COLOR_KEYS = ['skin', 'hair', 'eyes', 'shirt', 'pants', 'shoes'];
 
+// Caracteres invisibles o que dan vuelta el texto (para suplantar nombres o esquivar el antiflood)
+export const INVISIBLE = /[\u00ad\u034f\u061c\u115f\u1160\u17b4\u17b5\u180e\u200b-\u200f\u202a-\u202e\u2060-\u206f\u3164\ufe00-\ufe0f\ufeff\uffa0]/g;
+
+// Texto limpio: sin control ni invisibles, y con a lo sumo 2 acentos/marcas por letra (sin "zalgo")
+export function cleanText(text, n) {
+  return String(text ?? '').replace(/[\u0000-\u001f]/g, '').replace(INVISIBLE, '').replace(/(\p{M}{2})\p{M}+/gu, '$1').trim().slice(0, n);
+}
+
 export function cleanName(name) {
-  const n = String(name ?? '').replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 20);
+  const n = cleanText(String(name ?? '').replace(/[<>]/g, ''), 20);
   return n || 'Visitante';
+}
+
+// "Esqueleto" de un nombre: cómo se ve, sin mayúsculas, acentos, espacios ni signos, y con las letras que se
+// confunden (cirílicas, griegas, 0/o, 1/l/i) llevadas a una sola. Dos nombres con el mismo esqueleto se ven iguales.
+const CONFUSABLE = {
+  'а': 'a', 'е': 'e', 'о': 'o', 'р': 'p', 'с': 'c', 'у': 'y', 'х': 'x', 'і': 'l', 'ј': 'j', 'ѕ': 's', 'ԁ': 'd', 'һ': 'h',
+  'ӏ': 'l', 'к': 'k', 'м': 'm', 'н': 'h', 'т': 't', 'в': 'b', 'ο': 'o', 'α': 'a', 'ν': 'v', 'ρ': 'p', 'τ': 't', 'κ': 'k',
+  'ι': 'l', 'υ': 'u', 'ε': 'e', 'ı': 'l', '0': 'o', '1': 'l', 'i': 'l', '|': 'l', '5': 's',
+};
+export function nameKey(name) {
+  return [...cleanName(name).normalize('NFKD').toLowerCase().replace(/\p{M}/gu, '')]
+    .map((c) => CONFUSABLE[c] ?? c).join('').replace(/[\s._\-·•]/g, '');
 }
 
 export function cleanLook(look) {

@@ -3,10 +3,10 @@ import { checkGLB } from './glb.js';
 
 // Diseños de artistas como objetos del juego. Se suman a la clase Accounts (comparten la base SQLite);
 // los archivos van a R2 (binding ART) en disenos/<id>/<archivo>.
-// - Cualquier cuenta registrada sube estampas, cuadros y objetos 3D, sin límite por día; solo pasa el
+// - Cualquier cuenta registrada sube estampas, cuadros y objetos 3D, hasta 5 por día; solo pasa el
 //   control automático (imágenes válidas, modelos GLB con las reglas de MODEL_RULES).
-// - El que lo sube recibe una copia. Solo el autor puede "Hacer copia" (sin límite); soltar o
-//   intercambiar una copia se la saca, como cualquier objeto.
+// - El que lo sube recibe una copia. Solo el autor puede "Hacer copia", hasta 2 por día (decisión 26/10: pocas,
+//   para que sean preciadas); soltar o intercambiar una copia se la saca, como cualquier objeto.
 // - Con 3 objetos 3D que pasen el control se gana el título de Diseñador (solo reconocimiento).
 
 const randomHex = (n) => [...crypto.getRandomValues(new Uint8Array(n))].map((b) => b.toString(16).padStart(2, '0')).join('');
@@ -15,6 +15,11 @@ const clip = (s, n) => String(s ?? '').replace(/[\u0000-\u001f<>]/g, ' ').trim()
 const IMAGE_MIMES = ['image/jpeg', 'image/webp', 'image/png'];
 const LIMITS = { img: 900_000, hd: 2_000_000 }; // bytes
 export const DESIGNER_MODELS = 3; // objetos 3D para el título de Diseñador
+export const DESIGNS_PER_DAY = 5, COPIES_PER_DAY = 2;
+// Días según la hora de Argentina (GMT-3), como el resto de los topes diarios
+const DAY = 86_400_000, ARG = 3 * 3_600_000;
+const argDay = (ts) => Math.floor((ts - ARG) / DAY);
+const dayStart = (ts) => argDay(ts) * DAY + ARG;
 
 export function setupDesigns(sql) {
   sql.exec(`
@@ -23,6 +28,10 @@ export function setupDesigns(sql) {
       place TEXT, size TEXT, w INTEGER, h INTEGER, dims TEXT, tris INTEGER, created INTEGER NOT NULL
     );
     CREATE INDEX IF NOT EXISTS designs_author ON designs (author, created);
+    CREATE TABLE IF NOT EXISTS design_copies (
+      user_id TEXT NOT NULL, created INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS design_copies_user ON design_copies (user_id, created);
   `);
   const cols = sql.exec('PRAGMA table_info(items)').toArray().map((c) => c.name);
   if (!cols.includes('design')) sql.exec('ALTER TABLE items ADD COLUMN design TEXT');
@@ -46,6 +55,8 @@ export const designsMethods = {
     if (!me) return { ok: false, error: 'Sesión vencida.' };
     if (this.isGuest(me)) return this.guestError();
     if (!this.env.ART) return { ok: false, error: 'Falta configurar el almacenamiento de archivos (R2).' };
+    const today = this.sql.exec('SELECT COUNT(*) AS n FROM designs WHERE author = ? AND created >= ?', me.id, dayStart(Date.now())).one().n;
+    if (today >= DESIGNS_PER_DAY) return { ok: false, error: `Ya subiste ${DESIGNS_PER_DAY} diseños hoy. Mañana podés subir más.` };
     const kind = f.kind;
     if (!has(DESIGN_KINDS, kind)) return { ok: false, error: 'Elegí si es una estampa, un cuadro o un objeto 3D.' };
     const title = clip(f.title, 60);
@@ -114,7 +125,13 @@ export const designsMethods = {
     const d = item?.design && this.sql.exec('SELECT * FROM designs WHERE id = ?', item.design).toArray()[0];
     if (!d) return { ok: false, error: 'Ese diseño no está en tu inventario.' };
     if (d.author !== me.id) return { ok: false, error: 'Solo quien hizo el diseño puede hacer copias.' };
-    this.addDesignItem(me.id, d.id, d.kind);
+    const now = Date.now();
+    const today = this.sql.exec('SELECT COUNT(*) AS n FROM design_copies WHERE user_id = ? AND created >= ?', me.id, dayStart(now)).one().n;
+    if (today >= COPIES_PER_DAY) return { ok: false, error: `Ya hiciste ${COPIES_PER_DAY} copias hoy. Mañana podés hacer más.` };
+    this.ctx.storage.transactionSync(() => {
+      this.sql.exec('INSERT INTO design_copies (user_id, created) VALUES (?, ?)', me.id, now);
+      this.addDesignItem(me.id, d.id, d.kind);
+    });
     return { ok: true, items: this.items(me.id) };
   },
 

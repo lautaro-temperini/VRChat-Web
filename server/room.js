@@ -1,5 +1,5 @@
 import { DurableObject } from 'cloudflare:workers';
-import { cleanName, cleanLook, cleanEquip, EMOTES, ITEM_REACH, CONSUMABLES, FURNITURE, BOOST_TIME, KISS_RANGE, PUBLIC_MAPS } from './shared.js';
+import { cleanName, cleanText, cleanLook, cleanEquip, EMOTES, ITEM_REACH, CONSUMABLES, FURNITURE, BOOST_TIME, KISS_RANGE, PUBLIC_MAPS, ROOM_TEMPLATES } from './shared.js';
 import { roomTrack, roomEventTick } from './progress.js';
 import { roomEditorMethods, ROOM_SPAWN } from './editor.js';
 
@@ -27,6 +27,26 @@ const FLOOD_MAX = 5, FLOOD_WINDOW = 10_000, REPEAT_WINDOW = 30_000;
 // (trotar es 3,2 m/s) hasta MOVE_CAP, y cada movimiento lo gasta. El tope cubre unos 3 s de lag trotando,
 // saltos y sentarse; mandar muchos mensajes seguidos no sirve para ir más rápido
 const MAX_SPEED = 8, MOVE_CAP = 10;
+// Altura: cada sala tiene un techo según su plantilla (decisión 26/10); al aire libre, uno alto
+const OPEN_CEILING = 12, MUSEUM_CEILING = 8, FLOOR_MIN = -2;
+// Conexiones que todavía no entraron: tope por sala y, con IP, por IP (contra cientos de conexiones a la vez)
+const PENDING_MAX = 40, PER_IP_MAX = 8;
+const LOOPBACK = new Set(['127.0.0.1', '::1']); // en desarrollo todos vienen de la misma PC
+// Baneo: también la IP, por 24 h (decisión 26/10)
+const IP_BAN = 24 * 3_600_000;
+// Cabina y consola: hay que estar al lado (m, con margen por el atraso)
+const GEAR_REACH = 4;
+// DJ: un cambio de tema cada 20 s como máximo (decisión 26/10)
+const TRACK_EVERY = 20_000;
+// Avisos de "tomó la cabina / la consola": se repiten para la misma persona recién a los 30 s
+const ANNOUNCE_EVERY = 30_000;
+// Voz: cada cuánto se vuelve a mirar quién puede escuchar a quién mientras la gente se mueve
+const ENFORCE_EVERY = 2_000;
+// Intercambio: para invitar hay que estar cerca (decisión 26/10)
+const TRADE_RANGE = 3.5;
+// Museo: dónde están la cabina y la consola (ver museum.js)
+const MUSEUM_GEAR = { dj: [{ x: 17.05, z: 0 }], luces: [{ x: -4.05, z: -0.8 }], escenario: [{ x: -4.05, z: 0.8 }] };
+
 const DEFAULT_SETTINGS = { chat: true, voice: true, screen: true, items: true, dj: true, artists: true };
 // Partes que toman los artistas en la consola (además de la pantalla del hall, que es this.screen)
 const PARTS = ['luces', 'escenario', 'escenario2']; // escenario2: la segunda pantalla de una sala personal (editor)
@@ -50,8 +70,8 @@ const GUEST_STAGE = 'Creá una cuenta (es gratis) para pasar música o usar la c
 // por encima de lo que manda el juego (posición 10/s, luces 15/s, voz unos pocos por segundo).
 // Lo que pasa del límite se descarta en silencio. HEAVY: lo que escribe en la base o le pide algo a
 // las cuentas; SFU: pedidos al servidor de audio (cada uno es una llamada a la API de Cloudflare).
-const RATE = { all: [120, 40], heavy: [30, 5], sfu: [40, 10] }; // [ráfaga, por segundo]
-const HEAVY = new Set(['look', 'emote', 'phone', 'afk', 'mic', 'group', 'trade', 'edit', 'drop', 'pickup', 'mod', 'dj', 'part']);
+const RATE = { all: [120, 40], heavy: [30, 5], sfu: [40, 10], emote: [2, 1] }; // [ráfaga, por segundo]
+const HEAVY = new Set(['look', 'emote', 'phone', 'afk', 'mic', 'group', 'trade', 'edit', 'drop', 'pickup', 'mod', 'dj', 'part', 'consume', 'kiss']);
 // Conexiones que nunca mandan "join" (o con un token que no sirve) se cierran a los 15 s
 const JOIN_TIMEOUT = 15_000;
 // Posiciones: más allá de esto no hay nada en ninguna sala (el Museo mide 48 × 22 m)
@@ -87,9 +107,12 @@ export class Room extends DurableObject {
     this.tradeOf = new Map();  // jugador -> id del intercambio
     this.pulls = new Map();    // conexión -> Map("id:tipo" -> mid) de lo que está escuchando
     this.ginvites = new Map(); // "deUsuario>paraUsuario" -> hora de la invitación al grupo
-    this.boosts = new Map();   // usuario -> hasta cuándo le dura el efecto de un consumible o un beso
     this.kisses = new Map();   // "deUsuario>paraUsuario" -> hora del pedido de beso
     this.rates = new Map();    // conexión -> baldes del antiflood (ver allow)
+    this.lastPos = new Map();  // cuenta -> última posición en esta sala (para validar el "join" al reconectar)
+    this.announced = new Map(); // "cuenta:parte" -> último aviso de que la tomó
+    this.ignoring = new Map(); // "quien>a quién" -> { v, at }: ¿lo ignora? (para la voz; se pregunta a la cuenta)
+    this.lastEnforce = 0;
   }
 
   // Antiflood general: un "balde" por tipo que se vacía con cada mensaje y se llena solo con el tiempo
@@ -118,13 +141,82 @@ export class Room extends DurableObject {
   // Ajustes, baneos, silenciados y objetos en el suelo se guardan (sobreviven si la sala se duerme)
   async load() {
     if (this.loaded) return;
-    const s = await this.ctx.storage.get(['settings', 'bans', 'silenced', 'ground', 'groups']);
+    const s = await this.ctx.storage.get(['settings', 'bans', 'silenced', 'ground', 'groups', 'stage', 'ipbans']);
     this.groups = s.get('groups') ?? {}; // gid -> { leader: userId, members: [userIds en orden de entrada] }
     this.settings = { ...DEFAULT_SETTINGS, ...(s.get('settings') ?? {}) };
     this.bans = s.get('bans') ?? {};         // userId -> { name, at }
     this.silenced = s.get('silenced') ?? {}; // userId -> true
     this.ground = s.get('ground') ?? [];     // [{ iid, type, color, owner, ownerName, x, y, z, at }]
+    this.ipBans = s.get('ipbans') ?? {};     // ip -> hasta cuándo
+    // Cabina, consola y luces: se guardan, así no se pierden si la sala se duerme (sin mensajes un rato)
+    const stage = s.get('stage');
+    if (stage) {
+      const here = (x) => x && this.byId(x.id) ? x : null;
+      this.dj = here(stage.dj);
+      this.parts = Object.fromEntries(Object.entries(stage.parts ?? {}).filter(([, v]) => here(v)));
+      this.lights = this.parts.luces ? stage.lights ?? null : null;
+    }
     this.loaded = true;
+  }
+
+  async saveStage() {
+    await this.ctx.storage.put('stage', { dj: this.dj, parts: this.parts, lights: this.lights });
+  }
+
+  // Techo de altura de la sala (plantilla o Museo)
+  async ceiling() {
+    if (this.ceil) return this.ceil;
+    const layout = await this.layout();
+    const h = layout ? ROOM_TEMPLATES[layout.template]?.h : null;
+    this.ceil = layout ? (h ? h + 1 : OPEN_CEILING) : MUSEUM_CEILING;
+    return this.ceil;
+  }
+
+  // Dónde está la entrada de la sala (para validar dónde aparece alguien al entrar)
+  async spawnPoint() {
+    const name = await this.roomName();
+    if (name.startsWith('u-')) return ROOM_SPAWN;
+    return PUBLIC_MAPS[name]?.spawn ?? SPAWN;
+  }
+
+  // ¿Está al lado de la cabina (dj) o de la consola (luces / escenario / escenario2)?
+  async nearGear(meta, part) {
+    const s = this.states.get(meta.id);
+    if (!s) return false;
+    const layout = await this.layout();
+    if (!layout) return (MUSEUM_GEAR[part] ?? []).some((p) => Math.hypot(s[0] - p.x, s[2] - p.z) <= GEAR_REACH);
+    // Las pantallas son grandes y se usan desde más lejos
+    const types = part === 'dj' ? ['cabina'] : part === 'luces' ? ['consola'] : part === 'escenario' ? ['consola', 'pantalla'] : ['pantalla'];
+    return layout.pieces.some((p) => types.includes(p.type) && Math.hypot(s[0] - p.x, s[2] - p.z) <= (p.type === 'pantalla' ? GEAR_REACH * 2 : GEAR_REACH));
+  }
+
+  // ¿Tiene ya otra parte del escenario (cabina, luces o pantallas)? Una parte por persona (decisión 26/10)
+  holdsOther(meta, part) {
+    if (part !== 'dj' && this.dj?.id === meta.id) return 'la cabina';
+    for (const p of PARTS) if (p !== part && this.parts[p]?.id === meta.id) return p === 'luces' ? 'las luces' : 'una pantalla';
+    return null;
+  }
+
+  // ¿"from" ignora a "to"? (pregunta a la cuenta y lo recuerda un rato)
+  async ignores(fromUser, toUser) {
+    const key = `${fromUser}>${toUser}`, now = Date.now();
+    const c = this.ignoring.get(key);
+    if (c && now - c.at < 30_000) return c.v;
+    const v = !!(await this.accounts().isIgnoring(fromUser, toUser));
+    this.ignoring.set(key, { v, at: now });
+    return v;
+  }
+
+  // Lo que ve de los grupos cada uno: los suyos completos; de los demás, solo que están en un grupo
+  // (no con quién: cada uno aparece en un grupo aparte)
+  groupsFor(userId) {
+    const out = {};
+    let n = 0;
+    for (const [gid, g] of Object.entries(this.groups)) {
+      if (g.members.includes(userId)) out[gid] = g;
+      else for (const u of g.members) out[`o${n++}`] = { members: [u] };
+    }
+    return out;
   }
 
   async ownerId() {
@@ -141,7 +233,7 @@ export class Room extends DurableObject {
   // que estar puestas como muebles (y la 2ª pantalla, con su propio VJ)
   async hasGear(what) {
     const layout = await this.layout();
-    if (!layout) return true;
+    if (!layout) return what !== 'escenario2'; // el Museo tiene cabina, consola y una sola pantalla
     const n = (type, pred = () => true) => layout.pieces.filter((p) => p.type === type && pred(p)).length;
     if (what === 'dj') return n('cabina') > 0;
     if (what === 'luces') return n('consola') > 0;
@@ -153,10 +245,14 @@ export class Room extends DurableObject {
   async fetch(request) {
     const name = request.headers.get('X-Room');
     if (name && !this.name) { this.name = name; await this.ctx.storage.put('name', name); }
+    const ip = request.headers.get('CF-Connecting-IP') ?? '';
+    const all = this.ctx.getWebSockets().map((w) => w.deserializeAttachment()).filter((m) => m && !m.left);
+    if (all.filter((m) => !m.joined).length >= PENDING_MAX) return new Response('Sala ocupada', { status: 503 });
+    if (ip && !LOOPBACK.has(ip) && all.filter((m) => m.ip === ip).length >= PER_IP_MAX) return new Response('Demasiadas conexiones', { status: 429 });
     const { 0: client, 1: server } = new WebSocketPair();
     // acceptWebSocket permite que la sala "hiberne" sin cortar las conexiones.
     this.ctx.acceptWebSocket(server);
-    server.serializeAttachment({ id: crypto.randomUUID().slice(0, 8), joined: false, born: Date.now() });
+    server.serializeAttachment({ id: crypto.randomUUID().slice(0, 8), joined: false, born: Date.now(), ip });
     await this.scheduleAlarm();
     return new Response(null, { status: 101, webSocket: client });
   }
@@ -273,7 +369,9 @@ export class Room extends DurableObject {
         ws.close(4001, 'sin sesión');
         return;
       }
-      if (this.bans[user.id]) {
+      // Baneo por cuenta o por IP (24 h); el dueño y los admins nunca quedan afuera de su sala por IP compartida
+      const ipBanned = meta.ip && (this.ipBans[meta.ip] ?? 0) > Date.now() && !(await this.isMod({ userId: user.id, guest: !!user.guest }));
+      if (this.bans[user.id] || ipBanned) {
         this.send(ws, { t: 'error', code: 'banned' });
         ws.close(4003, 'baneado');
         return;
@@ -289,8 +387,19 @@ export class Room extends DurableObject {
       Object.assign(meta, { joined: true, userId: user.id, name: user.name, look: user.look, equip: user.equip, guest: !!user.guest, afk: !!msg.afk, mic: 'off' });
       meta.mod = await this.isMod(meta);
       ws.serializeAttachment(meta);
-      const s = cleanState(msg.s);
-      if (s) this.states.set(meta.id, s);
+      // Dónde aparece: cerca de la entrada o de donde estaba al irse (si no, reconectar sería teletransportarse)
+      let s = cleanState(msg.s);
+      if (s) {
+        const sp = await this.spawnPoint(), last = this.lastPos.get(user.id);
+        const okSpawn = Math.hypot(s[0] - sp.x, s[2] - sp.z) <= MOVE_CAP;
+        const okLast = last && Math.hypot(s[0] - last[0], s[2] - last[2]) <= MOVE_CAP;
+        if ((!okSpawn && !okLast) || s[1] > (await this.ceiling()) || s[1] < FLOOR_MIN) {
+          s = [sp.x, 0, sp.z, 0, 0, 0];
+          this.send(ws, { t: 'pos-fix', x: sp.x, y: 0, z: sp.z });
+        }
+        this.states.set(meta.id, s);
+        this.lastPos.set(user.id, s);
+      }
       // Grupos viejos: si se cortó la conexión sin avisar (pestaña cerrada, deploy), el grupo quedaba
       // guardado y al volver figuraba "En grupo". Se disuelven los que no tienen a nadie conectado.
       const present = new Set(this.joined().filter((w) => w !== ws).map((w) => w.deserializeAttachment().userId));
@@ -298,7 +407,7 @@ export class Room extends DurableObject {
       if (stale.length) { for (const gid of stale) delete this.groups[gid]; await this.saveGroups(); }
       const chat = (await this.ctx.storage.get('chat')) ?? [];
       this.send(ws, {
-        t: 'welcome', id: meta.id, players: this.players(ws), chat, screen: this.screen, dj: this.dj, parts: this.parts, lights: this.lights, groups: this.groups,
+        t: 'welcome', id: meta.id, players: this.players(ws), chat, screen: this.screen, dj: this.dj, parts: this.parts, lights: this.lights, groups: this.groupsFor(user.id),
         room: { name: await this.roomName(), owner: await this.ownerId(), settings: this.settings, mod: meta.mod, silenced: !!this.silenced[user.id] },
         ground: this.ground.map((g) => ({ ...g, age: Date.now() - g.at })),
         layout: await this.layout(),
@@ -327,6 +436,11 @@ export class Room extends DurableObject {
         // Posiciones falsas (teletransporte): un salto más rápido de lo posible no se acepta y se lo devuelve
         // a su última posición válida. Margen amplio por el lag; los movimientos del servidor no cuentan
         const prev = this.states.get(meta.id), now = Date.now();
+        // Altura: no más arriba del techo de la sala ni muy abajo del piso
+        if (s[1] > (await this.ceiling()) || s[1] < FLOOR_MIN) {
+          if (prev) this.send(ws, { t: 'pos-fix', x: prev[0], y: prev[1], z: prev[2] });
+          return;
+        }
         const budget = this.moveBudget.get(meta.id) ?? { m: MOVE_CAP, at: now };
         budget.m = Math.min(MOVE_CAP, budget.m + (MAX_SPEED * (now - budget.at)) / 1000);
         budget.at = now;
@@ -340,7 +454,10 @@ export class Room extends DurableObject {
           budget.m -= d;
         }
         this.states.set(meta.id, s);
+        this.lastPos.set(meta.userId, s);
         this.broadcast({ t: 's', id: meta.id, s }, ws);
+        // Voz: al moverse la gente, cortar a quien ya quedó lejos (cada unos segundos)
+        if (now - this.lastEnforce > ENFORCE_EVERY) { this.lastEnforce = now; await this.enforce(); }
         break;
       }
       case 'phone': {
@@ -357,7 +474,7 @@ export class Room extends DurableObject {
         break;
       }
       case 'emote': {
-        if (!has(EMOTES, msg.e)) return;
+        if (!has(EMOTES, msg.e) || !this.allow(meta.id, 'emote')) return;
         this.broadcast({ t: 'emote', id: meta.id, e: msg.e }, ws);
         await roomTrack(this, ws, meta.userId, 'gesto');
         break;
@@ -385,16 +502,18 @@ export class Room extends DurableObject {
       case 'chat': {
         if (silenced) return this.notice(ws, 'Estás silenciado en esta sala.');
         if (!this.settings.chat && !meta.mod) return this.notice(ws, 'El chat está deshabilitado en esta sala.');
-        const text = String(msg.text ?? '').replace(/[\u0000-\u001f]/g, '').trim().slice(0, 300);
+        const text = cleanText(msg.text, 300);
         if (!text) return;
-        // Antiflood: hasta 5 mensajes cada 10 s y no repetir el mismo mensaje en 30 s
+        // Antiflood por cuenta (reconectar no lo reinicia): hasta 5 mensajes cada 10 s y no repetir el mismo
+        // mensaje en 30 s (sin contar mayúsculas, espacios ni signos)
         const now = Date.now();
-        const recent = (this.chatTimes.get(meta.id) ?? []).filter((t) => now - t < FLOOD_WINDOW);
-        const last = this.lastText.get(meta.id);
+        const recent = (this.chatTimes.get(meta.userId) ?? []).filter((t) => now - t < FLOOD_WINDOW);
+        const last = this.lastText.get(meta.userId);
+        const plain = text.toLowerCase().normalize('NFKD').replace(/[\p{M}\p{P}\p{Z}\s]/gu, '');
         if (recent.length >= FLOOD_MAX) return this.notice(ws, 'Estás mandando mensajes muy rápido. Esperá unos segundos.');
-        if (last && last.text === text.toLowerCase() && now - last.at < REPEAT_WINDOW) return this.notice(ws, 'Ya mandaste ese mensaje.');
-        this.chatTimes.set(meta.id, [...recent, now]);
-        this.lastText.set(meta.id, { text: text.toLowerCase(), at: now });
+        if (last && last.text === plain && now - last.at < REPEAT_WINDOW) return this.notice(ws, 'Ya mandaste ese mensaje.');
+        this.chatTimes.set(meta.userId, [...recent, now]);
+        this.lastText.set(meta.userId, { text: plain, at: now });
         const entry = { id: meta.id, userId: meta.userId, name: meta.name, text, ts: Date.now() };
         const chat = (await this.ctx.storage.get('chat')) ?? [];
         chat.push(entry);
@@ -428,15 +547,24 @@ export class Room extends DurableObject {
             this.send(ws, { t: 'dj', busy: true, name: this.dj.name });
             return;
           }
-          this.dj = { id: meta.id, name: meta.name, streamId: str(msg.streamId, 100), track: '' };
-          this.broadcast({ t: 'dj', on: true, ...this.dj });
+          if (!(await this.nearGear(meta, 'dj'))) { this.send(ws, { t: 'dj', denied: true }); return this.notice(ws, 'Acercate a la cabina.'); }
+          const other = this.holdsOther(meta, 'dj');
+          if (other) { this.send(ws, { t: 'dj', denied: true }); return this.notice(ws, `Ya tenés ${other}: una parte por persona.`); }
+          const again = this.dj?.id === meta.id;
+          this.dj = { id: meta.id, name: meta.name, streamId: str(msg.streamId, 100), track: again ? this.dj.track : '', since: again ? this.dj.since : Date.now() };
+          this.broadcast({ t: 'dj', on: true, ...this.dj, quiet: !this.announce(meta, 'dj') });
+          await this.saveStage();
         } else if (typeof msg.track === 'string' && this.dj?.id === meta.id) {
-          const track = msg.track.replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 120);
+          const track = cleanText(msg.track.replace(/[<>]/g, ''), 120);
           if (track === this.dj.track) return;
+          if (Date.now() - (this.dj.trackAt ?? 0) < TRACK_EVERY) return; // un cambio de tema cada 20 s
           this.dj.track = track;
+          this.dj.trackAt = Date.now();
           this.broadcast({ t: 'dj', track, id: meta.id, name: meta.name });
+          await this.saveStage();
         } else if (this.dj?.id === meta.id) {
           this.stopDJ();
+          await this.saveStage();
         }
         break;
       }
@@ -454,9 +582,13 @@ export class Room extends DurableObject {
           }
           if (!(await this.hasGear(part))) return this.send(ws, { t: 'part', part, denied: true });
           if (cur && cur.id !== meta.id && this.byId(cur.id)) return this.send(ws, { t: 'part', part, busy: true, name: cur.name });
+          if (!(await this.nearGear(meta, part))) { this.send(ws, { t: 'part', part, denied: true }); return this.notice(ws, 'Acercate a la consola.'); }
+          const other = this.holdsOther(meta, part);
+          if (other) { this.send(ws, { t: 'part', part, denied: true }); return this.notice(ws, `Ya tenés ${other}: una parte por persona.`); }
           this.parts[part] = { id: meta.id, name: meta.name, ...(part !== 'luces' ? { streamId: str(msg.streamId, 100) } : {}) };
-          this.broadcast({ t: 'part', part, on: true, ...this.parts[part] });
-        } else if (cur?.id === meta.id) this.releasePart(part);
+          this.broadcast({ t: 'part', part, on: true, ...this.parts[part], quiet: !this.announce(meta, part) });
+          await this.saveStage();
+        } else if (cur?.id === meta.id) { this.releasePart(part); await this.saveStage(); }
         break;
       }
       case 'luces': {
@@ -466,6 +598,7 @@ export class Room extends DurableObject {
         if (!s) return;
         this.lights = s;
         this.broadcast({ t: 'luces', s }, ws);
+        if (Date.now() - (this.lightsSaved ?? 0) > 5_000) { this.lightsSaved = Date.now(); await this.saveStage(); }
         break;
       }
       case 'edit':
@@ -569,6 +702,13 @@ export class Room extends DurableObject {
         if (msg.op === 'ban') {
           this.bans[tm.userId] = { name: tm.name, at: Date.now() };
           await this.ctx.storage.put('bans', this.bans);
+          // También su IP por 24 h: así no vuelve enseguida como invitado nuevo
+          if (tm.ip) {
+            const now = Date.now();
+            for (const [ip, until] of Object.entries(this.ipBans)) if (until < now) delete this.ipBans[ip];
+            this.ipBans[tm.ip] = now + IP_BAN;
+            await this.ctx.storage.put('ipbans', this.ipBans);
+          }
         }
         this.send(target, { t: 'kicked', ban: msg.op === 'ban', by: meta.name });
         await this.leave(target);
@@ -690,8 +830,15 @@ export class Room extends DurableObject {
     return null;
   }
 
-  // ¿Puede "viewer" escuchar/ver la pista "kind" de "tm"? Devuelve null si sí, o el motivo
-  pullBlocked(viewer, tm, kind) {
+  // ¿Puede "viewer" escuchar/ver la pista "kind" de "tm"? Devuelve null si sí, o el motivo.
+  // Además de la distancia y los grupos: si "tm" ignoró a "viewer", no lo escucha
+  async pullBlocked(viewer, tm, kind) {
+    const why = this.pullBlockedSync(viewer, tm, kind);
+    if (why || kind !== 'voice') return why;
+    return (await this.ignores(tm.userId, viewer.userId)) ? 'denied' : null;
+  }
+
+  pullBlockedSync(viewer, tm, kind) {
     if (!tm?.joined || !tm.sfu) return 'not-yet';
     if (kind === 'dj') return this.dj?.id === tm.id ? (tm.pubs?.dj ? null : 'not-yet') : 'denied';
     if (kind === 'stage') return this.parts.escenario?.id === tm.id ? (tm.pubs?.stage ? null : 'not-yet') : 'denied';
@@ -755,7 +902,7 @@ export class Room extends DurableObject {
         const id = str(it?.id, 16), kind = str(it?.kind, 8);
         const target = this.byId(id);
         const tm = target?.deserializeAttachment();
-        const why = id === meta.id ? 'denied' : this.pullBlocked(meta, tm, kind);
+        const why = id === meta.id ? 'denied' : await this.pullBlocked(meta, tm, kind);
         if (why) out.push({ id, kind, error: why });
         else want.push({ it: { id, kind }, tm });
       }
@@ -801,7 +948,7 @@ export class Room extends DurableObject {
       for (const [key, mid] of mine) {
         const [id, kind] = key.split(':');
         if (kind !== 'voice') continue;
-        if (this.pullBlocked(meta, this.byId(id)?.deserializeAttachment(), 'voice') === 'denied') cut.push([key, mid]);
+        if ((await this.pullBlocked(meta, this.byId(id)?.deserializeAttachment(), 'voice')) === 'denied') cut.push([key, mid]);
       }
       if (!cut.length) continue;
       await this.sfuApi(`sessions/${meta.sfu}/tracks/close`, 'PUT', { tracks: cut.map(([, mid]) => ({ mid })), force: true });
@@ -818,6 +965,13 @@ export class Room extends DurableObject {
 
   // La cuenta del dueño cambió algo (cerró la sala, sacó a alguien de amigos, lo restringió): a quien ya
   // no puede estar adentro se lo echa con aviso (los mods y admins se quedan)
+  // ¿La sala tiene puesto este mueble? (la cuenta lo pregunta, ej. corazones solo con atril)
+  async hasPiece(type) {
+    await this.load();
+    const layout = await this.layout();
+    return !!layout?.pieces.some((p) => p.type === type);
+  }
+
   async recheckAccess() {
     const owner = await this.ownerId();
     if (!owner) return;
@@ -844,8 +998,24 @@ export class Room extends DurableObject {
 
   async saveGroups() {
     await this.ctx.storage.put('groups', this.groups);
-    this.broadcast({ t: 'groups', groups: this.groups });
+    for (const ws of this.joined()) this.send(ws, { t: 'groups', groups: this.groupsFor(ws.deserializeAttachment().userId) });
     await this.enforce();
+  }
+
+  // Avisar que tomó la cabina o una parte: una vez cada 30 s por persona y parte (si no, prender y apagar
+  // en bucle llena el chat de todos)
+  announce(meta, part) {
+    const key = `${meta.userId}:${part}`, now = Date.now();
+    if (now - (this.announced.get(key) ?? 0) < ANNOUNCE_EVERY) return false;
+    this.announced.set(key, now);
+    return true;
+  }
+
+  // Sacaron la cabina, la consola o una pantalla de la sala: quien la estaba usando la deja
+  async gearCheck() {
+    if (this.dj && !(await this.hasGear('dj'))) this.stopDJ();
+    for (const part of PARTS) if (this.parts[part] && !(await this.hasGear(part))) this.releasePart(part);
+    await this.saveStage();
   }
 
   // Sacar a alguien de su grupo (se fue, lo sacaron o se quedó solo)
@@ -869,16 +1039,17 @@ export class Room extends DurableObject {
     return !!s && Math.hypot(s[0] - x, s[2] - z) <= max;
   }
 
-  startBoost(ws, meta, kind) {
-    this.boosts.set(meta.userId, Date.now() + BOOST_TIME);
+  // El efecto vive en la cuenta: vale en todas las salas y no se puede tomar otro mientras dura
+  async startBoost(ws, meta, kind) {
+    if (!(await this.accounts().boostTry(meta.userId, BOOST_TIME))) { this.notice(ws, 'Todavía te dura el efecto de lo que tomaste.'); return false; }
     this.broadcast({ t: 'consume', id: meta.id, kind });
+    return true;
   }
 
   async consumeMessage(ws, meta, msg) {
-    if ((this.boosts.get(meta.userId) ?? 0) > Date.now()) return this.notice(ws, 'Todavía te dura el efecto de lo que tomaste.');
     if (msg.from === 'bar') {
       // Barra del hall del Museo (sur del hall, de x -24 a -15)
-      if ((await this.roomName()) !== 'museo' || !CONSUMABLES[msg.kind]) return;
+      if ((await this.roomName()) !== 'museo' || !has(CONSUMABLES, msg.kind)) return;
       const s = this.states.get(meta.id);
       if (!s || s[0] < -26 || s[0] > -13 || Math.abs(s[2] - 9.7) > 3) return this.notice(ws, 'Acercate a la barra.');
       return this.startBoost(ws, meta, msg.kind);
@@ -892,10 +1063,12 @@ export class Room extends DurableObject {
       return this.startBoost(ws, meta, kind);
     }
     if (msg.from === 'item') {
+      // Primero el efecto (de a uno): si ya hay uno activo, el objeto no se gasta
+      if (!(await this.accounts().boostTry(meta.userId, BOOST_TIME))) return this.notice(ws, 'Todavía te dura el efecto de lo que tomaste.');
       const r = await this.accounts().useConsumable(meta.userId, String(msg.iid ?? ''));
-      if (!r.ok) return this.notice(ws, r.error);
+      if (!r.ok) { await this.accounts().boostClear(meta.userId); return this.notice(ws, r.error); }
       this.send(ws, { t: 'inventory-changed' });
-      return this.startBoost(ws, meta, r.kind);
+      this.broadcast({ t: 'consume', id: meta.id, kind: r.kind });
     }
   }
 
@@ -906,7 +1079,7 @@ export class Room extends DurableObject {
     for (const [k, at] of this.kisses) if (now - at > 60_000) this.kisses.delete(k);
     const closeTo = (a, b) => {
       const sa = this.states.get(a.id), sb = this.states.get(b.id);
-      return !!sa && !!sb && Math.hypot(sa[0] - sb[0], sa[2] - sb[2]) <= KISS_RANGE + 0.6; // margen por el atraso
+      return !!sa && !!sb && Math.hypot(sa[0] - sb[0], sa[2] - sb[2]) <= KISS_RANGE + 0.6 && Math.abs(sa[1] - sb[1]) <= 1; // margen por el atraso; a la misma altura
     };
     if (msg.op === 'ask') {
       const target = this.byId(String(msg.to ?? ''));
@@ -933,9 +1106,10 @@ export class Room extends DurableObject {
         return;
       }
       if (!closeTo(meta, fm)) return this.notice(ws, 'Se alejaron: acercate y que te lo pida de nuevo.');
-      // Los dos se dan el beso y los dos reciben el efecto (aunque ya tuvieran uno, se renueva)
-      this.boosts.set(meta.userId, now + BOOST_TIME);
-      this.boosts.set(fm.userId, now + BOOST_TIME);
+      // Los dos se dan el beso y los dos reciben el efecto: el beso reinicia los 2 minutos aunque ya
+      // tuvieran uno (decisión 26/10)
+      await this.accounts().boostSet(meta.userId, BOOST_TIME);
+      await this.accounts().boostSet(fm.userId, BOOST_TIME);
       this.broadcast({ t: 'kiss', op: 'do', a: fm.id, b: meta.id });
     }
   }
@@ -1020,8 +1194,8 @@ export class Room extends DurableObject {
     for (const [me, other] of [trade.p, [...trade.p].reverse()]) {
       this.send(this.byId(me), {
         t: 'trade', op: 'state', id: trade.id,
-        you: { items: trade.items[me], ready: !!trade.ready[me] },
-        them: { items: trade.items[other], ready: !!trade.ready[other] },
+        you: { items: trade.items[me], ready: !!trade.ready[me], v: trade.ver[me] },
+        them: { items: trade.items[other], ready: !!trade.ready[other], v: trade.ver[other] },
       });
     }
   }
@@ -1054,12 +1228,18 @@ export class Room extends DurableObject {
           this.send(ws, { t: 'trade', op: 'busy' });
           return;
         }
+        // Hay que estar cerca para invitar (decisión 26/10)
+        const os = this.states.get(om.id);
+        if (!os || !this.near(meta, os[0], os[2], TRADE_RANGE + 0.6)) {
+          return this.notice(ws, `Acercate a ${om.name} para invitarlo a intercambiar.`);
+        }
         // La misma invitación mientras sigue pendiente no se le vuelve a mostrar al otro
         const key = `${me}>${msg.to}`;
         if (this.invites.has(key)) return;
         this.invites.set(key, now);
-        // Si el otro lo ignoró o restringió, la invitación no le llega (y quien invita no se entera)
-        const check = await this.accounts().tradeInviteCheck(meta.userId, om.userId);
+        // Si el otro lo rechazó hace poco (bloqueo creciente, como los grupos), lo ignoró o lo restringió,
+        // la invitación no le llega (y quien invita no se entera)
+        const check = await this.accounts().groupInviteCheck(meta.userId, om.userId, 'trade');
         if (check.ok) this.send(this.byId(msg.to), { t: 'trade', op: 'invite', from: me, name: meta.name, userId: meta.userId });
         break;
       }
@@ -1074,7 +1254,7 @@ export class Room extends DurableObject {
           return;
         }
         const otherMeta = other.deserializeAttachment();
-        const t = { id: crypto.randomUUID().slice(0, 8), p: [from, me], users: { [from]: otherMeta.userId, [me]: meta.userId }, items: { [from]: [], [me]: [] }, ready: {}, v: 0 };
+        const t = { id: crypto.randomUUID().slice(0, 8), p: [from, me], users: { [from]: otherMeta.userId, [me]: meta.userId }, items: { [from]: [], [me]: [] }, ready: {}, ver: { [from]: 0, [me]: 0 } };
         this.trades.set(t.id, t);
         this.tradeOf.set(from, t.id);
         this.tradeOf.set(me, t.id);
@@ -1086,22 +1266,29 @@ export class Room extends DurableObject {
       case 'decline': {
         const from = str(msg.from, 16);
         if (!this.invites.delete(`${from}>${me}`)) return;
+        const fm = this.byId(from)?.deserializeAttachment();
+        if (fm) await this.accounts().groupRejected(fm.userId, meta.userId, 'trade');
         this.send(this.byId(from), { t: 'trade', op: 'declined', name: meta.name });
         break;
       }
       case 'offer': {
         if (!trade || trade.busy) return;
-        const v = ++trade.v;
+        // Cada lado lleva su número de oferta (si los dos ofrecen a la vez, no se pisan)
+        const v = (trade.pending ??= {})[me] = (trade.pending[me] ?? trade.ver[me]) + 1;
         const items = await this.accounts().ownedItems(meta.userId, msg.iids);
-        // Mientras se leían los objetos pudo cerrarse el intercambio o llegar otra oferta más nueva
-        if (this.trades.get(trade.id) !== trade || trade.busy || trade.v !== v) return;
+        // Mientras se leían los objetos pudo cerrarse el intercambio o llegar otra oferta más nueva mía
+        if (this.trades.get(trade.id) !== trade || trade.busy || trade.pending[me] !== v) return;
         trade.items[me] = items;
+        trade.ver[me] = v;
         trade.ready = {}; // si cambia la oferta, los dos tienen que volver a confirmar
         this.tradeState(trade);
         break;
       }
       case 'ready': {
         if (!trade || trade.busy) return;
+        // "Estoy listo" vale para las ofertas que se vieron: si alguna cambió en el medio, no cuenta
+        const other = trade.p.find((p) => p !== me);
+        if (msg.v && (msg.seen?.you !== trade.ver[me] || msg.seen?.them !== trade.ver[other])) return this.tradeState(trade);
         trade.ready[me] = !!msg.v;
         if (trade.p.every((p) => trade.ready[p])) {
           // Se ejecuta una sola vez: mientras la cuenta hace el cambio, el intercambio queda trabado
@@ -1161,8 +1348,10 @@ export class Room extends DurableObject {
       this.screen = null;
       this.broadcast({ t: 'screen', on: false, id: meta.id });
     }
+    const hadStage = this.dj?.id === meta.id || PARTS.some((p) => this.parts[p]?.id === meta.id);
     if (this.dj?.id === meta.id) this.stopDJ();
     for (const part of PARTS) if (this.parts[part]?.id === meta.id) this.releasePart(part);
+    if (hadStage) await this.saveStage();
     const tradeId = this.tradeOf.get(meta.id);
     const trade = tradeId && this.trades.get(tradeId);
     // Si justo se estaba ejecutando, termina solo (la cuenta lo hace todo o nada)
@@ -1174,7 +1363,13 @@ export class Room extends DurableObject {
     const gid = this.groupOf(meta.userId);
     if (gid) {
       const present = new Set(this.joined().filter((w) => w !== ws).map((w) => w.deserializeAttachment().userId));
-      if (!this.groups[gid].members.some((u) => present.has(u))) { delete this.groups[gid]; await this.saveGroups(); }
+      const g = this.groups[gid];
+      if (!g.members.some((u) => present.has(u))) { delete this.groups[gid]; await this.saveGroups(); }
+      else if (g.leader === meta.userId) {
+        // Se fue el líder: el liderazgo pasa al siguiente que sigue en la sala (decisión 26/10)
+        g.leader = g.members.find((u) => present.has(u));
+        await this.saveGroups();
+      }
     }
     if (meta.userId && !keepConn) {
       await this.accounts().releaseConn(meta.userId, meta.id);

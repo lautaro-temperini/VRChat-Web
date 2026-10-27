@@ -31,6 +31,9 @@ const has = (obj, key) => typeof key === 'string' && Object.hasOwn(obj, key);
 const dim = (v) => Math.min(10_000, Math.max(0, Math.round(Number(v)) || 0));
 const clip = (s, n) => String(s ?? '').replace(/[\u0000-\u001f<>]/g, ' ').trim().slice(0, n);
 
+// La IP no se guarda: solo un resumen, para no darle a un curador obras subidas desde su misma conexión
+const ipHash = async (ip) => (ip ? [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`obra|${ip}`)))].slice(0, 8).map((b) => b.toString(16).padStart(2, '0')).join('') : null);
+
 export function setupWorks(sql) {
   sql.exec(`
     CREATE TABLE IF NOT EXISTS works (
@@ -50,11 +53,16 @@ export function setupWorks(sql) {
       user_id TEXT NOT NULL, title TEXT NOT NULL, created INTEGER NOT NULL, by_user TEXT,
       PRIMARY KEY (user_id, title)
     );
+    CREATE TABLE IF NOT EXISTS review_assign (
+      user_id TEXT PRIMARY KEY, work_id TEXT NOT NULL, at INTEGER NOT NULL
+    );
     CREATE TABLE IF NOT EXISTS slots (
       kind TEXT NOT NULL, idx INTEGER NOT NULL, work_id TEXT, ends_at INTEGER,
       PRIMARY KEY (kind, idx)
     );
   `);
+  const wcols = sql.exec('PRAGMA table_info(works)').toArray().map((c) => c.name);
+  if (!wcols.includes('ip_hash')) sql.exec('ALTER TABLE works ADD COLUMN ip_hash TEXT');
   const cols = sql.exec('PRAGMA table_info(users)').toArray().map((c) => c.name);
   if (!cols.includes('creator_streak')) sql.exec('ALTER TABLE users ADD COLUMN creator_streak INTEGER NOT NULL DEFAULT 0');
   const ncols = sql.exec('PRAGMA table_info(notifications)').toArray().map((c) => c.name);
@@ -127,10 +135,10 @@ export const worksMethods = {
       await this.env.ART.put(`obras/${id}/${name}`, file.data, { httpMetadata: { contentType: file.mime } });
     }
     const creator = this.hasTitle(me.id, 'creador');
-    this.sql.exec(`INSERT INTO works (id, author, kind, title, description, technique, year, link, w, h, status, created)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    this.sql.exec(`INSERT INTO works (id, author, kind, title, description, technique, year, link, w, h, status, created, ip_hash)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       id, me.id, kind, title, clip(f.description, 600), clip(f.technique, 80), clip(f.year, 12), link,
-      dim(f.w), dim(f.h), creator ? 'verificada' : 'pendiente', Date.now());
+      dim(f.w), dim(f.h), creator ? 'verificada' : 'pendiente', Date.now(), await ipHash(f.ip));
     if (creator) this.rotate();
     this.progressTrack(me.id, 'postular');
     return { ok: true, id, verified: creator };
@@ -173,8 +181,10 @@ export const worksMethods = {
   },
 
   // ---------- Revisar (curadores y admins) ----------
-  // Les toca una obra al azar: nunca propia (salvo admins) ni de amigos, y que no hayan votado
-  async reviewNext(token, skip) {
+  // Les toca una obra: nunca propia (salvo admins) ni de amigos, y que no hayan votado. Van por fecha (la más
+  // vieja primero, sin prioridades; decisión 26/10), pero antes las subidas desde otra conexión (prioridad,
+  // no exclusión). Solo pueden votar la que les tocó.
+  async reviewNext(token, skip, ip) {
     const me = await this.userFromToken(token);
     if (!me) return { ok: false, error: 'Sesión vencida.' };
     if (!this.isCurator(me.id)) return { ok: false, error: 'Solo para curadores.' };
@@ -186,11 +196,13 @@ export const worksMethods = {
         AND (? OR w.author != ?)
         AND (? OR NOT EXISTS (SELECT 1 FROM friends f WHERE f.status = 'accepted'
              AND ((f.a = ? AND f.b = w.author) OR (f.b = ? AND f.a = w.author))))`,
-    me.id, admin ? 1 : 0, me.id, admin ? 1 : 0, me.id, me.id).toArray();
+    me.id, admin ? 1 : 0, me.id, admin ? 1 : 0, me.id, me.id).toArray().sort((a, b) => a.created - b.created);
     const pool = rows.filter((w) => w.id !== String(skip ?? ''));
     const list = pool.length ? pool : rows;
-    if (!list.length) return { ok: true, work: null };
-    const w = list[Math.floor(Math.random() * list.length)];
+    if (!list.length) { this.sql.exec('DELETE FROM review_assign WHERE user_id = ?', me.id); return { ok: true, work: null }; }
+    const mine = await ipHash(ip);
+    const w = list.find((x) => !mine || x.ip_hash !== mine) ?? list[0];
+    this.sql.exec('INSERT OR REPLACE INTO review_assign (user_id, work_id, at) VALUES (?, ?, ?)', me.id, w.id, Date.now());
     return { ok: true, work: this.workPublic(w, me.id), reasons: DENY_REASONS };
   },
 
@@ -203,6 +215,9 @@ export const worksMethods = {
     if (!w || !['pendiente', 'en_disputa'].includes(w.status)) return { ok: false, error: 'Esa obra ya no está para revisar.' };
     if (w.status === 'en_disputa' && !admin) return { ok: false, error: 'Esa obra la decide un admin.' };
     if (!admin && w.author === me.id) return { ok: false, error: 'No podés revisar tus propias obras.' };
+    // Solo la que le tocó (si no, un curador elige a dedo la obra de un conocido)
+    const assigned = this.sql.exec('SELECT work_id FROM review_assign WHERE user_id = ?', me.id).toArray()[0]?.work_id;
+    if (!admin && assigned !== w.id) return { ok: false, error: 'Esa obra no te tocó a vos.' };
     if (!admin && this.relation(me.id, w.author) === 'friends') return { ok: false, error: 'No podés revisar obras de amigos.' };
     if (vote === 'no' && !has(DENY_REASONS, reason)) return { ok: false, error: 'Elegí un motivo.' };
     if (vote !== 'ok' && vote !== 'no') return { ok: false, error: 'Voto inválido.' };

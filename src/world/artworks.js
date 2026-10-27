@@ -54,3 +54,6 @@ export const SCULPTURES = {
   sphere: { title: 'Espejo', author: 'Colectivo Galería', year: 2026, technique: 'Acero pulido (virtual)', description: 'Una esfera que refleja la sala entera. Acercate y vas a ver tu reflejo.', link: 'https://es.wikipedia.org/wiki/Cloud_Gate' },
   column: { title: 'Columna torcida', author: 'Colectivo Galería', year: 2026, technique: 'Laca negra (virtual)', description: 'La pieza central: una columna que gira sobre sí misma, como si el museo bailara.', link: 'https://es.wikipedia.org/wiki/Escultura_abstracta' },
 };
+
+// Títulos de todas las obras fijas del Museo (el servidor los usa para validar "miré una obra")
+export const FIXED_TITLES = new Set([...STYLES.flatMap((s) => s.titles), ...Object.values(SCULPTURES).map((s) => s.title)]);

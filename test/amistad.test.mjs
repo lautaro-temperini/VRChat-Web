@@ -99,3 +99,15 @@ test('oauth: el ingreso queda atado al navegador que lo empezó (A2)', async () 
   assert.equal((await evil.json()).ok, false);
   await sleep(10);
 });
+
+test('nombres: un invitado no se puede llamar como una cuenta con letras que se confunden ni invisibles (M19)', async () => {
+  const a = await account('mi');
+  for (const fake of [a.nick.replace('i', 'і'), `${a.nick.slice(0, 2)}​${a.nick.slice(2)}`, a.nick.toUpperCase().replace('I', '1')]) {
+    const r = await api('guest', { method: 'POST', body: { name: fake, terms: true } });
+    assert.equal(r.ok, false, `entró como "${fake}"`);
+  }
+  // Un nombre todo invisible no queda vacío
+  const g = await api('guest', { method: 'POST', body: { name: '​​‮', terms: true } });
+  assert.ok(g.ok);
+  assert.equal(g.user.name, 'Visitante');
+});

@@ -331,3 +331,6 @@ La música del DJ y el puente OSC ya están hechos. Falta:
 | Altura (26/10) | Cada sala tiene un techo de altura según su plantilla. No se suma al saldo de movimiento |
 | Track del DJ (26/10) | Como máximo un cambio de tema cada 20 s |
 | Intercambio (26/10) | Al rechazar una invitación, mismo bloqueo creciente que los grupos. Para invitar hace falta estar a unos 3,5 m |
+| Formas de cara (26/10) | Se eligen con **presets** (caras armadas), sin deslizadores por rasgo. Salen de los modificadores de MPFB |
+| Partes no humanas (26/10) | **Mezcla:** algunas libres en el editor (ej. colores de ojos) y las más vistosas (colas, orejas de duende, ojos de reptil…) como premios |
+| Orden de assets nuevos (26/10) | Primero otros assets de MakeHuman (lo más fácil), al final formas de cara, ojos de fantasía, orejas y colas, y premios 3D CC0. Después de terminar los hallazgos |

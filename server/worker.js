@@ -101,7 +101,7 @@ async function api(request, env, path) {
       return f && typeof f === 'object' ? { mime: f.type, data: await f.arrayBuffer() } : null;
     };
     const f = Object.fromEntries(['kind', 'title', 'description', 'technique', 'year', 'link', 'w', 'h'].map((k) => { const v = fd.get(k); return [k, typeof v === 'string' ? v : '']; }));
-    Object.assign(f, { hd: await file('hd'), wall: await file('wall'), model: await file('model') });
+    Object.assign(f, { hd: await file('hd'), wall: await file('wall'), model: await file('model'), ip: request.headers.get('CF-Connecting-IP') ?? '' });
     const result = await accounts.workSubmit(token, f);
     return json(result, result.ok ? 200 : 400);
   }
@@ -230,7 +230,7 @@ async function api(request, env, path) {
     case 'POST notificationsseen': result = await accounts.notificationsSeen(token); break;
     case 'GET museum': result = await accounts.museumNow(); break;
     case 'GET myworks': result = await accounts.myWorks(token); break;
-    case 'GET review': result = await accounts.reviewNext(token, q.get('skip')); break;
+    case 'GET review': result = await accounts.reviewNext(token, q.get('skip'), ip); break;
     case 'POST reviewvote': result = await accounts.reviewVote(token, body.id, body.vote, body.reason, body.text); break;
     case 'GET worksadmin': result = await accounts.worksAdmin(token); break;
     case 'POST workremove': result = await accounts.workRemove(token, body.id); break;

@@ -55,7 +55,9 @@ export const roomEditorMethods = {
       // (primero se cambia la sala y después se devuelven: así nada queda puesto y en el inventario a la vez)
       const iids = layout.pieces.filter((p) => p.iid).map((p) => p.iid);
       this.roomLayout = templateLayout(msg.template);
+      this.ceil = null; // otra plantilla, otro techo
       await this.saveLayout();
+      await this.gearCheck();
       if (iids.length) await this.accounts().furnitureReturn(owner, iids);
       this.broadcast({ t: 'layout', layout: this.roomLayout, back: iids.length });
       return;
@@ -65,6 +67,8 @@ export const roomEditorMethods = {
     if (msg.op === 'add') {
       if (!has(FURNITURE, msg.piece?.type)) return;
       const def = FURNITURE[msg.piece.type];
+      // Los muebles de los mapas públicos (hidden) no se ponen en salas propias (la barra del café regala café)
+      if (def.hidden) return fail('Ese mueble no está en el catálogo.');
       if (layout.pieces.length >= ROOM_MAX_PIECES) return fail(`Llegaste al máximo de ${ROOM_MAX_PIECES} objetos en la sala.`);
       if (def.max && layout.pieces.filter((p) => p.type === msg.piece.type).length >= def.max) {
         return fail(`"${def.name}": puede haber ${def.max === 1 ? 'uno solo' : `hasta ${def.max}`} por sala.`);
@@ -114,6 +118,7 @@ export const roomEditorMethods = {
       if (cur.iid) await this.accounts().furnitureReturn(owner, [cur.iid]);
       await this.saveLayout();
       this.broadcast({ t: 'piece-', id: cur.id, back: !!cur.iid });
+      if (['cabina', 'consola', 'pantalla'].includes(cur.type)) await this.gearCheck();
     }
   },
 };

@@ -1,5 +1,5 @@
 import { DurableObject } from 'cloudflare:workers';
-import { cleanName, cleanLook, isImage, ITEMS, STARTER_ITEMS, FURNITURE, SPECIAL_FURNITURE, CONSUMABLES, HAND_MAX, designHoldable, PUBLIC_MAPS, isRoomName } from './shared.js';
+import { cleanName, nameKey, cleanLook, isImage, ITEMS, STARTER_ITEMS, rarityOf, FURNITURE, CONSUMABLES, HAND_MAX, designHoldable, PUBLIC_MAPS, isRoomName } from './shared.js';
 import { setupWorks, worksMethods } from './works.js';
 import { setupDesigns, designsMethods } from './designs.js';
 import { sessionState } from './sessions.js';
@@ -137,6 +137,11 @@ export class Accounts extends DurableObject {
     addCol('email', 'TEXT');                                     // cuentas registradas (sin verificar por ahora)
     addCol('terms', 'INTEGER');                                  // cuándo aceptó +18 y condiciones
     addCol('email_verified', 'INTEGER NOT NULL DEFAULT 0');      // 1 = lo confirmó Google/Discord
+    addCol('name_key', 'TEXT');                                  // esqueleto del nickname (ver nameKey)
+    for (const r of this.sql.exec('SELECT id, username FROM users WHERE username IS NOT NULL AND name_key IS NULL').toArray()) {
+      this.sql.exec('UPDATE users SET name_key = ? WHERE id = ?', nameKey(r.username), r.id);
+    }
+    this.sql.exec('CREATE INDEX IF NOT EXISTS users_name_key ON users (name_key)');
     this.sql.exec('CREATE UNIQUE INDEX IF NOT EXISTS users_email ON users (email)');
     // Restringir (ocultar todo de una persona) y reportes a los admins
     this.sql.exec(`
@@ -161,6 +166,9 @@ export class Accounts extends DurableObject {
       CREATE TABLE IF NOT EXISTS group_rejects (
         from_id TEXT NOT NULL, to_id TEXT NOT NULL, day INTEGER NOT NULL, count INTEGER NOT NULL, until INTEGER NOT NULL,
         PRIMARY KEY (from_id, to_id)
+      );
+      CREATE TABLE IF NOT EXISTS boosts (
+        user_id TEXT PRIMARY KEY, until INTEGER NOT NULL
       );
       CREATE TABLE IF NOT EXISTS limits (
         key TEXT PRIMARY KEY, n INTEGER NOT NULL, since INTEGER NOT NULL
@@ -189,8 +197,14 @@ export class Accounts extends DurableObject {
   isAdmin(id) { return String(this.env.ADMIN_IDS ?? '').split(',').map((s) => s.trim()).includes(id); }
 
   // ¿El nombre ya lo usa una cuenta registrada? (sin importar mayúsculas)
+  // ¿Se ve igual que el nickname de otra cuenta? (mismas letras aunque sean cirílicas, con invisibles, 0 por o…)
   nameTaken(name, exceptId = '') {
-    return this.sql.exec('SELECT 1 FROM users WHERE username = ? AND id != ?', String(name).trim().toLowerCase(), exceptId).toArray().length > 0;
+    return this.sql.exec('SELECT 1 FROM users WHERE (username = ? OR name_key = ?) AND id != ?', String(name).trim().toLowerCase(), nameKey(name), exceptId).toArray().length > 0;
+  }
+
+  setNameKey(id) {
+    const r = this.row(id);
+    if (r?.username) this.sql.exec('UPDATE users SET name_key = ? WHERE id = ?', nameKey(r.username), id);
   }
 
   // ---------- Frenos por IP ----------
@@ -274,7 +288,7 @@ export class Accounts extends DurableObject {
     if (!USERNAME.test(username)) return { ok: false, error: 'El nickname debe tener 3 a 20 caracteres: letras, números, punto o guion bajo.' };
     if (typeof password !== 'string' || password.length < 6 || password.length > 200) return { ok: false, error: 'La contraseña tiene que tener al menos 6 caracteres.' };
     if (!terms) return { ok: false, error: 'Tenés que confirmar que sos mayor de 18 y aceptar las condiciones.' };
-    if (this.sql.exec('SELECT 1 FROM users WHERE username = ?', username).toArray().length) return { ok: false, error: 'Ese nickname ya está en uso.' };
+    if (this.nameTaken(username)) return { ok: false, error: 'Ese nickname ya está en uso (o se ve igual que otro).' };
     if (this.sql.exec('SELECT 1 FROM users WHERE email = ?', email).toArray().length) return { ok: false, error: 'Ya hay una cuenta con ese mail. Iniciá sesión.' };
     if (await this.createBlocked(ip)) return { ok: false, error: 'Se crearon muchas cuentas desde tu conexión. Probá de nuevo en un rato.' };
 
@@ -299,6 +313,7 @@ export class Accounts extends DurableObject {
       token = null;
       await this.createCount(ip);
     }
+    this.setNameKey(id);
     if (!this.row(id).starter) this.giveStarter(id); // los objetos iniciales llegan al registrarse
     return { ok: true, token: token ?? await this.newSession(id), user: this.publicUser(this.row(id)) };
   }
@@ -423,8 +438,9 @@ export class Accounts extends DurableObject {
     const username = nick.toLowerCase();
     if (!USERNAME.test(username)) return { ok: false, error: 'El nickname debe tener 3 a 20 caracteres: letras, números, punto o guion bajo.' };
     if (!row.terms && !terms) return { ok: false, error: 'Tenés que confirmar que sos mayor de 18 y aceptar las condiciones.' };
-    if (this.sql.exec('SELECT 1 FROM users WHERE username = ?', username).toArray().length) return { ok: false, error: 'Ese nickname ya está en uso.' };
+    if (this.sql.exec('SELECT 1 FROM users WHERE username = ?', username).toArray().length || this.nameTaken(username, row.id)) return { ok: false, error: 'Ese nickname ya está en uso.' };
     this.sql.exec('UPDATE users SET username = ?, name = ?, terms = COALESCE(terms, ?) WHERE id = ?', username, nick, Date.now(), row.id);
+    this.setNameKey(row.id);
     if (!this.row(row.id).starter) this.giveStarter(row.id);
     return { ok: true, user: this.publicUser(this.row(row.id)) };
   }
@@ -452,6 +468,7 @@ export class Accounts extends DurableObject {
         username = newName.toLowerCase();
       }
       this.sql.exec('UPDATE users SET name = ?, username = ?, look = ?, bio = ? WHERE id = ?', newName, username, JSON.stringify(cleanLook(look ?? JSON.parse(row.look ?? 'null'))), cleanBio, row.id);
+      this.setNameKey(row.id);
     }
     return { ok: true, user: this.publicUser(this.row(row.id)) };
   }
@@ -488,11 +505,16 @@ export class Accounts extends DurableObject {
   // ---------- Inventario ----------
 
   giveStarter(userId) {
-    // Paquete inicial: 15 objetos al azar entre prendas y muebles especiales (se pueden repetir)
-    const pool = [...STARTER_ITEMS, ...SPECIAL_FURNITURE];
+    // Paquete inicial: 15 objetos básicos al azar (se pueden repetir). Sin muebles especiales ni nada raro o
+    // exótico (decisión 26/10: si no, cada cuenta nueva es una fuente de objetos para pasar a otra)
+    const pool = STARTER_ITEMS.filter((t) => rarityOf(t) === 'basico');
     for (let i = 0; i < 15; i++) {
       const type = pick(pool);
       this.addItem(userId, type, ITEMS[type] ? pick(ITEMS[type].colors) : FURNITURE[type].color);
+    }
+    // Solo en las pruebas automáticas (scripts/test.mjs): objetos extra para probar muebles especiales
+    for (const type of String(this.env.TEST_STARTER_EXTRA ?? '').split(',').filter((t) => Object.hasOwn(FURNITURE, t))) {
+      this.addItem(userId, type, FURNITURE[type].color);
     }
     this.sql.exec('UPDATE users SET starter = 1 WHERE id = ?', userId);
   }
@@ -878,6 +900,8 @@ export class Accounts extends DurableObject {
     if (me.id === ownerId) return { ok: false, error: 'No podés dejarte un corazón a vos mismo.' };
     // Se deja en el atril de la sala: hay que estar ahí (lo sabe la sala, no el cliente)
     if (this.where(me.id) !== `u-${ownerId}`) return { ok: false, error: 'Para dejar un corazón tenés que estar en esa sala.' };
+    // y la sala tiene que tener su atril
+    if (!(await this.env.ROOMS.get(this.env.ROOMS.idFromName(`u-${ownerId}`)).hasPiece('atril'))) return { ok: false, error: 'Esta sala no tiene atril.' };
     this.sql.exec('INSERT OR IGNORE INTO hearts (owner, from_user, created) VALUES (?, ?, ?)', ownerId, me.id, Date.now());
     this.progressTrack(me.id, 'corazon', ownerId);
     return { ok: true, count: this.heartCount(ownerId), given: true };
@@ -1046,12 +1070,34 @@ export class Accounts extends DurableObject {
     return hit('ignores', 'ignored_id') || hit('blocks', 'blocked_id');
   }
 
-  // Intercambios: quien está ignorado o restringido no te puede invitar (no se entera)
-  async tradeInviteCheck(fromId, toId) {
-    return { ok: !this.shields(toId, fromId) };
+  // ¿fromId ignora a toId? (la sala lo usa para la voz: a quien ignorás no te escucha)
+  async isIgnoring(fromId, toId) {
+    return this.sql.exec('SELECT 1 FROM ignores WHERE user_id = ? AND ignored_id = ?', fromId, toId).toArray().length > 0;
   }
 
-  // kind: '' = invitación a grupo, 'kiss' = pedido de beso (cada uno lleva su propia cuenta de rechazos)
+  // ---------- Efecto de consumibles y besos: uno por cuenta, vale en todas las salas ----------
+  // Tomar algo: solo si no te dura uno (devuelve si lo tomó)
+  async boostTry(userId, ms) {
+    const now = Date.now();
+    const r = this.sql.exec('SELECT until FROM boosts WHERE user_id = ?', userId).toArray()[0];
+    if (r && r.until > now) return false;
+    this.sql.exec('INSERT OR REPLACE INTO boosts (user_id, until) VALUES (?, ?)', userId, now + ms);
+    return true;
+  }
+
+  // El beso reinicia el efecto aunque ya hubiera uno
+  async boostSet(userId, ms) {
+    this.sql.exec('INSERT OR REPLACE INTO boosts (user_id, until) VALUES (?, ?)', userId, Date.now() + ms);
+    return true;
+  }
+
+  async boostClear(userId) {
+    this.sql.exec('DELETE FROM boosts WHERE user_id = ?', userId);
+    return true;
+  }
+
+  // kind: '' = invitación a grupo, 'kiss' = pedido de beso, 'trade' = intercambio (cada uno lleva su
+  // propia cuenta de rechazos)
   async groupInviteCheck(fromId, toId, kind = '') {
     if (this.shields(toId, fromId)) return { ok: false };
     const key = kind ? `${kind}:${toId}` : toId;
@@ -1073,7 +1119,7 @@ export class Accounts extends DurableObject {
   // Tomar un consumible de la mochila: se gasta. Devuelve qué era (trago / cafe)
   async useConsumable(userId, iid) {
     const item = this.sql.exec('SELECT * FROM items WHERE iid = ? AND owner_id = ?', String(iid ?? ''), userId).toArray()[0];
-    if (!item || !CONSUMABLES[item.type]) return { ok: false, error: 'Eso no se puede tomar.' };
+    if (!item || !Object.hasOwn(CONSUMABLES, item.type)) return { ok: false, error: 'Eso no se puede tomar.' };
     this.sql.exec('DELETE FROM items WHERE iid = ?', item.iid);
     return { ok: true, kind: item.type };
   }

@@ -153,13 +153,16 @@ function useScreen() {
 }
 
 // Mensajes de la sala: la cabina (dj) y la consola (part)
+const quiet = {}; // parte -> la última vez que la tomaron no se anunció (tampoco se anuncia cuando la suelta)
 function onDJ(m) {
   if (m.busy) { rtc.stopMusic(); return toast(`La cabina está ocupada: está pasando música ${m.name}.`); }
   if (m.denied) { rtc.stopMusic(); return; }
   const mine = m.id === net.id;
   if (m.on) {
     setDJ(m);
-    G.system(`🎧 ${mine ? 'Empezaste' : `${m.name} empezó`} a pasar música en la cabina.`);
+    // Si la toma y la suelta seguido, la sala no lo vuelve a anunciar (quiet) para no llenar el chat
+    quiet.dj = m.quiet && !mine;
+    if (!quiet.dj) G.system(`🎧 ${mine ? 'Empezaste' : `${m.name} empezó`} a pasar música en la cabina.`);
     if (mine) {
       rtc.startMusic();
       ctrl.enterBooth(world.dj.spot);
@@ -172,7 +175,7 @@ function onDJ(m) {
   } else {
     if (mine) endMySet(false);
     setDJ(null);
-    G.system(`🎧 ${mine ? 'Terminaste' : `${m.name} terminó`} su set.`);
+    if (!quiet.dj) G.system(`🎧 ${mine ? 'Terminaste' : `${m.name} terminó`} su set.`);
   }
 }
 function onPart(m) {
@@ -188,13 +191,14 @@ function onPart(m) {
     if (m.part === 'escenario') { if (mine) rtc.startStage(); else rtc.setStage({ id: m.id, streamId: m.streamId }); }
     // Como el DJ: queda fijo en la cabina de VJ y luces hasta soltar el control
     if (mine && !ctrl.booth) { ctrl.enterBooth(world.artists.spots[m.part]); G.closeOverlays(); toast('Tenés el control. E para soltarlo.'); }
-    G.system(m.part === 'luces' ? `💡 ${who} ${mine ? 'tomaste' : 'tomó'} las luces.` : `🎬 ${who} ${mine ? 'estás pasando' : 'está pasando'} visuales en la pantalla.`);
+    quiet[m.part] = m.quiet && !mine;
+    if (!quiet[m.part]) G.system(m.part === 'luces' ? `💡 ${who} ${mine ? 'tomaste' : 'tomó'} las luces.` : `🎬 ${who} ${mine ? 'estás pasando' : 'está pasando'} visuales en la pantalla.`);
   } else {
     delete parts[m.part];
     if (m.part === 'luces') world.artists.setLights(null); // vuelven a automático
     if (m.part === 'escenario') rtc.setStage(null);
     if (mine) endPart(m.part);
-    G.system(m.part === 'luces' ? `💡 ${who} ${mine ? 'soltaste' : 'soltó'} las luces (vuelven a automático).` : `🎬 ${who} ${mine ? 'dejaste' : 'dejó'} la pantalla.`);
+    if (!quiet[m.part]) G.system(m.part === 'luces' ? `💡 ${who} ${mine ? 'soltaste' : 'soltó'} las luces (vuelven a automático).` : `🎬 ${who} ${mine ? 'dejaste' : 'dejó'} la pantalla.`);
   }
   refreshArtists();
 }

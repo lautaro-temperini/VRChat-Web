@@ -352,7 +352,7 @@ export function createSocial({ net, ui, me, room, onEquip, onDrop }) {
       ? `Esperando que ${trade.name} confirme.`
       : 'Si alguno cambia su oferta, los dos tienen que volver a confirmar.';
   }
-  $('trade-ready').onclick = () => net.send({ t: 'trade', op: 'ready', v: !trade?.state?.you?.ready });
+  $('trade-ready').onclick = () => net.send({ t: 'trade', op: 'ready', v: !trade?.state?.you?.ready, seen: { you: trade?.state?.you?.v, them: trade?.state?.them?.v } });
   $('trade-cancel').onclick = () => cancelTrade();
 
   function cancelTrade() {

@@ -3,13 +3,14 @@
 //
 // Qué suma puntos (cada cosa UNA sola vez: la misma obra o sala no suma dos veces):
 //   ver una obra del público expuesta (estando en el Museo) · visitar la sala personal de otro ·
-//   que te expongan una obra · curar (verificar o denegar) · asistir a un evento (5 min en un set
+//   que te expongan una obra · curar (verificar o denegar) · asistir a un evento (5 min en un set, uno por sala por día
 //   de DJ o show de la consola con más de 5 personas). Los me gusta NO dan puntos.
 // Los invitados no suman (no tienen objetos para recibir las recompensas).
 //
 // Todo entra por progressTrack(userId, acción, ref): lo llaman los enganches de accounts.js,
 // works.js y room.js. Nunca tira error (si algo falla, la acción original sigue igual).
 
+import { FIXED_TITLES } from '../src/world/artworks.js';
 import { ITEMS, ITEM_RARITY, RARITIES, FURNITURE, CONSUMABLES } from './shared.js';
 
 const randomHex = (n) => [...crypto.getRandomValues(new Uint8Array(n))].map((b) => b.toString(16).padStart(2, '0')).join('');
@@ -303,7 +304,7 @@ export const progressMethods = {
       return { ok: true, ...this.progressTrackNews(me.id, 'obra', w.id) };
     }
     const key = String(fixed ?? '').slice(0, 60);
-    if (!key) return { ok: true, news: [] };
+    if (!FIXED_TITLES.has(key)) return { ok: true, news: [] }; // solo obras fijas que existen (M6)
     return { ok: true, ...this.progressTrackNews(me.id, 'obra_fija', key) };
   },
 
@@ -355,22 +356,24 @@ export async function roomTrack(room, ws, userId, action, ref = null) {
   } catch { /* la progresión nunca frena a la sala */ }
 }
 
-// Eventos: cada set de DJ (o show de la consola sin DJ) es un evento. Cuenta haber estado 5 minutos
-// en la sala mientras dura, con más de 5 personas presentes (aunque estés AFK).
+// Eventos: hay evento mientras alguien pasa música de verdad en la cabina (su audio publicado en el servidor
+// de audio) con más de 5 personas en la sala (invitados y AFK cuentan). Cuenta haber estado 5 minutos en total.
+// Un evento por sala por día (decisión 26/10): otro set en la misma sala el mismo día no suma.
 // Se llama en cada alarma de la sala (cada 30 s mientras hay gente).
 const EVENT_MIN_PEOPLE = 6, EVENT_TIME = 5 * 60_000;
-const shows = new WeakMap(); // sala → { key, start, last, time: Map(userId → ms), done: Set }
+const shows = new WeakMap(); // sala → { day, last, time: Map(userId → ms), done: Set }
 
 export async function roomEventTick(room) {
   try {
     const now = Date.now();
-    const holder = room.parts?.escenario ?? room.parts?.luces;
-    const key = room.dj ? `dj:${room.dj.id}:${room.dj.streamId}` : holder ? `consola:${holder.id}` : null;
+    const djWs = room.dj ? room.byId(room.dj.id) : null;
+    const playing = !!djWs?.deserializeAttachment()?.pubs?.dj;
+    const day = Math.floor((now - ARG) / DAY);
     let st = shows.get(room);
-    if (!key) { shows.delete(room); return; }
-    if (!st || st.key !== key) { st = { key, start: now, last: now, time: new Map(), done: new Set() }; shows.set(room, st); }
+    if (!st || st.day !== day) { st = { day, last: now, time: new Map(), done: new Set() }; shows.set(room, st); }
     const dt = Math.min(now - st.last, 60_000);
     st.last = now;
+    if (!playing) return;
     const people = new Map(); // userId → una de sus conexiones (puede tener dos pestañas)
     for (const ws of room.joined()) people.set(ws.deserializeAttachment().userId, ws);
     if (people.size < EVENT_MIN_PEOPLE) return;
@@ -381,7 +384,7 @@ export async function roomEventTick(room) {
       st.time.set(userId, t);
       if (t < EVENT_TIME) continue;
       st.done.add(userId);
-      await roomTrack(room, ws, userId, 'evento', `${name}:${st.key}:${st.start}`);
+      await roomTrack(room, ws, userId, 'evento', `${name}:${day}`);
     }
   } catch { /* nunca frena a la sala */ }
 }

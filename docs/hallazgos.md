@@ -28,7 +28,7 @@ archivo y línea) está en [`docs/hallazgos/`](hallazgos/), un archivo por agent
 
 ## Altos
 
-- [ ] **A1. Voz: la distancia se controla solo al suscribirse.** Te acercás una vez, te alejás y seguís
+- [x] **A1. Voz: la distancia se controla solo al suscribirse.** Te acercás una vez, te alejás y seguís
   escuchando desde cualquier punto de la sala (probado a 195 m). `enforce` no corre al moverse.
   Rep. (lógica de la sala con SFU simulado) — `server/room.js` (`pullBlocked`/`enforce`). *Arreglo:* correr
   `enforce` periódicamente o cuando cambian las posiciones. [acoso #2, permisos H5]
@@ -52,98 +52,98 @@ archivo y línea) está en [`docs/hallazgos/`](hallazgos/), un archivo por agent
 - [x] **A7. Texturas por `data:` URI no se miden:** una imagen enorme embebida pasa el tope de 1024 px y puede
   tumbar la pestaña de quien carga el modelo. Rep. (el paso) — `server/glb.js`. *Arreglo:* medir también las
   `data:` o prohibirlas. [archivos #5]
-- [ ] **A8. Cambiazo en el intercambio:** el "Estoy listo" no queda atado a la oferta vista; si el otro cambia
+- [x] **A8. Cambiazo en el intercambio:** el "Estoy listo" no queda atado a la oferta vista; si el otro cambia
   justo antes, tu "listo" vale para la nueva (viste un minibar, recibiste espejos). Rep. — `server/room.js`
   (intercambio, ~l. 1088). *Arreglo:* el `ready` lleva la versión de la oferta. [economía #1]
-- [ ] **A9. Eventos farmeables sin límite 🗳️:** una cuenta + 5 invitados de relleno + cabina con un `streamId`
+- [x] **A9. Eventos farmeables sin límite 🗳️:** una cuenta + 5 invitados de relleno + cabina con un `streamId`
   inventado (sin música); reenviando `dj on` con otro id arranca un evento nuevo. ~600 puntos/hora, niveles,
   objetos e insignia Fiestero. Rep. — `server/progress.js` (~l. 362-386), `room.js`. *Decidir:* ¿cuentan los
   invitados?, ¿hace falta música de verdad?, ¿tope de eventos por día? [mecánicas #1, economía #5, permisos H4]
-- [ ] **A10. Cientos de conexiones bloquean una sala ~10 s:** 300 WebSocket con joins falsos llevan la
+- [x] **A10. Cientos de conexiones bloquean una sala ~10 s:** 300 WebSocket con joins falsos llevan la
   latencia de 17 ms a 10 s; no hay tope por sala ni freno por IP en `/ws/`. Rep. — `server/worker.js`,
   `room.js`. *Arreglo:* tope de conexiones sin entrar por sala/IP y cerrar antes las mudas. [saturación #1]
 - [x] **A11. Spam de avisos de amistad:** cancelar y reenviar la solicitud en bucle llena los avisos de la víctima
   (aunque te haya restringido o ignorado, y desde invitados); el bloqueo de 24 h solo se arma si rechaza.
   Rep. — `server/accounts.js` (~l. 620, 651). [acoso #3, permisos H14]
-- [ ] **A12. El antiflood del chat se reinicia al reconectar** (va por conexión, no por cuenta): 20 mensajes en
+- [x] **A12. El antiflood del chat se reinicia al reconectar** (va por conexión, no por cuenta): 20 mensajes en
   1,3 s. Rep. — `server/room.js` (~l. 385). *Arreglo:* contarlo por cuenta. [acoso #4]
-- [ ] **A13. Silenciar no frena casi nada:** el silenciado igual manda besos, invitaciones a intercambio y a
+- [x] **A13. Silenciar no frena casi nada:** el silenciado igual manda besos, invitaciones a intercambio y a
   grupo, y gestos. Rep. — `server/room.js`. *Arreglo:* que silenciado frene todo lo que llega a otros. [acoso #5]
-- [ ] **A14. Granja de cuentas 🗳️:** cada cuenta nueva trae 15 objetos al azar (con muebles raros y exóticos) que
+- [x] **A14. Granja de cuentas 🗳️:** cada cuenta nueva trae 15 objetos al azar (con muebles raros y exóticos) que
   se pasan a la principal por intercambio; con el freno por IP, ~300 objetos/hora. Rep. — `accounts.js`
   (`giveStarter`). *Decidir:* paquete inicial más chico, sin especiales, o intransferible por un tiempo. [economía #2]
 
 ## Medios
 
-- [ ] **M1. Teletransporte reconectando:** la posición del `join` (y la primera `s`) no pasa por el control de
+- [x] **M1. Teletransporte reconectando:** la posición del `join` (y la primera `s`) no pasa por el control de
   velocidad; reconectar te deja aparecer donde quieras (probado juntando un objeto a 40 m). Rep. —
   `server/room.js` (~l. 292). *Arreglo:* validar el `join` contra la entrada de la sala o la última posición
   conocida de la cuenta. [saturación #2, mecánicas #8, permisos H3]
-- [ ] **M2. La altura no tiene control:** se puede "volar" 480 m, soltar algo a 300 m y juntarlo desde arriba.
+- [x] **M2. La altura no tiene control:** se puede "volar" 480 m, soltar algo a 300 m y juntarlo desde arriba.
   Rep. — `room.js` (case `s`). *Decidir/arreglar:* incluir `y` en el saldo con margen para caídas. [saturación #3, mecánicas #9, permisos H16]
-- [ ] **M3. `consume` y `kiss` fuera del antiflood pesado (`HEAVY`):** una conexión fuerza ~70 llamadas/s a
+- [x] **M3. `consume` y `kiss` fuera del antiflood pesado (`HEAVY`):** una conexión fuerza ~70 llamadas/s a
   `Accounts`. Rep. — `room.js` (~l. 55). [saturación #4, mecánicas #16]
-- [ ] **M4. Diseños y copias sin tope 🗳️:** se aceptaron 25 estampas de 800 KB y 200 copias seguidas (el Museo
+- [x] **M4. Diseños y copias sin tope 🗳️:** se aceptaron 25 estampas de 800 KB y 200 copias seguidas (el Museo
   tiene 5 por día; los diseños, nada). Rep. — `server/designs.js`. *Decidir:* tope por día/cuenta. [saturación #5]
-- [ ] **M5. Muebles ocultos de los mapas públicos en la sala propia:** el editor deja poner `hidden` (la barra
+- [x] **M5. Muebles ocultos de los mapas públicos en la sala propia:** el editor deja poner `hidden` (la barra
   de la Cafetería reparte café gratis y desvaloriza Cafetera/Minibar/Barra). Rep. — `server/editor.js`
   (~l. 65). *Arreglo:* rechazar `hidden` en `add`. [economía #3, permisos H8]
-- [ ] **M6. Obras fijas inventadas en la progresión:** `progressview` con `fixed` cualquiera cumple "Mirá 3
+- [x] **M6. Obras fijas inventadas en la progresión:** `progressview` con `fixed` cualquiera cumple "Mirá 3
   obras" y el paso 1 del camino. Rep. — `server/progress.js` (~l. 305). *Arreglo:* lista de obras fijas
   válidas. [economía #4, mecánicas #11, permisos H15]
-- [ ] **M7. La cabina y la consola se toman desde cualquier punto de la sala** (el servidor no mira la
+- [x] **M7. La cabina y la consola se toman desde cualquier punto de la sala** (el servidor no mira la
   distancia). Rep. — `room.js` (~l. 417-461). [mecánicas #2, permisos H10]
-- [ ] **M8. Una persona acapara DJ + luces + pantalla (+ 2ª pantalla)** aunque la decisión es una parte cada uno.
+- [x] **M8. Una persona acapara DJ + luces + pantalla (+ 2ª pantalla)** aunque la decisión es una parte cada uno.
   Rep. — `room.js`. [mecánicas #3]
-- [ ] **M9. Spam de avisos del sistema** con `dj on` / `part on/off` en bucle (~5/s, "ignorar" no los filtra).
+- [x] **M9. Spam de avisos del sistema** con `dj on` / `part on/off` en bucle (~5/s, "ignorar" no los filtra).
   Rep. — `room.js`. [mecánicas #4]
-- [ ] **M10. El "track" del DJ es un chat libre** sin antiflood, sin "chat deshabilitado" y sin "ignorar".
+- [x] **M10. El "track" del DJ es un chat libre** sin antiflood, sin "chat deshabilitado" y sin "ignorar".
   Rep. — `room.js` (~l. 433). [mecánicas #5]
-- [ ] **M11. Sacar la cabina/consola/pantalla o cambiar de plantilla no baja al DJ ni a los artistas.** Rep. —
+- [x] **M11. Sacar la cabina/consola/pantalla o cambiar de plantilla no baja al DJ ni a los artistas.** Rep. —
   `server/editor.js`. [mecánicas #6]
-- [ ] **M12. Grupo de voz acéfalo 🗳️:** si el líder cierra la pestaña sigue como líder y ocupando lugar; nadie
+- [x] **M12. Grupo de voz acéfalo 🗳️:** si el líder cierra la pestaña sigue como líder y ocupando lugar; nadie
   puede invitar ni sacarlo. Rep. — `room.js` (~l. 1157). *Decidir:* ¿pasa el liderazgo?, ¿se disuelve? [mecánicas #7]
-- [ ] **M13. Al hibernar la sala (unos 30 s sin mensajes) se pierde quién tiene la cabina, la consola y las luces**,
+- [x] **M13. Al hibernar la sala (unos 30 s sin mensajes) se pierde quién tiene la cabina, la consola y las luces**,
   y también intercambios y efectos: otro puede tomar la cabina con el DJ adentro. Rep. — `room.js` (estado
   en memoria). *Arreglo:* guardar en storage lo que tiene que sobrevivir. [permisos H19, economía]
-- [ ] **M14. Intercambio:** rechazar no tiene bloqueo creciente, reconectar renueva la invitación al instante y
+- [x] **M14. Intercambio:** rechazar no tiene bloqueo creciente, reconectar renueva la invitación al instante y
   no hace falta estar cerca (30 m). Rep. — `room.js`. 🗳️ (¿mismo bloqueo que grupos/beso? ¿distancia?) [acoso #6]
-- [ ] **M15. Invitados descartables 🗳️** esquivan ignorar, el bloqueo del beso y el baneo de una sala personal.
+- [x] **M15. Invitados descartables 🗳️** esquivan ignorar, el bloqueo del beso y el baneo de una sala personal.
   Rep. *Decidir:* ¿se banea por IP/navegador?, ¿invitados sin ciertas interacciones? [acoso #7, permisos H12]
-- [ ] **M16. "Ignorar" no impide que el ignorado escuche tu voz** (la sala no consulta los ignorados al
+- [x] **M16. "Ignorar" no impide que el ignorado escuche tu voz** (la sala no consulta los ignorados al
   suscribir). Rep. (lógica) — `room.js` (`pullBlocked`). [acoso #8]
 - [x] **M17. Restringir o ignorar a un amigo no le saca nada 🗳️:** sigue viendo tu sala en vivo, entra a tu
   sala "solo amigos", ve y le da me gusta a tus fotos (hoy es coherente con la regla actual). [acoso #9]
 - [x] **M18. Cerrar la sala o sacar a alguien de amigos no echa a quien ya está adentro 🗳️.** Rep. [acoso #10, permisos H11]
-- [ ] **M19. Suplantación de nombres:** un invitado se llama igual que una cuenta con letras cirílicas o un
+- [x] **M19. Suplantación de nombres:** un invitado se llama igual que una cuenta con letras cirílicas o un
   espacio invisible (U+200B), o con un nombre invisible. Rep. — `shared.js` (`cleanName`). *Arreglo:* sacar
   invisibles/bidi y comparar con nicks registrados (normalizado). [acoso #11, permisos H7]
-- [ ] **M20. Chat:** caracteres invisibles esquivan el filtro de repetidos; pasan texto invertido (U+202E) y
+- [x] **M20. Chat:** caracteres invisibles esquivan el filtro de repetidos; pasan texto invertido (U+202E) y
   "zalgo" (281 combinantes). Rep. — `room.js`. [acoso #12]
-- [ ] **M21. Pedidos de beso y grupo sin respuesta repetibles cada minuto para siempre 🗳️** (es la regla
+- [x] **M21. Pedidos de beso y grupo sin respuesta repetibles cada minuto para siempre 🗳️** (es la regla
   actual; ¿alcanza?). [acoso #13]
-- [ ] **M22. Curadores: `reviewvote` acepta cualquier obra pendiente por id**, no solo la que les tocó al azar.
+- [x] **M22. Curadores: `reviewvote` acepta cualquier obra pendiente por id**, no solo la que les tocó al azar.
   Hip. — `server/works.js`. [permisos H6]
 - [x] **M23. Mallas comprimidas (Draco/meshopt): el conteo de triángulos cree en `count`.** Hip. —
   `server/glb.js`. [archivos #6]
 
 ## Bajos
 
-- [ ] **B1.** Todos los de la sala ven quién está en un grupo privado con quién (llegan los ids). [acoso #14]
+- [x] **B1.** Todos los de la sala ven quién está en un grupo privado con quién (llegan los ids). [acoso #14]
 - [x] **B2.** Solicitudes de amistad sin tope (6 en 75 ms) y mandarlas ya suma progresión. [acoso #15]
-- [ ] **B3.** El buscador le muestra a cualquiera si estás conectado. [acoso #16]
-- [ ] **B4.** Gestos: 5 por segundo a toda la sala (también silenciado). [acoso #17]
-- [ ] **B5.** Una sala cerrada muestra nombre, descripción y dueño a cualquiera sin sesión. [acoso #18]
-- [ ] **B6.** Se puede tomar `escenario2` en el Museo, que no tiene segunda pantalla (`hasGear` sin layout). [mecánicas #10]
-- [ ] **B7.** El efecto de 2 minutos vive en cada sala: en otra se toma otro enseguida. [mecánicas #12, economía #8]
-- [ ] **B8. 🗳️** El beso renueva el efecto aunque esté activo; su distancia no mira la altura. [mecánicas #13]
-- [ ] **B9.** `consume` (barra) usa `CONSUMABLES[kind]` sin `Object.hasOwn`: `'constructor'` se acepta y se
+- [x] **B3.** El buscador le muestra a cualquiera si estás conectado. [acoso #16]
+- [x] **B4.** Gestos: 5 por segundo a toda la sala (también silenciado). [acoso #17]
+- [x] **B5.** Una sala cerrada muestra nombre, descripción y dueño a cualquiera sin sesión. [acoso #18]
+- [x] **B6.** Se puede tomar `escenario2` en el Museo, que no tiene segunda pantalla (`hasGear` sin layout). [mecánicas #10]
+- [x] **B7.** El efecto de 2 minutos vive en cada sala: en otra se toma otro enseguida. [mecánicas #12, economía #8]
+- [x] **B8. 🗳️** El beso renueva el efecto aunque esté activo; su distancia no mira la altura. [mecánicas #13]
+- [x] **B9.** `consume` (barra) usa `CONSUMABLES[kind]` sin `Object.hasOwn`: `'constructor'` se acepta y se
   reparte a la sala. Rep. — `room.js`. [saturación #6, mecánicas #14]
 - [x] **B10.** Las salas favoritas aceptan salas que no existen (falta `isRoomName`). [mecánicas #15]
-- [ ] **B11.** Si los dos ofrecen a la vez en un intercambio, una oferta se descarta en silencio (contador de
+- [x] **B11.** Si los dos ofrecen a la vez en un intercambio, una oferta se descarta en silencio (contador de
   versión compartido). [economía #6]
-- [ ] **B12.** Dos consumibles a la vez: se gastan los dos y el efecto es uno. [economía #7]
-- [ ] **B13.** Se dejan corazones en una sala sin atril. [permisos H9]
+- [x] **B12.** Dos consumibles a la vez: se gastan los dos y el efecto es uno. [economía #7]
+- [x] **B13.** Se dejan corazones en una sala sin atril. [permisos H9]
 - [x] **B14. 🗳️** Los invitados pueden tener amigos y con eso entran a salas "solo amigos". [permisos H13]
 - [x] **B15. 🗳️** Los invitados pueden reportar, leer el muro y guardar favoritas (no están en la lista de vedadas). [permisos H17]
 - [x] **B16.** `PUT me` sin `look` borra el personaje; `oauthstart` acepta cualquier origen https (no explotable:

@@ -12,6 +12,11 @@ async function openTrade(ca, cb) {
   await ca.wait((m) => m.t === 'trade' && m.op === 'open');
   await cb.wait((m) => m.t === 'trade' && m.op === 'open');
 }
+// "Estoy listo" con las ofertas que se vieron (la sala lo exige)
+function ready(c) {
+  const st = c.msgs.findLast((m) => m.t === 'trade' && m.op === 'state');
+  c.send({ t: 'trade', op: 'ready', v: true, seen: { you: st?.you.v, them: st?.them.v } });
+}
 const ends = (m) => m.t === 'trade' && ['done', 'failed', 'closed'].includes(m.op);
 
 test('intercambio completo: los objetos cambian de dueño', async () => {
@@ -23,9 +28,9 @@ test('intercambio completo: los objetos cambian de dueño', async () => {
   await cb.wait((m) => m.t === 'trade' && m.op === 'state' && m.them.items.length === 1);
   cb.send({ t: 'trade', op: 'offer', iids: [y.iid, y2.iid] });
   await ca.wait((m) => m.t === 'trade' && m.op === 'state' && m.them.items.length === 2);
-  ca.send({ t: 'trade', op: 'ready', v: true });
+  ready(ca);
   await cb.wait((m) => m.t === 'trade' && m.op === 'state' && m.them.ready);
-  cb.send({ t: 'trade', op: 'ready', v: true });
+  ready(cb);
   assert.equal((await ca.wait(ends)).op, 'done');
   const ia = (await inventory(a.token)).map((i) => i.iid), ib = (await inventory(b.token)).map((i) => i.iid);
   assert.ok(ia.includes(y.iid) && ia.includes(y2.iid) && !ia.includes(x.iid));
@@ -51,10 +56,10 @@ test('intercambio: aceptar dos veces seguidas lo ejecuta una sola vez', async ()
   await openTrade(ca, cb);
   ca.send({ t: 'trade', op: 'offer', iids: [x.iid] });
   await cb.wait((m) => m.t === 'trade' && m.op === 'state' && m.them.items.length === 1);
-  ca.send({ t: 'trade', op: 'ready', v: true });
+  ready(ca);
   await cb.wait((m) => m.t === 'trade' && m.op === 'state' && m.them.ready);
   const from = cb.msgs.length;
-  for (let i = 0; i < 4; i++) cb.send({ t: 'trade', op: 'ready', v: true });
+  for (let i = 0; i < 4; i++) ready(cb);
   await sleep(800);
   const fin = cb.since(from).filter(ends);
   assert.deepEqual(fin.map((m) => m.op), ['done'], 'un solo final, sin "failed" de una segunda ejecución');
@@ -66,14 +71,13 @@ test('intercambio: si el objeto se suelta a mitad, el intercambio falla y no se 
   const a = await account('tr'), b = await account('tr');
   const [x] = await inventory(a.token);
   const ca = await joined(a.token), cb = await joined(b.token);
-  await moveTo(ca, 0, 0, 0);
   await openTrade(ca, cb);
   ca.send({ t: 'trade', op: 'offer', iids: [x.iid] });
   await cb.wait((m) => m.t === 'trade' && m.op === 'state' && m.them.items.length === 1);
-  ca.send({ t: 'drop', iid: x.iid, x: 1, y: 0, z: 0 });
+  ca.send({ t: 'drop', iid: x.iid, x: -26.5, y: 0, z: 0 });
   await cb.wait((m) => m.t === 'ground+' && m.iid === x.iid);
-  ca.send({ t: 'trade', op: 'ready', v: true });
-  cb.send({ t: 'trade', op: 'ready', v: true });
+  ready(ca);
+  ready(cb);
   assert.equal((await cb.wait(ends)).op, 'failed');
   assert.ok(!(await inventory(b.token)).some((i) => i.iid === x.iid));
   assert.ok(!(await inventory(a.token)).some((i) => i.iid === x.iid), 'sigue en el suelo');
@@ -159,7 +163,7 @@ async function myRoom(acc, template = 'club') {
 test('editor: un mueble especial puesto no vuelve al inventario con una plantilla trucha', async () => {
   const a = await account('ed');
   const sp = (await inventory(a.token)).find((i) => ['trono', 'espejos', 'sillonNeon', 'esculturaNeon'].includes(i.type));
-  assert.ok(sp, 'el paquete inicial trae algún especial');
+  assert.ok(sp, 'la cuenta de prueba trae un especial (TEST_STARTER_EXTRA)');
   const c = await myRoom(a);
   c.send({ t: 'edit', op: 'add', piece: { id: 'tmp1', type: sp.type, iid: sp.iid, x: 0, z: 0 } });
   await c.wait((m) => m.t === 'piece' && m.piece.iid === sp.iid);
@@ -176,7 +180,8 @@ test('editor: tipos de mueble que no son del catálogo no entran', async () => {
   const a = await account('ed');
   const c = await myRoom(a);
   const from = c.msgs.length;
-  for (const type of ['constructor', '__proto__', 'toString', 'valueOf']) c.send({ t: 'edit', op: 'add', piece: { id: `t${type.length}`, type, x: 0, z: 0 } });
+  // Tampoco los de los mapas públicos (M5: la barra del café regala café)
+  for (const type of ['constructor', '__proto__', 'toString', 'valueOf', 'barraCafe', 'probador']) c.send({ t: 'edit', op: 'add', piece: { id: `t${type.length}`, type, x: 0, z: 0 } });
   await sleep(400);
   assert.ok(!c.since(from).some((m) => m.t === 'piece'));
   await c.close();

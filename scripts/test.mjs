@@ -23,7 +23,9 @@ mkdirSync('dist', { recursive: true });
 const state = mkdtempSync(join(tmpdir(), 'galeria-test-'));
 const server = spawn('npx', ['wrangler', 'dev', '--port', port, '--ip', '127.0.0.1', '--inspector-port', '0', '--persist-to', state, '--show-interactive-dev-session=false',
   // Las pruebas crean muchas cuentas seguidas desde la misma PC: se sube ese freno
-  '--var', 'CREATE_PER_HOUR:100000'],
+  '--var', 'CREATE_PER_HOUR:100000',
+  // El paquete inicial ya no trae muebles especiales: en las pruebas se suma uno
+  '--var', 'TEST_STARTER_EXTRA:esculturaNeon'],
   { stdio: ['ignore', 'pipe', 'pipe'], shell: process.platform === 'win32', detached: process.platform !== 'win32' });
 let log = '';
 const ready = new Promise((resolve, reject) => {

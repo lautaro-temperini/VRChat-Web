@@ -95,8 +95,12 @@ export class Client {
     if (!this.ws) await this.open();
     this.mark = this.msgs.length;
     this.send({ t: 'join', token: this.token, s, ...extra });
+    const from = this.mark;
     this.welcome = await this.wait((m) => m.t === 'welcome' || m.t === 'error', { what: 'welcome' });
     if (this.welcome.t === 'welcome') this.id = this.welcome.id;
+    // La sala pone en la entrada a quien aparece lejos de ella (o de donde estaba al irse)
+    const fix = this.msgs.slice(from).find((m) => m.t === 'pos-fix');
+    if (fix) { this.joinedAt = [fix.x, fix.y, fix.z]; this.at = null; }
     return this.welcome;
   }
 
@@ -104,6 +108,7 @@ export class Client {
     return new Promise((resolve) => {
       if (!this.ws || this.ws.readyState === WebSocket.CLOSED) return resolve();
       this.ws.addEventListener('close', () => resolve(), { once: true });
+      setTimeout(resolve, 2000); // wrangler dev a veces no avisa el cierre
       this.ws.close(1000);
     });
   }

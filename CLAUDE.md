@@ -50,6 +50,9 @@ node scripts/test.mjs test/sala.test.mjs  # un solo archivo de pruebas
 ```
 
 Cada agujero de seguridad que se cierre lleva su prueba en `test/` (clientes WebSocket reales, sin navegador).
+Las pruebas entran al Museo por la puerta (-27.5, 0): la sala corrige a quien aparece lejos de la entrada. Lo que usa
+cabina o consola va en una sala propia con plantilla `club` (el Museo lo comparten otras pruebas). `npm test` suma un
+mueble especial a cada cuenta nueva (`TEST_STARTER_EXTRA`). No edites `server/` mientras corren: wrangler se recarga.
 
 ## Cosas a saber
 
@@ -66,7 +69,11 @@ Cada agujero de seguridad que se cierre lleva su prueba en `test/` (clientes Web
 - **Cuidarse** (`src/ui/roompanel.js`): mutear (voz) se guarda en el navegador; ignorar (voz + texto,
   rutas `ignores`/`ignore`) y restringir (oculta sus publicaciones del muro, rutas `blocks`/`block`) viven en la cuenta. Reportar está
   postergado: las rutas `report`/`reports` existen en el servidor pero no hay botón.
-- **Antiflood** del chat en `server/room.js` (`FLOOD_MAX`, `FLOOD_WINDOW`, `REPEAT_WINDOW`).
+- **Antiflood** del chat en `server/room.js` (`FLOOD_MAX`, `FLOOD_WINDOW`, `REPEAT_WINDOW`), por cuenta. Texto y nombres
+  pasan por `cleanText`/`cleanName` (shared.js: sin invisibles ni "zalgo"); `nameKey` compara nombres que se ven iguales.
+- **Sala (reglas del 26/10):** techo de altura por plantilla (`ceiling`), cabina/consola solo de cerca (`nearGear`), una
+  parte por persona (`holdsOther`), tema del DJ cada 20 s, cabina/consola/luces guardadas en storage (`stage`), baneo
+  también por IP 24 h (`ipBans`, nunca al dueño/admins), el efecto de consumibles y besos vive en la cuenta (`boosts`).
 - **Voz:** el cliente se suscribe a los más cercanos (`updateVoices`, cada 0,5 s) y suenan los 4 más
   cercanos que hablan dentro de 10 m. La sala valida cada suscripción (`pullBlocked`: distancia con margen,
   grupos, silenciados) y corta las que ya no valen (`enforce` → mensaje `sfu-cut`). Pistas: `<idConexión>-voice|dj|stage`.

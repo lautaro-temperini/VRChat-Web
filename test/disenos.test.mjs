@@ -112,3 +112,22 @@ test('diseños: objetos 3D, control automático, mano y título de Diseñador', 
   const p = await api('progress', { token: a.token });
   assert.ok(p.titles.includes('disenador'));
 });
+
+test('diseños: hasta 5 subidas y 2 copias por día (M4)', async () => {
+  const a = await account('ds');
+  const ids = [];
+  for (let i = 0; i < 5; i++) {
+    const r = await stamp(a.token);
+    assert.ok(r.ok, r.error);
+    ids.push(r.id);
+  }
+  const sixth = await stamp(a.token);
+  assert.equal(sixth.ok, false);
+  assert.match(sixth.error, /hoy/);
+  const inv = await inventory(a.token);
+  const mine = inv.find((i) => i.design?.id === ids[0]);
+  for (let i = 0; i < 2; i++) assert.ok((await api('designcopy', { method: 'POST', token: a.token, body: { iid: mine.iid } })).ok);
+  const third = await api('designcopy', { method: 'POST', token: a.token, body: { iid: mine.iid } });
+  assert.equal(third.ok, false);
+  assert.match(third.error, /hoy/);
+});

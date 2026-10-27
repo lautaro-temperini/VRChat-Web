@@ -24,6 +24,7 @@ test('moderar sin decir a quién no rompe la sala', async () => {
   const own = await joined(a.token, `u-${a.user.id}`);
   own.send({ t: 'edit', op: 'template', template: 'club' });
   await own.wait('layout');
+  await moveTo(own, 0, 0, -2.8); // al lado de la cabina
   own.send({ t: 'dj', on: true, streamId: 'x' });
   await own.wait((m) => m.t === 'dj' && m.on);
   for (const op of ['kick', 'ban', 'silence', 'bring', 'spawn']) own.send({ t: 'mod', op });
@@ -60,14 +61,14 @@ test('antiflood general: una ráfaga de posiciones no se reenvía entera', async
   const a = await account('fl'), b = await account('fl');
   const ca = await joined(a.token), cb = await joined(b.token);
   const from = cb.msgs.length;
-  for (let i = 0; i < 600; i++) ca.send({ t: 's', s: [i / 100, 0, 0, 0, 0, 0] });
+  for (let i = 0; i < 600; i++) ca.send({ t: 's', s: [-27.5 + i / 100, 0, 0, 0, 0, 0] });
   await sleep(800);
   const got = cb.since(from).filter((m) => m.t === 's' && m.id === ca.id).length;
   assert.ok(got > 50 && got < 300, `llegaron ${got} de 600`);
   // Y a ritmo normal (10 por segundo) llega todo
   await sleep(3000);
   const from2 = cb.msgs.length;
-  for (let i = 0; i < 10; i++) { ca.send({ t: 's', s: [1 + i, 0, 0, 0, 0, 0] }); await sleep(100); }
+  for (let i = 0; i < 10; i++) { ca.send({ t: 's', s: [-26.5 + i * 0.5, 0, 0, 0, 0, 0] }); await sleep(100); }
   await sleep(200);
   assert.equal(cb.since(from2).filter((m) => m.t === 's' && m.id === ca.id).length, 10);
   await ca.close(); await cb.close();
@@ -86,9 +87,9 @@ test('antiflood: los gestos en ráfaga no le llegan todos a los demás', async (
 
 test('posiciones: números raros se rechazan y las enormes se acotan', async () => {
   const a = await account('po'), b = await account('po');
-  // Al entrar, la posición enorme se acota (después, saltar hasta ahí sería un teletransporte: ver movimiento.test.mjs)
+  // Al entrar, una posición enorme (lejos de la entrada) se cambia por la entrada (M1)
   const ca = await joined(a.token, 'museo', [1e300, -1e300, 0, 0, 0, 99]), cb = await joined(b.token);
-  assert.deepEqual(cb.welcome.players.find((p) => p.id === ca.id)?.s, [500, -500, 0, 0, 0, 5]);
+  assert.deepEqual(cb.welcome.players.find((p) => p.id === ca.id)?.s, [-27.5, 0, 0, 0, 0, 0]);
   for (const s of [[1, 2, 3], ['1', 0, 0, 0, 0, 0], [null, 0, 0, 0, 0, 0], [1e400, 0, 0, 0, 0, 0], 'hola', { 0: 1 }]) ca.send({ t: 's', s });
   ca.send('{"t":"s","s":[NaN,0,0,0,0,0]}');
   assert.ok(await cb.none((x) => x.t === 's' && x.id === ca.id, 600), 'pasó una posición inválida');
@@ -172,6 +173,7 @@ test('DJ y consola: en una sala personal solo si están los muebles', async () =
   await cb.wait((m) => m.t === 'part' && m.denied);
   own.send({ t: 'edit', op: 'template', template: 'club' }); // el club trae cabina, consola y una pantalla
   await cb.wait('layout');
+  await moveTo(cb, 0, 0, -2.8); // al lado de la cabina
   cb.send({ t: 'dj', on: true, streamId: 'x' });
   await cb.wait((m) => m.t === 'dj' && m.on && m.id === cb.id);
   await own.close(); await cb.close();
