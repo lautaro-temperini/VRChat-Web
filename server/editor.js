@@ -33,7 +33,9 @@ export const roomEditorMethods = {
       this.roomLayout = { template: map.template, pieces, chosen: true, fixed: true };
       return this.roomLayout;
     }
-    this.roomLayout = (await this.ctx.storage.get('layout')) ?? templateLayout('loft', false);
+    // Sala nueva: arranca con la plantilla que se eligió al crearla (las de antes: el loft hasta que elija)
+    const template = (await this.roomInfo())?.template;
+    this.roomLayout = (await this.ctx.storage.get('layout')) ?? (template && has(ROOM_TEMPLATES, template) ? templateLayout(template) : templateLayout('loft', false));
     return this.roomLayout;
   },
 
@@ -51,6 +53,8 @@ export const roomEditorMethods = {
 
     if (msg.op === 'template') {
       if (!has(ROOM_TEMPLATES, msg.template) || ROOM_TEMPLATES[msg.template].public) return;
+      // La plantilla es fija (decisión 26/10): se elige una sola vez. Para cambiarla, se borra la sala o se crea otra
+      if (layout.chosen) return fail('La plantilla de la sala no se cambia. Para otra plantilla, creá otra sala o borrá esta (Mapa).');
       // Los especiales vuelven al inventario; los básicos se borran (la plantilla trae los suyos)
       // (primero se cambia la sala y después se devuelven: así nada queda puesto y en el inventario a la vez)
       const iids = layout.pieces.filter((p) => p.iid).map((p) => p.iid);
@@ -58,6 +62,8 @@ export const roomEditorMethods = {
       this.ceil = null; // otra plantilla, otro techo
       await this.saveLayout();
       await this.gearCheck();
+      await this.accounts().roomTemplateChosen((await this.roomName()).slice(2), msg.template);
+      this.info = undefined;
       if (iids.length) await this.accounts().furnitureReturn(owner, iids);
       this.broadcast({ t: 'layout', layout: this.roomLayout, back: iids.length });
       return;

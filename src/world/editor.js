@@ -247,14 +247,15 @@ export function createRoomEditor({ world, scene, camera, renderer, net, rtc, ctr
   }
 
   $('re-done').onclick = close;
-  $('re-template').onclick = () => chooseTemplate(false);
+  // La plantilla es fija: se elige una sola vez (para otra, se crea otra sala o se borra esta)
+  $('re-template').onclick = () => (world.layout?.chosen ? toast('La plantilla queda fija. Para otra, creá otra sala o borrá esta desde el Mapa.') : chooseTemplate(false));
   $('re-toggle').onclick = () => $('re-catalog').classList.toggle('open');
 
   // ---------- Plantillas ----------
   function chooseTemplate(first) {
     const card = $('re-modal-card');
     card.innerHTML = `<h1 class="display">${first ? 'Elegí cómo es tu sala' : 'Cambiar de plantilla'}</h1>
-      <p class="meta">${first ? 'Después la podés cambiar cuando quieras.' : 'Los muebles básicos se borran (la plantilla nueva trae los suyos) y los especiales vuelven a tu inventario.'}</p>
+      <p class="meta">La plantilla queda fija. Para tener otra, creá otra sala o borrá esta (desde el Mapa).</p>
       <div class="re-templates"></div>
       <div class="re-row"><button class="act" data-cancel>${first ? 'Más tarde' : 'Cancelar'}</button></div>`;
     const list = card.querySelector('.re-templates');

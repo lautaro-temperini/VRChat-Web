@@ -2,6 +2,7 @@ import { DurableObject } from 'cloudflare:workers';
 import { cleanName, nameKey, cleanLook, isImage, ITEMS, STARTER_ITEMS, rarityOf, FURNITURE, CONSUMABLES, HAND_MAX, designHoldable, PUBLIC_MAPS, isRoomName } from './shared.js';
 import { setupWorks, worksMethods } from './works.js';
 import { setupDesigns, designsMethods } from './designs.js';
+import { setupRooms, roomsMethods } from './rooms.js';
 import { sessionState } from './sessions.js';
 import { setupMessages, messagesMethods } from './messages.js';
 import { setupProgress, progressMethods } from './progress.js';
@@ -187,6 +188,7 @@ export class Accounts extends DurableObject {
     `);
     setupWorks(this.sql); // Museo rotativo (works.js)
     setupDesigns(this.sql); // Diseños de artistas como objetos (designs.js)
+    setupRooms(this.sql); // Salas personales, hasta 3 por cuenta (rooms.js)
     setupMessages(this.sql); // Mensajes entre amigos (messages.js)
     setupProgress(this.sql); // Progresión (progress.js)
   }
@@ -314,6 +316,7 @@ export class Accounts extends DurableObject {
       await this.createCount(ip);
     }
     this.setNameKey(id);
+    this.ensureFirstRoom(id);
     if (!this.row(id).starter) this.giveStarter(id); // los objetos iniciales llegan al registrarse
     return { ok: true, token: token ?? await this.newSession(id), user: this.publicUser(this.row(id)) };
   }
@@ -441,6 +444,7 @@ export class Accounts extends DurableObject {
     if (this.sql.exec('SELECT 1 FROM users WHERE username = ?', username).toArray().length || this.nameTaken(username, row.id)) return { ok: false, error: 'Ese nickname ya está en uso.' };
     this.sql.exec('UPDATE users SET username = ?, name = ?, terms = COALESCE(terms, ?) WHERE id = ?', username, nick, Date.now(), row.id);
     this.setNameKey(row.id);
+    this.ensureFirstRoom(row.id);
     if (!this.row(row.id).starter) this.giveStarter(row.id);
     return { ok: true, user: this.publicUser(this.row(row.id)) };
   }
@@ -495,8 +499,9 @@ export class Accounts extends DurableObject {
       profile: {
         id: row.id, username, name, look, bio, created, equip,
         relation: viewer ? (viewer.id === row.id ? 'self' : this.relation(viewer.id, row.id)) : 'none',
-        hearts: this.heartCount(row.id),
-        roomName: this.roomTitle(row),
+        hearts: this.ownerHearts(row.id),
+        roomName: this.roomsOf(row.id)[0] ? this.roomTitleOf(this.roomsOf(row.id)[0]) : null,
+        rooms: this.roomsOf(row.id).length,
         galleryPrivacy: row.gallery_privacy,
       },
     };
@@ -702,8 +707,7 @@ export class Accounts extends DurableObject {
   // Le pide a la sala personal de ownerId que vuelva a mirar quién puede estar adentro (cerró la sala,
   // sacó a alguien de amigos o lo restringió): a quien ya no puede entrar se lo echa con aviso
   async roomRecheck(ownerId) {
-    if (!/^[0-9a-f]{16}$/.test(ownerId)) return;
-    try { await this.env.ROOMS.get(this.env.ROOMS.idFromName(`u-${ownerId}`)).recheckAccess(); } catch { /* sala dormida o vacía */ }
+    for (const r of this.roomsOf(String(ownerId ?? ''))) await this.roomRecheckOne(r.id);
   }
 
   // ---------- Privacidad ----------
@@ -714,14 +718,6 @@ export class Accounts extends DurableObject {
     if (privacy === 'todos') return true;
     if (privacy === 'amigos') return !!viewerId && this.relation(viewerId, ownerId) === 'friends' && !this.restrictedBy(ownerId, viewerId);
     return false;
-  }
-
-  // ¿Puede este usuario entrar a la sala personal de ownerId? (la usa la sala al entrar)
-  async canEnter(ownerId, userId) {
-    const owner = this.row(ownerId);
-    if (!owner) return false; // no existe esa cuenta: no hay sala (si no, cualquiera crearía salas sin fin)
-    if (this.isGuest(owner)) return userId === ownerId; // los invitados no tienen sala propia para recibir gente
-    return this.allowed(userId, ownerId, owner.room_privacy);
   }
 
   // ---------- Galería de fotos del perfil (hasta 30, visibilidad la elige el dueño) ----------
@@ -779,11 +775,13 @@ export class Accounts extends DurableObject {
 
   // ---------- Notas del dueño (las lee cualquiera; solo escribe el dueño) ----------
 
-  async notesList(ownerId) {
-    const owner = this.row(ownerId);
-    if (!owner) return { ok: false, error: 'No existe ese perfil.' };
-    const notes = this.sql.exec('SELECT id, text, created FROM notes WHERE owner = ? ORDER BY created DESC LIMIT 100', ownerId).toArray();
-    return { ok: true, owner: { id: owner.id, name: owner.name, room: this.roomTitle(owner) }, notes };
+  // Notas del atril de una sala (las del muro del dueño que publicó desde ese atril)
+  async notesList(roomId) {
+    const r = this.roomRow(roomId);
+    const owner = r && this.row(r.owner);
+    if (!owner) return { ok: false, error: 'No existe esa sala.' };
+    const notes = this.sql.exec('SELECT id, text, created FROM notes WHERE room = ? ORDER BY created DESC LIMIT 100', r.id).toArray();
+    return { ok: true, owner: { id: owner.id, name: owner.name, room: this.roomTitleOf(r) }, notes };
   }
 
   // Las últimas notas del muro de todos (atril de la Cafetería), sin las de quien restringiste
@@ -798,7 +796,8 @@ export class Accounts extends DurableObject {
     return { ok: true, notes };
   }
 
-  async noteAdd(token, text) {
+  // room: el atril de una sala propia donde se escribió (desde el celular, ninguna: solo va al muro)
+  async noteAdd(token, text, room) {
     const me = await this.userFromToken(token);
     if (!me) return { ok: false, error: 'Sesión vencida.' };
     if (this.isGuest(me)) return this.guestError();
@@ -808,7 +807,8 @@ export class Accounts extends DurableObject {
       return { ok: false, error: `Podés publicar hasta ${NOTES_PER_HOUR} notas por hora. Probá en un rato.` };
     }
     const id = randomHex(8);
-    this.sql.exec('INSERT INTO notes (id, owner, text, created) VALUES (?, ?, ?, ?)', id, me.id, clean, Date.now());
+    const r = room ? this.roomRow(room) : null;
+    this.sql.exec('INSERT INTO notes (id, owner, text, created, room) VALUES (?, ?, ?, ?, ?)', id, me.id, clean, Date.now(), r?.owner === me.id ? r.id : null);
     this.progressTrack(me.id, 'muro');
     return { ok: true, note: { id, text: clean, created: Date.now() } };
   }
@@ -881,59 +881,41 @@ export class Accounts extends DurableObject {
 
   // ---------- Corazones del atril: uno por visitante; cuentan para la sala y para el dueño ----------
 
-  heartCount(ownerId) {
-    return this.sql.exec('SELECT COUNT(*) AS n FROM hearts WHERE owner = ?', ownerId).one().n;
-  }
-
-  async hearts(token, ownerId) {
+  // (la columna "owner" de hearts es la sala: las salas de antes tienen el id de la cuenta)
+  async hearts(token, roomId) {
     const viewer = await this.userFromToken(token);
-    const mine = !!viewer && this.sql.exec('SELECT 1 FROM hearts WHERE owner = ? AND from_user = ?', ownerId, viewer.id).toArray().length > 0;
-    return { ok: true, count: this.heartCount(ownerId), given: mine, self: viewer?.id === ownerId };
+    const r = this.roomRow(roomId);
+    const mine = !!viewer && this.sql.exec('SELECT 1 FROM hearts WHERE owner = ? AND from_user = ?', String(roomId ?? ''), viewer.id).toArray().length > 0;
+    return { ok: true, count: r ? this.roomHearts(r.id) : 0, given: mine, self: !!viewer && viewer.id === r?.owner };
   }
 
-  async heartGive(token, ownerId) {
+  async heartGive(token, roomId) {
     const me = await this.userFromToken(token);
     if (!me) return { ok: false, error: 'Sesión vencida.' };
     if (this.isGuest(me)) return this.guestError();
-    const owner = this.row(ownerId);
-    if (!owner || this.isGuest(owner)) return { ok: false, error: 'No existe esa sala.' };
-    if (me.id === ownerId) return { ok: false, error: 'No podés dejarte un corazón a vos mismo.' };
+    const r = this.roomRow(roomId);
+    if (!r) return { ok: false, error: 'No existe esa sala.' };
+    if (me.id === r.owner) return { ok: false, error: 'No podés dejarte un corazón a vos mismo.' };
     // Se deja en el atril de la sala: hay que estar ahí (lo sabe la sala, no el cliente)
-    if (this.where(me.id) !== `u-${ownerId}`) return { ok: false, error: 'Para dejar un corazón tenés que estar en esa sala.' };
+    if (this.where(me.id) !== `u-${r.id}`) return { ok: false, error: 'Para dejar un corazón tenés que estar en esa sala.' };
     // y la sala tiene que tener su atril
-    if (!(await this.env.ROOMS.get(this.env.ROOMS.idFromName(`u-${ownerId}`)).hasPiece('atril'))) return { ok: false, error: 'Esta sala no tiene atril.' };
-    this.sql.exec('INSERT OR IGNORE INTO hearts (owner, from_user, created) VALUES (?, ?, ?)', ownerId, me.id, Date.now());
-    this.progressTrack(me.id, 'corazon', ownerId);
-    return { ok: true, count: this.heartCount(ownerId), given: true };
+    if (!(await this.env.ROOMS.get(this.env.ROOMS.idFromName(`u-${r.id}`)).hasPiece('atril'))) return { ok: false, error: 'Esta sala no tiene atril.' };
+    this.sql.exec('INSERT OR IGNORE INTO hearts (owner, from_user, created) VALUES (?, ?, ?)', r.id, me.id, Date.now());
+    this.progressTrack(me.id, 'corazon', r.id);
+    return { ok: true, count: this.roomHearts(r.id), given: true };
   }
 
   // ---------- Mi sala: nombre, descripción y quién puede entrar ----------
 
-  roomTitle(row) {
-    return row.room_name || `Sala de ${row.name}`;
+  async roomInfo(roomId) {
+    const r = this.roomRow(roomId);
+    if (!r) return { ok: false, error: 'No existe esa sala.' };
+    return { ok: true, room: this.roomPublic(r) };
   }
 
-  async roomInfo(ownerId) {
-    const owner = this.row(ownerId);
-    if (!owner) return { ok: false, error: 'No existe esa sala.' };
-    return {
-      ok: true,
-      room: { owner: owner.id, ownerName: owner.name, name: this.roomTitle(owner), customName: owner.room_name, desc: owner.room_desc, privacy: owner.room_privacy, hearts: this.heartCount(owner.id) },
-    };
-  }
-
-  async setMyRoom(token, { name, desc, privacy } = {}) {
-    const me = await this.userFromToken(token);
-    if (!me) return { ok: false, error: 'Sesión vencida.' };
-    if (this.isGuest(me)) return this.guestError();
-    if (privacy !== undefined && !['todos', 'amigos', 'cerrada'].includes(privacy)) return { ok: false, error: 'Opción no válida.' };
-    const clean = (s, n) => String(s ?? '').replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, n);
-    this.sql.exec('UPDATE users SET room_name = ?, room_desc = ?, room_privacy = ? WHERE id = ?',
-      name !== undefined ? clean(name, 32) : me.room_name,
-      desc !== undefined ? clean(desc, 140) : me.room_desc,
-      privacy ?? me.room_privacy, me.id);
-    if (privacy !== undefined && privacy !== me.room_privacy) await this.roomRecheck(me.id);
-    return this.roomInfo(me.id);
+  // Ajustes de una sala propia (id; sin id, la primera)
+  async setMyRoom(token, body = {}) {
+    return this.roomUpdate(token, body);
   }
 
   // ---------- Salas favoritas (se guardan desde el Mapa) ----------
@@ -942,8 +924,8 @@ export class Accounts extends DurableObject {
     if (room === 'museo') return { name: 'Museo', hearts: null };
     if (Object.hasOwn(PUBLIC_MAPS, room)) return { name: PUBLIC_MAPS[room].name, hearts: null };
     if (room.startsWith('u-')) {
-      const owner = this.row(room.slice(2));
-      if (owner) return { name: this.roomTitle(owner), hearts: this.heartCount(owner.id), ownerName: owner.name };
+      const r = this.roomRow(room.slice(2));
+      if (r) return { name: this.roomTitleOf(r), hearts: this.roomHearts(r.id), ownerName: this.row(r.owner)?.name ?? '' };
     }
     return { name: `Sala ${room}`, hearts: null };
   }
@@ -1184,6 +1166,7 @@ export class Accounts extends DurableObject {
 // Museo rotativo: postular, revisar, rotar (server/works.js)
 Object.assign(Accounts.prototype, worksMethods);
 Object.assign(Accounts.prototype, designsMethods);
+Object.assign(Accounts.prototype, roomsMethods);
 // Mensajes entre amigos (server/messages.js)
 Object.assign(Accounts.prototype, messagesMethods);
 // Progresión: puntos, niveles, insignias y misiones (server/progress.js)

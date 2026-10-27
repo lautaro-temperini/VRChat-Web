@@ -212,7 +212,7 @@ async function api(request, env, path) {
     case 'POST galleryprivacy': result = await accounts.setGalleryPrivacy(token, body.privacy); break;
     case 'GET notes': result = await accounts.notesList(q.get('id')); break;
     case 'GET latestnotes': result = await accounts.notesLatest(token); break;
-    case 'POST note': result = await accounts.noteAdd(token, body.text); break;
+    case 'POST note': result = await accounts.noteAdd(token, body.text, body.room); break;
     case 'POST notedelete': result = await accounts.noteDelete(token, body.id); break;
     case 'GET feed': result = await accounts.feed(token); break;
     case 'POST like': result = await accounts.like(token, body.type, body.id, !!body.on); break;
@@ -220,6 +220,10 @@ async function api(request, env, path) {
     case 'POST heart': result = await accounts.heartGive(token, String(body.id ?? '')); break;
     case 'GET roominfo': result = await accounts.roomInfo(q.get('id')); break;
     case 'PUT myroom': result = await accounts.setMyRoom(token, body); break;
+    case 'GET myrooms': result = await accounts.myRooms(token); break;
+    case 'GET rooms': result = await accounts.userRooms(token, q.get('owner')); break;
+    case 'POST roomcreate': result = await accounts.roomCreate(token, body); break;
+    case 'POST roomdelete': result = await accounts.roomDelete(token, String(body.id ?? '')); break;
     case 'GET favorites': result = await accounts.favorites(token); break;
     case 'POST favorite': result = await accounts.setFavorite(token, body.room, !!body.on); break;
     case 'GET search': result = await accounts.search(token, q.get('q')); break;

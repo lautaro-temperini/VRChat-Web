@@ -48,14 +48,17 @@ renderer.domElement.addEventListener('drop', (e) => {
   if (p) social.dropByIid(iid, p);
 });
 
-// Mapa: favoritas (arriba de todo), el Museo, tu sala (con sus ajustes) y las salas de tus amigos.
-// La estrella marca/desmarca favorita, también la sala en la que estás.
+// Mapa: favoritas (arriba de todo), el Museo y los mapas públicos, tus salas (hasta 3, con sus ajustes) y las
+// salas de tus amigos. La estrella marca/desmarca favorita, también la sala en la que estás.
 let favorites = [];
 const PRIVACY_LABEL = { todos: 'Abierta a todos', amigos: 'Solo amigos', cerrada: 'Cerrada (solo vos)' };
+const PRIVACY_OPTIONS = '<option value="todos">Abierta a todos</option><option value="amigos">Solo amigos</option><option value="cerrada">Cerrada (solo vos)</option>';
 async function openMundi() {
   G.openOverlay('mundi');
-  const [fav, mine] = await Promise.all([api('favorites'), G.account ? api(`roominfo?id=${G.account.id}`) : null]);
+  const own = G.account && !G.account.guest;
+  const [fav, mine] = await Promise.all([api('favorites'), own ? api('myrooms') : null]);
   if (fav.ok) favorites = fav.favorites;
+  social.refreshMyRooms();
   const isFav = (target) => favorites.some((f) => f.room === target);
   const list = $('mundi-list');
   list.innerHTML = '';
@@ -65,18 +68,22 @@ async function openMundi() {
     h.textContent = title;
     list.append(h);
   };
-  const add = (title, sub, target) => {
+  // target: la sala (u-<id>, museo…); onGo: otra forma de ir (la sala de un amigo que no está en ninguna)
+  const add = (title, sub, target, onGo) => {
     const el = document.createElement('div');
-    el.className = `mundi-room ${target === room ? 'here' : ''}`;
-    const star = document.createElement('button');
-    star.className = `star ${isFav(target) ? 'on' : ''}`;
-    star.title = isFav(target) ? 'Sacar de favoritas' : 'Agregar a favoritas';
-    star.textContent = isFav(target) ? '★' : '☆';
-    star.onclick = async () => {
-      const r = await api('favorite', { method: 'POST', body: { room: target, on: !isFav(target) } });
-      if (!r.ok) return toast(r.error);
-      openMundi();
-    };
+    el.className = `mundi-room ${target && target === room ? 'here' : ''}`;
+    if (target) {
+      const star = document.createElement('button');
+      star.className = `star ${isFav(target) ? 'on' : ''}`;
+      star.title = isFav(target) ? 'Sacar de favoritas' : 'Agregar a favoritas';
+      star.textContent = isFav(target) ? '★' : '☆';
+      star.onclick = async () => {
+        const r = await api('favorite', { method: 'POST', body: { room: target, on: !isFav(target) } });
+        if (!r.ok) return toast(r.error);
+        openMundi();
+      };
+      el.append(star);
+    }
     const who = document.createElement('div');
     who.className = 'who';
     const b = document.createElement('b');
@@ -84,12 +91,12 @@ async function openMundi() {
     const s = document.createElement('span');
     s.textContent = target === room ? `Estás acá${sub ? ` · ${sub}` : ''}` : sub;
     who.append(b, s);
-    el.append(star, who);
+    el.append(who);
     if (target !== room) {
       const go = document.createElement('button');
       go.className = 'act on';
       go.textContent = 'Ir';
-      go.onclick = () => social.go(target);
+      go.onclick = onGo ?? (() => social.go(target));
       el.append(go);
     }
     list.append(el);
@@ -104,52 +111,108 @@ async function openMundi() {
   section('Salas');
   add('Museo', 'Sala pública', 'museo');
   for (const [id, m] of Object.entries(PUBLIC_MAPS)) add(m.name, `Mapa público · ${m.desc}`, id);
-  if (G.account && !G.account.guest && mine?.ok) {
-    const myRoom = `u-${G.account.id}`;
-    const el = add(mine.room.name, ['Tu sala', PRIVACY_LABEL[mine.room.privacy], hearts(mine.room.hearts)].filter(Boolean).join(' · '), myRoom);
-    // Ajustes de tu sala: nombre, descripción y quién puede entrar
-    const edit = document.createElement('button');
-    edit.className = 'act';
-    edit.textContent = 'Editar';
-    edit.onclick = () => {
-      const form = document.createElement('form');
-      form.className = 'room-form';
-      form.innerHTML = `
-        <label class="field">Nombre de la sala<input name="name" maxlength="32" placeholder="Sala de ${G.account.name.replace(/[<>"]/g, '')}"></label>
-        <label class="field">Descripción<input name="desc" maxlength="140" placeholder="¿De qué se trata tu sala?"></label>
-        <label class="field">Quién puede entrar<select name="privacy">
-          <option value="todos">Abierta a todos</option><option value="amigos">Solo amigos</option><option value="cerrada">Cerrada (solo vos)</option>
-        </select></label>
-        <div class="compose-row"><button type="button" class="act" data-cancel>Cancelar</button><button class="act on">Guardar</button></div>`;
-      form.name.value = mine.room.customName ?? '';
-      form.desc.value = mine.room.desc ?? '';
-      form.privacy.value = mine.room.privacy;
-      form.querySelector('[data-cancel]').onclick = () => openMundi();
-      form.onsubmit = async (e) => {
-        e.preventDefault();
-        const r = await api('myroom', { method: 'PUT', body: { name: form.name.value, desc: form.desc.value, privacy: form.privacy.value } });
-        if (!r.ok) return toast(r.error);
-        toast('Guardaste los cambios de tu sala.');
-        if (room === myRoom) { G.roomTitle = r.room.name; G.setStatus(); }
-        openMundi();
-      };
-      el.after(form);
-      edit.remove();
-    };
-    el.append(edit);
-    if (mine.room.desc) { const d = document.createElement('p'); d.className = 'meta room-desc'; d.textContent = mine.room.desc; el.after(d); }
+  const myRooms = mine?.ok ? mine.rooms : [];
+  if (own && mine?.ok) {
+    section(`Tus salas (${myRooms.length} de ${mine.max})`);
+    for (const r of myRooms) {
+      const tpl = mine.templates.find((t) => t.id === r.template)?.name;
+      const el = add(r.name, [tpl, PRIVACY_LABEL[r.privacy], hearts(r.hearts)].filter(Boolean).join(' · '), r.room);
+      const edit = document.createElement('button');
+      edit.className = 'act';
+      edit.textContent = 'Editar';
+      edit.onclick = () => roomForm(el, edit, r);
+      el.append(edit);
+      if (r.desc) { const d = document.createElement('p'); d.className = 'meta room-desc'; d.textContent = r.desc; el.after(d); }
+    }
+    if (myRooms.length < mine.max) {
+      const create = document.createElement('button');
+      create.className = 'act on';
+      create.textContent = 'Crear una sala';
+      create.onclick = () => createForm(create, mine.templates);
+      list.append(create);
+    }
   }
   const friends = social.friends.friends;
   if (friends.length) {
     section('Salas de tus amigos');
-    for (const f of friends) add(`Sala de ${f.name}`, f.room ? social.roomLabel(f.room).replace(/^En /, `${f.name} está en `) : 'Su sala personal', `u-${f.id}`);
+    for (const f of friends) {
+      if (f.room?.startsWith('u-')) add(`Sala donde está ${f.name}`, social.roomLabel(f.room).replace(/^En /, `${f.name} está en `), f.room);
+      else add(`Salas de ${f.name}`, f.room ? social.roomLabel(f.room).replace(/^En /, `${f.name} está en `) : 'Sus salas personales', null, () => social.goUser(f.id, f.name));
+    }
   }
   // La sala actual, si no aparece en ninguna lista, igual se puede marcar como favorita
-  const listed = ['museo', ...Object.keys(PUBLIC_MAPS), G.account && `u-${G.account.id}`, ...favorites.map((f) => f.room), ...friends.map((f) => `u-${f.id}`)];
+  const listed = ['museo', ...Object.keys(PUBLIC_MAPS), ...myRooms.map((r) => r.room), ...favorites.map((f) => f.room), ...friends.map((f) => f.room)];
   if (!listed.includes(room)) {
     section('Estás en');
     add(G.roomTitle, '', room);
   }
+}
+
+// Ajustes de una sala propia: nombre, descripción, quién puede entrar, y borrarla (con confirmación)
+function roomForm(el, edit, r) {
+  const form = document.createElement('form');
+  form.className = 'room-form';
+  form.innerHTML = `
+    <label class="field">Nombre de la sala<input name="name" maxlength="32"></label>
+    <label class="field">Descripción<input name="desc" maxlength="140" placeholder="¿De qué se trata tu sala?"></label>
+    <label class="field">Quién puede entrar<select name="privacy">${PRIVACY_OPTIONS}</select></label>
+    <div class="compose-row"><button type="button" class="act danger" data-delete>Borrar sala</button><button type="button" class="act" data-cancel>Cancelar</button><button class="act on">Guardar</button></div>`;
+  form.name.placeholder = r.name;
+  form.name.value = r.customName ?? '';
+  form.desc.value = r.desc ?? '';
+  form.privacy.value = r.privacy;
+  form.querySelector('[data-cancel]').onclick = () => openMundi();
+  form.querySelector('[data-delete]').onclick = () => {
+    // Confirmación: borrar no se deshace
+    const row = form.querySelector('.compose-row');
+    row.innerHTML = '';
+    const q = document.createElement('p');
+    q.className = 'meta';
+    q.textContent = `¿Borrar "${r.name}"? Se echa a quien esté adentro, los muebles especiales vuelven a tu mochila y se pierden sus corazones. No se puede deshacer.`;
+    const no = document.createElement('button');
+    no.type = 'button'; no.className = 'act'; no.textContent = 'No, dejarla';
+    no.onclick = () => openMundi();
+    const yes = document.createElement('button');
+    yes.type = 'button'; yes.className = 'act danger'; yes.textContent = 'Sí, borrar';
+    yes.onclick = async () => {
+      const res = await api('roomdelete', { method: 'POST', body: { id: r.id } });
+      if (!res.ok) return toast(res.error);
+      toast(`Borraste "${r.name}".`);
+      if (room === r.room) return social.go('museo');
+      openMundi();
+    };
+    row.before(q);
+    row.append(no, yes);
+  };
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    const res = await api('myroom', { method: 'PUT', body: { id: r.id, name: form.name.value, desc: form.desc.value, privacy: form.privacy.value } });
+    if (!res.ok) return toast(res.error);
+    toast('Guardaste los cambios de tu sala.');
+    if (room === r.room) { G.roomTitle = res.room.name; G.setStatus(); }
+    openMundi();
+  };
+  el.after(form);
+  edit.remove();
+}
+
+// Crear una sala: la plantilla se elige ahora y queda fija
+function createForm(button, templates) {
+  const form = document.createElement('form');
+  form.className = 'room-form';
+  form.innerHTML = `
+    <label class="field">Plantilla (queda fija)<select name="template"></select></label>
+    <label class="field">Nombre de la sala<input name="name" maxlength="32" placeholder="Opcional"></label>
+    <div class="compose-row"><button type="button" class="act" data-cancel>Cancelar</button><button class="act on">Crear</button></div>`;
+  for (const t of templates) form.template.add(new Option(t.name, t.id));
+  form.querySelector('[data-cancel]').onclick = () => openMundi();
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    const res = await api('roomcreate', { method: 'POST', body: { template: form.template.value, name: form.name.value } });
+    if (!res.ok) return toast(res.error);
+    social.go(res.room.room);
+  };
+  button.replaceWith(form);
 }
 const toggleMundi = () => (body.classList.contains('mundi') ? G.closeOverlays() : openMundi());
 $('btn-mundi').onclick = toggleMundi;

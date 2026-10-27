@@ -74,7 +74,7 @@ export function createNotes({ ui, onHearts, me }) {
   $('notes-form').onsubmit = async (e) => {
     e.preventDefault();
     const input = $('notes-input');
-    const r = await api('note', { method: 'POST', body: { text: input.value } });
+    const r = await api('note', { method: 'POST', body: { text: input.value, room: ownerId } }); // queda en el atril de esta sala
     if (!r.ok) return toast(r.error);
     input.value = '';
     $('notes-count').textContent = `0/${input.maxLength}`;

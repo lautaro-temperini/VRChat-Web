@@ -97,10 +97,11 @@ function command(text) {
       if (arg === 'museo') return social.go('museo');
       const map = Object.entries(PUBLIC_MAPS).find(([id, m]) => id === arg || m.name.toLowerCase() === arg);
       if (map) return social.go(map[0]);
-      if (arg === 'mi sala' || arg === 'casa') return G.account && social.go(`u-${G.account.id}`);
+      if (arg === 'mi sala' || arg === 'casa') return G.account && social.goUser(G.account.id, 'Vos');
       const f = friends.find((x) => x.name.toLowerCase().startsWith(arg) || x.username?.startsWith(arg));
       if (!f) return system(`No encontré a "${arg}" en tus amigos. Agregalo desde su perfil (E sobre su personaje).`);
-      social.go(f.room ?? `u-${f.id}`);
+      if (f.room) social.go(f.room);
+      else social.goUser(f.id, f.name);
       break;
     }
     default:

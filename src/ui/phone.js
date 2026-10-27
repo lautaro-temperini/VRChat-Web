@@ -105,7 +105,7 @@ export function createPhone({ social, me, go, room }) {
       const visit = document.createElement('button');
       visit.className = 'act';
       visit.textContent = 'Su sala';
-      visit.onclick = () => go(`u-${u.id}`);
+      visit.onclick = () => social.goUser(u.id, u.name);
       row.append(who, act, visit);
       box.append(row);
     }
@@ -121,7 +121,7 @@ export function createPhone({ social, me, go, room }) {
     who.className = 'link who';
     who.textContent = it.mine ? 'Vos' : it.author.name;
     who.title = it.mine ? '' : `Ir a la sala de ${it.author.name}`;
-    if (!it.mine) who.onclick = () => go(`u-${it.author.id}`);
+    if (!it.mine) who.onclick = () => social.goUser(it.author.id, it.author.name);
     const when = document.createElement('span');
     when.className = 'meta';
     when.textContent = `${it.type === 'photo' ? 'subió una foto · ' : ''}${ago(it.created)}`;

@@ -17,9 +17,11 @@ const remotes = new Map();
 
 // Nombre de la sala (las salas personales usan el nombre que les puso su dueño)
 G.roomTitle = room === 'museo' ? 'Museo' : PUBLIC_MAPS[room]?.name ?? room;
+// Sala personal: su id (el de u-<id>; corazones y notas del atril son de la sala) y, cuando llega, su dueño
 const roomOwner = room.startsWith('u-') ? room.slice(2) : null;
+G.roomOwnerId = null;
 if (roomOwner) {
-  api(`profile?id=${roomOwner}`).then((r) => { if (r.ok) { G.roomTitle = r.profile.roomName; G.setStatus(); } });
+  api(`roominfo?id=${roomOwner}`).then((r) => { if (r.ok) { G.roomTitle = r.room.name; G.roomOwnerId = r.room.owner; G.setStatus(); } });
 }
 
 // Voz y pantalla compartida (P2P)

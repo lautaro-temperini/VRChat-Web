@@ -151,21 +151,30 @@ export function createSocial({ net, ui, me, room, onEquip, onDrop }) {
 
   // ---------- Amigos y salas ----------
 
-  const roomOf = (userId) => `u-${userId}`;
   let writeTo = null; // abrir el chat con un amigo (lo pone el celular)
+  let myRooms = [];   // salas propias (u-<id>), para saber cuáles son mías
   function go(target) {
     if (target === room) return toast('Ya estás en esa sala.');
     location.search = `?sala=${encodeURIComponent(target)}`;
+  }
+  // Ir a la sala de alguien: la primera que puedas ver (cada uno tiene hasta 3)
+  async function goUser(userId, name) {
+    const r = await api(`rooms?owner=${encodeURIComponent(userId)}`);
+    if (!r.ok) return toast(r.error);
+    if (!r.rooms.length) return toast(userId === me()?.id ? 'No tenés salas. Creá una desde el Mapa.' : `${name} no tiene salas que puedas ver.`);
+    go(r.rooms[0].room);
+  }
+  async function refreshMyRooms() {
+    if (!me() || me().guest) { myRooms = []; return; }
+    const r = await api('myrooms');
+    if (r.ok) myRooms = r.rooms.map((x) => x.room);
   }
   function roomLabel(r) {
     if (!r) return 'Desconectado';
     if (r === 'museo') return 'En el Museo';
     if (PUBLIC_MAPS[r]) return PUBLIC_MAPS[r].where;
-    if (r === roomOf(me()?.id)) return 'En tu sala';
-    if (r.startsWith('u-')) {
-      const owner = friendsData.friends.find((f) => roomOf(f.id) === r);
-      return owner ? `En la sala de ${owner.name}` : 'En una sala personal';
-    }
+    if (myRooms.includes(r)) return 'En tu sala';
+    if (r.startsWith('u-')) return 'En una sala personal';
     return `En la sala ${r}`;
   }
 
@@ -242,7 +251,7 @@ export function createSocial({ net, ui, me, room, onEquip, onDrop }) {
     const friendButtons = (f) => [
       ...(writeTo ? [['Escribir', () => writeTo(f.id)]] : []),
       ...(f.room && f.room !== room ? [['Ir', () => go(f.room), 'on']] : []),
-      ['Su sala', () => go(roomOf(f.id))],
+      ['Su sala', () => goUser(f.id, f.name)],
     ];
     const online = friendsData.friends.filter((f) => f.room);
     const offline = friendsData.friends.filter((f) => !f.room);
@@ -300,7 +309,7 @@ export function createSocial({ net, ui, me, room, onEquip, onDrop }) {
       toast(`Invitaste a ${player.name} a intercambiar. Esperando respuesta…`);
       ui.closeOverlays();
     };
-    $('act-visit').onclick = () => go(roomOf(profile.id));
+    $('act-visit').onclick = () => goUser(profile.id, profile.name);
     // Grupo de voz privado: la sala responde si se mandó (o por qué no)
     $('act-group').onclick = () => {
       if (me()?.guest) return guestGate('invitar a grupos de voz');
@@ -401,7 +410,7 @@ export function createSocial({ net, ui, me, room, onEquip, onDrop }) {
 
   return {
     setWriter: (fn) => { writeTo = fn; },
-    openInventory, showItems, openFriends, refreshFriends, profileActions, onTrade, cancelTrade, loadInventory, go, roomLabel, dropByIid,
+    openInventory, showItems, openFriends, refreshFriends, profileActions, onTrade, cancelTrade, loadInventory, go, goUser, refreshMyRooms, roomLabel, dropByIid,
     get friends() { return friendsData; },
     get trading() { return !!trade; },
   };

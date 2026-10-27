@@ -244,7 +244,7 @@ export const progressMethods = {
           this.progressPath(userId, 'obra');
           break;
         case 'sala': // salas personales de otros (ni la propia ni el Museo)
-          if (!room?.startsWith('u-') || room === `u-${userId}`) return;
+          if (!room?.startsWith('u-') || this.roomRow(room.slice(2))?.owner === userId) return;
           ref = room;
           if (this.progressOnce(userId, 'sala', room)) this.progressPoints(userId, POINTS.sala);
           this.progressPath(userId, 'sala');

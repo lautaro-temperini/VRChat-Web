@@ -219,9 +219,19 @@ export class Room extends DurableObject {
     return out;
   }
 
-  async ownerId() {
+  // Sala personal: de quién es y con qué plantilla se creó (lo sabe la cuenta; null si se borró)
+  async roomInfo() {
     const name = await this.roomName();
-    return name.startsWith('u-') ? name.slice(2) : null;
+    if (!name.startsWith('u-')) return null;
+    if (this.info === undefined || Date.now() - (this.infoAt ?? 0) > 60_000) {
+      this.info = await this.accounts().roomOwner(name.slice(2));
+      this.infoAt = Date.now();
+    }
+    return this.info;
+  }
+
+  async ownerId() {
+    return (await this.roomInfo())?.owner ?? null;
   }
 
   async isMod(meta) {
@@ -378,7 +388,16 @@ export class Room extends DurableObject {
       }
       // Sala personal: el dueño elige quién entra (todos, amigos o nadie más). Los admins siempre.
       const owner = await this.ownerId();
-      if (owner && !(await this.isMod({ userId: user.id, guest: !!user.guest })) && !(await this.accounts().canEnter(owner, user.id))) {
+      // Sala personal que no existe (o se borró)
+      if (!owner && (await this.roomName()).startsWith('u-')) {
+        this.info = undefined; // por si se acaba de crear
+        if (!(await this.ownerId())) {
+          this.send(ws, { t: 'error', code: 'noroom' });
+          ws.close(4004, 'no existe');
+          return;
+        }
+      }
+      if (owner && !(await this.isMod({ userId: user.id, guest: !!user.guest })) && !(await this.accounts().canEnterRoom((await this.roomName()).slice(2), user.id))) {
         this.send(ws, { t: 'error', code: 'private' });
         ws.close(4004, 'sala privada');
         return;
@@ -972,13 +991,33 @@ export class Room extends DurableObject {
     return !!layout?.pieces.some((p) => p.type === type);
   }
 
+  // El dueño borró la sala: se echa a todos (con aviso), los muebles especiales vuelven a su mochila y se
+  // olvida todo lo guardado
+  async destroy(ownerId) {
+    await this.load();
+    const layout = await this.ctx.storage.get('layout');
+    const iids = (layout?.pieces ?? []).filter((p) => p.iid).map((p) => p.iid);
+    if (iids.length) await this.accounts().furnitureReturn(ownerId, iids);
+    if (this.dj) this.stopDJ();
+    for (const part of PARTS) if (this.parts[part]) this.releasePart(part);
+    for (const ws of this.joined()) {
+      this.send(ws, { t: 'kicked', access: true, gone: true });
+      await this.leave(ws);
+      try { ws.close(4002, 'sala borrada'); } catch { /* ya cerrada */ }
+    }
+    await this.ctx.storage.deleteAll();
+    await this.ctx.storage.put('name', this.name);
+    Object.assign(this, { roomLayout: null, info: undefined, ceil: null, loaded: false, dj: null, parts: {}, lights: null });
+    return { ok: true };
+  }
+
   async recheckAccess() {
     const owner = await this.ownerId();
     if (!owner) return;
     for (const ws of this.joined()) {
       const m = ws.deserializeAttachment();
       if (m.mod || m.userId === owner) continue;
-      if (await this.accounts().canEnter(owner, m.userId)) continue;
+      if (await this.accounts().canEnterRoom((await this.roomName()).slice(2), m.userId)) continue;
       this.send(ws, { t: 'kicked', access: true });
       await this.leave(ws);
       try { ws.close(4002, 'acceso'); } catch { /* ya cerrada */ }

@@ -26,9 +26,9 @@ export function buildPersonalRoom(scene, renderer, quality) {
   scene.background = new THREE.Color(0x0d0d0f);
 
   const sala = (new URLSearchParams(location.search).get('sala') || '').toLowerCase();
-  const ownerId = sala.startsWith('u-') ? sala.slice(2) : null; // los mapas públicos no tienen dueño
+  const roomId = sala.startsWith('u-') ? sala.slice(2) : null; // los mapas públicos no tienen dueño
   let ownerName = '';
-  if (ownerId) api(`profile?id=${ownerId}`).then((r) => { if (r.ok) ownerName = r.profile.name; });
+  if (roomId) api(`roominfo?id=${roomId}`).then((r) => { if (r.ok) ownerName = r.room.ownerName; });
 
   let shell = null;
   let layout = null;      // { template, pieces, chosen }
@@ -40,7 +40,7 @@ export function buildPersonalRoom(scene, renderer, quality) {
   let idleTex = null;
 
   const world = {
-    editable: !!ownerId,
+    editable: !!roomId,
     colliders: [], blockers: [], interactables: [],
     bounds: { minY: 0.2, maxY: 4 },
     spawn: { x: 0, z: 4, yaw: 0, ...PUBLIC_MAPS[sala]?.spawn }, // hasta que llega la plantilla
