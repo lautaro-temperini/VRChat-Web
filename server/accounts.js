@@ -521,6 +521,11 @@ export class Accounts extends DurableObject {
     for (const type of String(this.env.TEST_STARTER_EXTRA ?? '').split(',').filter((t) => Object.hasOwn(FURNITURE, t))) {
       this.addItem(userId, type, FURNITURE[type].color);
     }
+    // Solo en las pruebas: las cuentas con este prefijo de nick nacen curadoras (para probar la curaduría)
+    const curatorPrefix = String(this.env.TEST_CURATOR_PREFIX ?? '');
+    if (curatorPrefix && this.row(userId)?.username?.startsWith(curatorPrefix)) {
+      this.sql.exec('INSERT OR IGNORE INTO titles (user_id, title, created) VALUES (?, ?, ?)', userId, 'curador', Date.now());
+    }
     this.sql.exec('UPDATE users SET starter = 1 WHERE id = ?', userId);
   }
 
