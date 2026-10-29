@@ -1,4 +1,4 @@
-import { isImage, DESIGN_KINDS, DESIGN_ITEM, STAMP_PLACES, STAMP_SIZES, DESIGN_IMAGE, cleanDesign } from './shared.js';
+import { isImage, cleanText, DESIGN_KINDS, DESIGN_ITEM, STAMP_PLACES, STAMP_SIZES, DESIGN_IMAGE, cleanDesign } from './shared.js';
 import { checkGLB } from './glb.js';
 
 // Diseños de artistas como objetos del juego. Se suman a la clase Accounts (comparten la base SQLite);
@@ -11,7 +11,7 @@ import { checkGLB } from './glb.js';
 
 const randomHex = (n) => [...crypto.getRandomValues(new Uint8Array(n))].map((b) => b.toString(16).padStart(2, '0')).join('');
 const has = (obj, key) => typeof key === 'string' && Object.hasOwn(obj, key);
-const clip = (s, n) => String(s ?? '').replace(/[\u0000-\u001f<>]/g, ' ').trim().slice(0, n);
+const clip = (s, n) => cleanText(String(s ?? '').replace(/[<>]/g, ' '), n);
 const IMAGE_MIMES = ['image/jpeg', 'image/webp', 'image/png'];
 const LIMITS = { img: 900_000, hd: 2_000_000 }; // bytes
 export const DESIGNER_MODELS = 3; // objetos 3D para el título de Diseñador

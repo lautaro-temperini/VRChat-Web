@@ -1,4 +1,4 @@
-import { ROOM_TEMPLATES } from './shared.js';
+import { ROOM_TEMPLATES, cleanText } from './shared.js';
 
 // Salas personales: cada cuenta registrada tiene hasta 3 (decisión 26/10). Se suma a la clase Accounts
 // (comparte la base SQLite), igual que works.js y designs.js.
@@ -13,7 +13,7 @@ import { ROOM_TEMPLATES } from './shared.js';
 
 export const ROOMS_MAX = 3;
 const randomHex = (n) => [...crypto.getRandomValues(new Uint8Array(n))].map((b) => b.toString(16).padStart(2, '0')).join('');
-const clean = (s, n) => String(s ?? '').replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, n);
+const clean = (s, n) => cleanText(String(s ?? '').replace(/[<>]/g, ''), n);
 const PRIVACY = ['todos', 'amigos', 'cerrada'];
 // Plantillas que se ofrecen para las salas personales (las de los mapas públicos no)
 export const roomTemplates = () => Object.entries(ROOM_TEMPLATES).filter(([, t]) => !t.public).map(([id, t]) => ({ id, name: t.name }));

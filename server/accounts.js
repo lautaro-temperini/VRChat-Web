@@ -1,5 +1,5 @@
 import { DurableObject } from 'cloudflare:workers';
-import { cleanName, nameKey, cleanLook, isImage, ITEMS, STARTER_ITEMS, rarityOf, FURNITURE, CONSUMABLES, HAND_MAX, designHoldable, PUBLIC_MAPS, isRoomName } from './shared.js';
+import { cleanName, cleanLines, nameKey, cleanLook, isImage, ITEMS, STARTER_ITEMS, rarityOf, FURNITURE, CONSUMABLES, HAND_MAX, designHoldable, PUBLIC_MAPS, isRoomName } from './shared.js';
 import { setupWorks, worksMethods } from './works.js';
 import { setupDesigns, designsMethods } from './designs.js';
 import { setupRooms, roomsMethods } from './rooms.js';
@@ -457,7 +457,7 @@ export class Accounts extends DurableObject {
   async update(token, name, look, bio) {
     const row = await this.userFromToken(token);
     if (!row) return { ok: false, error: 'Sesión vencida.' };
-    const cleanBio = String(bio ?? row.bio ?? '').replace(/[\u0000-\u0009\u000b-\u001f]/g, '').trim().slice(0, 280);
+    const cleanBio = cleanLines(bio ?? row.bio ?? '', 280);
     let newName = cleanName(name ?? row.name);
     if (this.isGuest(row)) {
       if (newName !== row.name && this.nameTaken(newName)) return { ok: false, error: 'Ese nombre es de una cuenta registrada.' };
@@ -819,7 +819,7 @@ export class Accounts extends DurableObject {
     const me = await this.userFromToken(token);
     if (!me) return { ok: false, error: 'Sesión vencida.' };
     if (this.isGuest(me)) return this.guestError();
-    const clean = String(text ?? '').replace(/[\u0000-\u0009\u000b-\u001f]/g, '').trim().slice(0, NOTE_LENGTH);
+    const clean = cleanLines(text, NOTE_LENGTH);
     if (!clean) return { ok: false, error: 'La nota está vacía.' };
     if (this.sql.exec('SELECT COUNT(*) AS n FROM notes WHERE owner = ? AND created > ?', me.id, Date.now() - HOUR).one().n >= NOTES_PER_HOUR) {
       return { ok: false, error: `Podés publicar hasta ${NOTES_PER_HOUR} notas por hora. Probá en un rato.` };

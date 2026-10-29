@@ -133,6 +133,12 @@ export function cleanText(text, n) {
   return String(text ?? '').replace(/[\u0000-\u001f]/g, '').replace(INVISIBLE, '').replace(/(\p{M}{2})\p{M}+/gu, '$1').trim().slice(0, n);
 }
 
+// Lo mismo para textos de varias líneas (sobre mí, notas): conserva los saltos de línea
+export function cleanLines(text, n) {
+  return String(text ?? '').replace(/[\u0000-\u0009\u000b-\u001f\u007f]/g, '').replace(INVISIBLE, '')
+    .replace(/(\p{M}{2})\p{M}+/gu, '$1').trim().slice(0, n);
+}
+
 export function cleanName(name) {
   const n = cleanText(String(name ?? '').replace(/[<>]/g, ''), 20);
   return n || 'Visitante';

@@ -4,10 +4,12 @@
 // - Se guardan (el otro los lee cuando entra): los últimos 50 de cada conversación.
 // - Si el amigo está conectado, la sala donde está se lo entrega al instante (mensaje `dm`).
 
+import { cleanText } from './shared.js';
+
 const DM_MAX = 200, DM_KEEP = 50;
 const FLOOD_MAX = 5, FLOOD_WINDOW = 10_000, REPEAT_WINDOW = 30_000;
 const pair = (x, y) => (x < y ? [x, y] : [y, x]);
-const clean = (s) => String(s ?? '').replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim();
+const clean = (s) => cleanText(String(s ?? '').replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' '), 100000);
 
 export function setupMessages(sql) {
   sql.exec(`

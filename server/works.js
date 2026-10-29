@@ -1,4 +1,4 @@
-import { isImage } from './shared.js';
+import { isImage, cleanText } from './shared.js';
 import { checkGLB } from './glb.js';
 
 // Museo rotativo: obras del público que se postulan en el atril de la entrada del Museo.
@@ -29,7 +29,7 @@ const LIMITS = { hd: 2_000_000, wall: 700_000, model: 2 * 1024 * 1024 }; // byte
 const IMAGE_MIMES = ['image/jpeg', 'image/webp', 'image/png'];
 const has = (obj, key) => typeof key === 'string' && Object.hasOwn(obj, key);
 const dim = (v) => Math.min(10_000, Math.max(0, Math.round(Number(v)) || 0));
-const clip = (s, n) => String(s ?? '').replace(/[\u0000-\u001f<>]/g, ' ').trim().slice(0, n);
+const clip = (s, n) => cleanText(String(s ?? '').replace(/[<>]/g, ' '), n);
 
 // La IP no se guarda: solo un resumen, para no darle a un curador obras subidas desde su misma conexión
 const ipHash = async (ip) => (ip ? [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`obra|${ip}`)))].slice(0, 8).map((b) => b.toString(16).padStart(2, '0')).join('') : null);
