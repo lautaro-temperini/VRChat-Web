@@ -371,10 +371,12 @@ export function buildShell(id, { high }) {
       const a = (i / 6) * Math.PI * 2;
       const jet = mesh(new THREE.CylinderGeometry(0.03, 0.09, 1.1, 8, 1, true), jetMat, Math.sin(a) * 1.25, 1.2, Math.cos(a) * 1.25);
       jet.castShadow = false;
+      jet.userData.dynamic = true; // se estira con el agua (no se junta con lo quieto)
       jets.push(jet);
     }
     const spout = mesh(new THREE.CylinderGeometry(0.04, 0.12, 0.9, 8, 1, true), jetMat, 0, 3.15, 0);
     spout.castShadow = false;
+    spout.userData.dynamic = true;
     jets.push(spout);
     animated.push((dt, t) => {
       jets.forEach((j, i) => { j.scale.y = 1 + 0.12 * Math.sin(t * 6 + i); });
@@ -391,6 +393,7 @@ export function buildShell(id, { high }) {
     const knotMat = neonMat(0x19d3ff);
     const knot = mesh(new THREE.TorusKnotGeometry(1.1, 0.16, 220, 14, 2, 3), knotMat, -14, 2.6, -14);
     knot.castShadow = false;
+    knot.userData.dynamic = true; // gira
     animated.push((dt) => { knot.rotation.y += dt * 0.25; });
     // 2) Bloques de colores apilados
     plinth(14, -14, 2.4, 0.5);

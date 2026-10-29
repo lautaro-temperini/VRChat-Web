@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { FURNITURE, PUBLIC_MAPS } from '../../server/shared.js';
 import { buildShell } from './templates.js';
+import { mergeStatic } from './merge.js';
 import { buildFurniture } from './furniture.js';
 import { boothSign, artistsSign } from './textures.js';
 import { api, photoUrl } from '../net/api.js';
@@ -34,6 +35,9 @@ export function buildPersonalRoom(scene, renderer, quality) {
   let layout = null;      // { template, pieces, chosen }
   let hours = 12;
   const pieces = new Map(); // id -> { piece, holder, built, colliders, blockers, item, seats }
+  // Los muebles van en un grupo propio: en los mapas públicos (fijos) lo quieto se junta (ver mergePieces)
+  const piecesGroup = new THREE.Group();
+  scene.add(piecesGroup);
   const state = { music: -1, lights: null, dj: null, parts: {}, hearts: 0, video: null, video2: null };
   const speakers = [new THREE.Vector3(-1, 1.6, -4), new THREE.Vector3(1, 1.6, -4)];
   const screenPos = new THREE.Vector3(0, 2.5, -5);
@@ -110,6 +114,9 @@ export function buildPersonalRoom(scene, renderer, quality) {
       if (shell) { scene.remove(shell.group); shell.dispose(); }
       shell = buildShell(next.template, { high });
       scene.add(shell.group);
+      // Lo quieto de la plantilla se junta en pocas mallas (menos llamadas de dibujo; ver merge.js)
+      shell.group.updateMatrixWorld(true);
+      if (shell.group.matrixWorld.equals(new THREE.Matrix4())) mergeStatic(shell.group);
       shell.setTime(hours);
       world.bounds = shell.bounds;
       world.spawn = shell.spawn;
@@ -117,19 +124,36 @@ export function buildPersonalRoom(scene, renderer, quality) {
       scene.background = new THREE.Color(next.template === 'terraza' ? 0x87b3e8 : 0x0d0d0f);
     }
     for (const id of [...pieces.keys()]) dropPiece(id);
+    for (const o of piecesGroup.children.filter((c) => c.name === 'estatico')) { o.removeFromParent(); o.geometry.dispose(); }
     for (const p of next.pieces) addPiece(p);
     rebuildLists();
+    if (!roomId) mergePieces();
+  }
+
+  // Mapas públicos: nadie los edita, así que los muebles quietos (árboles, faroles, bancos…) se juntan en
+  // pocas mallas. Los asientos siguen respondiendo a la E (mergeable). Lo que cambia (cuadros, cabina, consola,
+  // atril, pantallas, parlantes) queda aparte.
+  const LIVE = new Set(['cuadro', 'cabina', 'consola', 'atril', 'pantalla', 'parlante', 'probador']);
+  function mergePieces() {
+    for (const e of pieces.values()) {
+      if (LIVE.has(e.piece.type) || e.piece.design) e.holder.userData.dynamic = true;
+      else if (e.item) e.holder.userData.mergeable = true;
+    }
+    mergeStatic(piecesGroup);
   }
 
   // ---------- Muebles ----------
   function addPiece(piece) {
     const built = buildFurniture(piece, { high, h: shell?.def.h });
+    // Las piezas de cada mueble que comparten material se juntan (el mueble se sigue moviendo entero en el
+    // editor). Los que cambian por dentro (cuadros, cabina, consola, atril…) quedan como están
+    if (!LIVE.has(piece.type) && !piece.design) mergeStatic(built.group);
     const holder = new THREE.Group();
     holder.position.set(piece.x, piece.y ?? 0, piece.z);
     holder.rotation.y = piece.r;
     holder.add(built.group);
     holder.userData.pieceId = piece.id;
-    scene.add(holder);
+    piecesGroup.add(holder);
     const e = { piece, holder, built };
     pieces.set(piece.id, e);
     place(e);
@@ -160,7 +184,7 @@ export function buildPersonalRoom(scene, renderer, quality) {
   function dropPiece(id) {
     const e = pieces.get(id);
     if (!e) return;
-    scene.remove(e.holder);
+    e.holder.removeFromParent();
     e.holder.traverse((o) => {
       o.element?.remove(); // carteles HTML (corazones del atril)
       o.geometry?.dispose();

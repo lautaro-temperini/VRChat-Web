@@ -95,9 +95,10 @@ export function mergeStatic(scene, { skip = [] } = {}) {
   }
   for (const r of roots) r.removeFromParent();
   // Grupos que quedaron vacíos (por ejemplo, las plantas): se sacan para no recorrerlos cada cuadro
-  for (;;) {
+  // (nunca la raíz ni algo sin padre: no se puede sacar y el bucle no terminaría)
+  for (let n = 0; n < 64; n++) {
     const empty = [];
-    scene.traverse((o) => { if (o.isGroup && !o.children.length && !o.userData.interact && !o.userData.dynamic) empty.push(o); });
+    scene.traverse((o) => { if (o !== scene && o.parent && o.isGroup && !o.children.length && !o.userData.interact && !o.userData.dynamic) empty.push(o); });
     if (!empty.length) break;
     for (const g of empty) g.removeFromParent();
   }

@@ -274,14 +274,19 @@ export function buildFurniture(piece, env = {}) {
       for (const s of [-1, 1]) cbox(0.04, h, d, m, s * (w / 2 - 0.02), h / 2, 0);
       for (let i = 0; i < 5; i++) cbox(w, 0.03, d, m, 0, 0.02 + i * 0.44, 0);
       cbox(w, h, 0.02, tint(0.7), 0, h / 2, -d / 2 + 0.01);
-      // Libros de colores
+      // Libros de colores: un solo material con el color en los vértices (así se juntan en una malla)
       const rand = (n) => (Math.sin(n * 12.9898) * 43758.5453) % 1;
+      const bookMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8 });
+      const col = new THREE.Color();
       for (let s = 0; s < 4; s++) {
         let x = -w / 2 + 0.06;
         for (let i = 0; x < w / 2 - 0.12 && i < 14; i++) {
           const bw = 0.04 + Math.abs(rand(s * 20 + i)) * 0.04, bh = 0.24 + Math.abs(rand(s * 31 + i)) * 0.12;
           if (Math.abs(rand(s * 7 + i)) > 0.82) { x += 0.12; continue; }
-          cbox(bw, bh, 0.24, new THREE.MeshStandardMaterial({ color: new THREE.Color().setHSL(Math.abs(rand(i * 3 + s)), 0.45, 0.4), roughness: 0.8 }), x + bw / 2, 0.035 + s * 0.44 + bh / 2, 0.02);
+          const book = cbox(bw, bh, 0.24, bookMat, x + bw / 2, 0.035 + s * 0.44 + bh / 2, 0.02);
+          col.setHSL(Math.abs(rand(i * 3 + s)), 0.45, 0.4);
+          const n = book.geometry.attributes.position.count;
+          book.geometry.setAttribute('color', new THREE.Float32BufferAttribute(Array.from({ length: n }, () => [col.r, col.g, col.b]).flat(), 3));
           x += bw + 0.008;
         }
       }
