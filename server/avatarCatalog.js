@@ -215,6 +215,15 @@ export const MH_MORPHS = {
   caraFauno: { slot: 'hocico', name: 'Cara de fauno', targets: [['animal/culturalibre_faun_face', 1]], prize: 'exotico' },
 };
 
+// Ojos de fantasía (premios): se hacen en el sombreador de los ojos, sin modelos. slit: pupila rasgada; glow: brillo
+export const MH_EYES = {
+  ojosReptil: { name: 'Ojos de reptil', color: '#c8d82a', slit: true, glow: 0, prize: 'exotico' },
+  ojosGato: { name: 'Ojos de gato', color: '#f0a020', slit: true, glow: 0, prize: 'raro' },
+  ojosDemonio: { name: 'Ojos de demonio', color: '#ff2a2a', slit: true, glow: 0.6, prize: 'exotico' },
+  ojosBrillantes: { name: 'Ojos brillantes', color: '#39e6ff', slit: false, glow: 0.9, prize: 'exotico' },
+  ojosHielo: { name: 'Ojos de hielo', color: '#d6f6ff', slit: false, glow: 0.35, prize: 'raro' },
+};
+
 // Cejas: 12 formas (misma malla, cambia la textura)
 export const MH_BROWS = Array.from({ length: 12 }, (_, i) => `eyebrow${String(i + 1).padStart(3, '0')}`);
 

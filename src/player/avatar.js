@@ -4,7 +4,7 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { buildAccessory } from './accessories.js';
 import { ITEMS, EMOTES, STAMP_SIZES, TOPS, BOTTOMS, FEET, HATS, GLASSES, BROWS } from '../../server/shared.js';
-import { MH_GARMENTS, MH_ACCESSORIES, MH_FACE, faceKey, morphKey } from '../../server/avatarCatalog.js';
+import { MH_GARMENTS, MH_ACCESSORIES, MH_FACE, MH_EYES, faceKey, morphKey } from '../../server/avatarCatalog.js';
 import { loadGLTF } from '../loaders.js';
 import { fitDesignModel } from '../world/designModel.js';
 import { designFileUrl } from '../net/api.js';
@@ -72,7 +72,7 @@ function hideBits(garments) {
 }
 // Premios equipados que cambian al personaje: { acc: [ids], feet, skin, morphs: [ids], head, face }
 function prizesOf(equip = []) {
-  const out = { acc: [], feet: null, skin: null, morphs: [], head: false, face: false };
+  const out = { acc: [], feet: null, skin: null, morphs: [], eyes: null, head: false, face: false };
   for (const it of equip) {
     const def = ITEMS[it.type];
     if (!def) continue;
@@ -80,6 +80,7 @@ function prizesOf(equip = []) {
     else if (def.mh === 'cloth') out.feet = it.type;
     else if (def.mh === 'skin') out.skin = it.type;
     else if (def.mh === 'morph') out.morphs.push(it.type);
+    else if (def.mh === 'eyes') out.eyes = it.type;
     if (def.slot === 'head') out.head = true;
     if (def.slot === 'face') out.face = true;
   }
@@ -164,18 +165,40 @@ function bodyMaterial(base, uniforms) {
   return m;
 }
 
+// Ojos de fantasía (premios): uEyeMode 0 = normal (color elegido), 1 = color propio con pupila redonda,
+// 2 = con pupila rasgada; uEyeGlow = cuánto brilla el iris
 function eyeMaterial(base, uniforms) {
   const m = base.clone();
   m.onBeforeCompile = (shader) => {
-    shader.uniforms.uEye = uniforms.uEye;
+    for (const k of ['uEye', 'uEyeFx', 'uEyeMode', 'uEyeGlow']) shader.uniforms[k] = uniforms[k];
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', '#include <common>\nuniform vec3 uEye;')
+      .replace('#include <common>', '#include <common>\nuniform vec3 uEye, uEyeFx;\nuniform float uEyeMode, uEyeGlow;')
       .replace('#include <map_fragment>', `
         vec4 texel = texture2D(map, vMapUv);
-        // El iris está en el centro de la textura; la pupila (oscura) no se tiñe
+        // La textura de los ojos trae dos iris (uno por ojo, en diagonal): se usa el del lado que toca.
+        // La pupila (oscura) no se tiñe
         float l = dot(texel.rgb, vec3(0.333));
-        float iris = (1.0 - smoothstep(0.15, 0.175, distance(vMapUv, vec2(0.496, 0.495)))) * smoothstep(0.02, 0.05, l);
-        diffuseColor.rgb *= mix(texel.rgb, uEye * clamp(l * 6.0, 0.4, 1.6), iris);`);
+        vec2 pc = vMapUv - (vMapUv.x > vMapUv.y ? vec2(0.704, 0.297) : vec2(0.288, 0.709));
+        float irisR = 1.0 - smoothstep(0.115, 0.135, length(pc));
+        // (l es lineal: el iris de esta textura ronda 0,015 y la pupila es negra)
+        float iris = irisR * smoothstep(0.002, 0.008, l);
+        vec3 eyeGlow = vec3(0.0);
+        if (uEyeMode < 0.5) {
+          // (la textura del iris es muy oscura: se aclara para que se vea el color elegido)
+          diffuseColor.rgb *= mix(texel.rgb, uEye * clamp(l * 45.0, 0.5, 1.5), iris);
+        } else {
+          // Iris de color propio (un poco más chico que el de la textura: queda su aro oscuro alrededor) y
+          // pupila redonda o rasgada
+          float disc = 1.0 - smoothstep(0.08, 0.095, length(pc));
+          float vein = clamp(l * 8.0, 0.65, 1.25);
+          float pupil = uEyeMode > 1.5
+            ? 1.0 - smoothstep(0.85, 1.0, length(pc / vec2(0.011, 0.07)))
+            : 1.0 - smoothstep(0.85, 1.0, length(pc) / 0.028);
+          vec3 col = mix(uEyeFx * vein, vec3(0.01), pupil);
+          diffuseColor.rgb *= mix(texel.rgb, col, disc);
+          eyeGlow = uEyeFx * uEyeGlow * disc * (1.0 - pupil);
+        }`)
+      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n        totalEmissiveRadiance += eyeGlow;');
   };
   m.customProgramCacheKey = () => 'avatar-eyes';
   return m;
@@ -417,6 +440,7 @@ export class Avatar {
       uSkin: { value: M.skin.color }, uShirt: { value: M.shirt.color }, uPants: { value: M.pants.color },
       uShoes: { value: M.shoes.color }, uEye: { value: M.eyes.color }, uRefSkin: { value: REF_SKIN.masc },
       uHide0: { value: 0 }, uHide1: { value: 0 }, uHide2: { value: 0 }, uHide3: { value: 0 }, uTint: { value: 1 },
+      uEyeFx: { value: new THREE.Color() }, uEyeMode: { value: 0 }, uEyeGlow: { value: 0 },
     };
 
     // Caja invisible para apuntarle con la E / el click (más barata que la malla animada)
@@ -452,6 +476,7 @@ export class Avatar {
   applyStamp() {
     const U = this.stampU, d = this.stamp;
     U.uStampOn.value = 0;
+    this.refreshUniforms();
     if (!d || !this.model) return;
     const id = d.id;
     stampTexture(id).then((tex) => {
@@ -464,6 +489,7 @@ export class Avatar {
       U.uStampC.value.set(0, neck - 0.1 - h / 2);
       U.uStampSide.value = d.place === 'espalda' ? -1 : 1;
       U.uStampOn.value = 1;
+      this.refreshUniforms();
     });
   }
 
@@ -495,6 +521,7 @@ export class Avatar {
     for (const k of ['skin', 'hair', 'eyes', 'shirt', 'pants', 'shoes']) this.mats[k].color.set(L[k]);
     if (this.model?.type !== L.body) this.loadBody(L.body);
     else this.syncHair();
+    this.refreshUniforms();
     if (this.model) this.applyShape();
     const def = BODIES[L.body] ?? BODIES.masc;
     this.scale = L.height / 1.75;
@@ -559,6 +586,12 @@ export class Avatar {
     this.syncHair();
   }
 
+  // Three solo vuelve a subir los uniforms de un material cuando el material cambia: los que agregamos con
+  // onBeforeCompile (piel, partes tapadas, ojos) hay que marcarlos cada vez que cambian sus valores
+  refreshUniforms() {
+    for (const o of [...(this.model?.meshes ?? []), ...this.hairMeshes]) o.material.uniformsNeedUpdate = true;
+  }
+
   // Piel de premio y cejas: cambian la textura (las cejas siguen teñidas con el color del pelo)
   async applyTextures() {
     const m = this.model;
@@ -579,6 +612,7 @@ export class Avatar {
       m.body.material.needsUpdate = true;
       this.uniforms.uTint.value = skinTex ? 0 : 1;
     }
+    this.refreshUniforms();
     for (const o of m.meshes) {
       if (!o.userData.brows) continue;
       o.material.map = browTex ?? o.userData.baseMap;
@@ -595,6 +629,12 @@ export class Avatar {
     const outfit = outfitOf(L, this.equip);
     const prizes = prizesOf(this.equip);
     this.applyTextures();
+    // Ojos de fantasía (premio)
+    const fx = prizes.eyes && MH_EYES[prizes.eyes];
+    this.uniforms.uEyeMode.value = fx ? (fx.slit ? 2 : 1) : 0;
+    this.uniforms.uEyeGlow.value = fx?.glow ?? 0;
+    if (fx) this.uniforms.uEyeFx.value.set(fx.color);
+    this.refreshUniforms();
     // [archivo, qué es, color] (sin color: va con su textura, sin teñir)
     const parts = [
       [hairFile(m.type, LOOK_OPTIONS.hairStyle.includes(style) ? style : 'corto'), style, this.mats.hair],
@@ -609,6 +649,7 @@ export class Avatar {
     ].filter(Boolean);
     // La piel que tapan las prendas puestas no se dibuja
     hideBits(Object.values(outfit)).forEach((bits, i) => { this.uniforms[`uHide${i}`].value = bits; });
+    this.refreshUniforms();
     const key = parts.map((p) => p[0]).join('+');
     this.updateHairVisibility();
     if (m.hairKey === key) return;

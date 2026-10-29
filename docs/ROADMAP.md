@@ -335,6 +335,7 @@ La música del DJ y el puente OSC ya están hechos. Falta:
 | Assets de MakeHuman instalados (29/10) | Se suman todos: cejas (11 formas), calzado nuevo, fedoras y ropa nueva. **Libres en el editor** (como la ropa de hoy). Se buscan además packs de la comunidad (CC0/CC-BY) para bajar, con OK previo |
 | Packs bajados (29/10) | **Premios** (inventario con rareza): pieles no humanas, partes animales (cuernos, colas, alas, orejas y bocas de animal), ropa exótica, sombreros/anteojos llamativos y máscaras. **En el editor** (libres): el resto (ropa común, calzado, sombreros y anteojos comunes, cejas). Nariz, mejillas y orejas van dentro de los presets de cara |
 | Tope de salas creadas (29/10, PROVISORIO) | Hasta 10 salas creadas por día por cuenta (contra crear y borrar en bucle). Lo puso Claude sin consultar: revisar |
+| Ojos de fantasía (29/10, PROVISORIO) | Premios hechos por sombreador (sin modelos): reptil, gato, demonio, brillantes y hielo (`MH_EYES` en avatarCatalog.js). Nombres, colores y rarezas los puso Claude: revisar |
 | Comando de admin (29/10) | `/item <id>`: el admin se da a sí mismo cualquier objeto (premios, exóticos, muebles especiales, consumibles) |
 | Chat (29/10) | Cada mensaje se corre a izquierda/centro/derecha según dónde estaba quien lo escribió respecto de tu cámara. En celular, el chat tiene una cruz para cerrarlo |
 | Celular (29/10) | El cartel de acción ("Ver obra", "Tomar trago"…) se puede tocar para hacerla, además del botón Usar |

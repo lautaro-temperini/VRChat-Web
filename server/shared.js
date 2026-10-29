@@ -1,5 +1,5 @@
 // Validaciones y catálogos compartidos entre el servidor y el cliente.
-import { MH_GARMENTS, MH_ACCESSORIES, MH_SKINS, MH_MORPHS, MH_FACE, MH_BROWS } from './avatarCatalog.js';
+import { MH_GARMENTS, MH_ACCESSORIES, MH_SKINS, MH_MORPHS, MH_FACE, MH_BROWS, MH_EYES } from './avatarCatalog.js';
 
 // Objetos equipables. slot: dónde se ponen (uno por lugar).
 export const ITEMS = {
@@ -20,6 +20,7 @@ for (const [id, a] of Object.entries(MH_ACCESSORIES)) if (a.prize) ITEMS[id] = {
 for (const [id, g] of Object.entries(MH_GARMENTS)) if (g.prize) ITEMS[id] = { slot: 'pies', name: g.name, colors: [PRIZE_COLOR], mh: 'cloth' };
 for (const [id, k] of Object.entries(MH_SKINS)) ITEMS[id] = { slot: 'piel', name: k.name, colors: [PRIZE_COLOR], mh: 'skin' };
 for (const [id, m] of Object.entries(MH_MORPHS)) ITEMS[id] = { slot: m.slot === 'orejas' ? 'ears' : m.slot, name: m.name, colors: [PRIZE_COLOR], mh: 'morph' };
+for (const [id, e] of Object.entries(MH_EYES)) ITEMS[id] = { slot: 'ojos', name: e.name, colors: [PRIZE_COLOR], mh: 'eyes' };
 
 // Lo que recibe cada cuenta nueva (se eligen 3 al azar, sin repetir)
 export const STARTER_ITEMS = ['cap', 'beanie', 'headphones', 'sunglasses', 'glasses', 'chain', 'backpack'];
@@ -224,7 +225,7 @@ export const ITEM_RARITY = {
   trago: 'basico', cafe: 'basico',
 };
 // Premios de MakeHuman: su rareza está en el catálogo (provisoria, 29/10)
-for (const list of [MH_ACCESSORIES, MH_GARMENTS, MH_SKINS, MH_MORPHS]) {
+for (const list of [MH_ACCESSORIES, MH_GARMENTS, MH_SKINS, MH_MORPHS, MH_EYES]) {
   for (const [id, it] of Object.entries(list)) if (it.prize) ITEM_RARITY[id] = it.prize;
 }
 // Consumibles: se toman y durante BOOST_TIME la stamina no se gasta (no se puede tomar otro mientras dura)
