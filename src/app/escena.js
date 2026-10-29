@@ -32,7 +32,7 @@ renderer.setSize(innerWidth, innerHeight);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.1;
 renderer.shadowMap.enabled = high;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.shadowMap.type = THREE.PCFShadowMap; // (PCFSoftShadowMap ya no existe en three: usaba esta igual)
 $('app').append(renderer.domElement);
 setLoaderRenderer(renderer);
 

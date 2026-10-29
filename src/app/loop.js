@@ -8,7 +8,8 @@ import { G, $ } from './state.js';
 const { quality, renderer, labels, scene, camera, world, me, ctrl, fpArms, net, remotes, rtc, groups, ground, roomEditor } = G;
 
 // ---------- Bucle principal ----------
-const clock = new THREE.Clock();
+const clock = new THREE.Timer(); // (THREE.Clock está obsoleto)
+clock.connect(document); // al volver a la pestaña no cuenta el tiempo que estuvo oculta
 const staminaEl = $('stamina');
 const staminaFill = staminaEl.querySelector('.fill');
 let sendTimer = 0, lastSent = '', lastSentAt = 0, frame = 0, voiceTimer = 0, inExit = false;
@@ -19,9 +20,10 @@ const fpsWatch = new FpsWatch(quality, () => {
   toast('Bajamos la calidad gráfica para que el juego ande más fluido.');
 });
 renderer.setAnimationLoop(() => {
-  const dt = Math.min(clock.getDelta(), 0.05);
+  clock.update();
+  const dt = Math.min(Math.max(clock.getDelta(), 0), 0.05); // nunca negativo (rompería la física)
   fpsWatch.tick(dt, ctrl.enabled && !document.hidden);
-  const t = clock.elapsedTime;
+  const t = clock.getElapsed();
   // DJ: en la cabina pone las manos en la consola (yo, y el que está pasando música)
   const djSpot = ctrl.booth && world.dj.spot; // en las salas personales es un objeto nuevo cada vez
   me.djing = !!djSpot && Math.hypot(ctrl.booth.x - djSpot.x, ctrl.booth.z - djSpot.z) < 0.05;
