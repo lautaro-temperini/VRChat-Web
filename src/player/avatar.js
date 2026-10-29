@@ -476,7 +476,6 @@ export class Avatar {
   applyStamp() {
     const U = this.stampU, d = this.stamp;
     U.uStampOn.value = 0;
-    this.refreshUniforms();
     if (!d || !this.model) return;
     const id = d.id;
     stampTexture(id).then((tex) => {
@@ -489,7 +488,6 @@ export class Avatar {
       U.uStampC.value.set(0, neck - 0.1 - h / 2);
       U.uStampSide.value = d.place === 'espalda' ? -1 : 1;
       U.uStampOn.value = 1;
-      this.refreshUniforms();
     });
   }
 
@@ -521,7 +519,6 @@ export class Avatar {
     for (const k of ['skin', 'hair', 'eyes', 'shirt', 'pants', 'shoes']) this.mats[k].color.set(L[k]);
     if (this.model?.type !== L.body) this.loadBody(L.body);
     else this.syncHair();
-    this.refreshUniforms();
     if (this.model) this.applyShape();
     const def = BODIES[L.body] ?? BODIES.masc;
     this.scale = L.height / 1.75;
@@ -586,12 +583,6 @@ export class Avatar {
     this.syncHair();
   }
 
-  // Three solo vuelve a subir los uniforms de un material cuando el material cambia: los que agregamos con
-  // onBeforeCompile (piel, partes tapadas, ojos) hay que marcarlos cada vez que cambian sus valores
-  refreshUniforms() {
-    for (const o of [...(this.model?.meshes ?? []), ...this.hairMeshes]) o.material.uniformsNeedUpdate = true;
-  }
-
   // Piel de premio y cejas: cambian la textura (las cejas siguen teñidas con el color del pelo)
   async applyTextures() {
     const m = this.model;
@@ -612,7 +603,6 @@ export class Avatar {
       m.body.material.needsUpdate = true;
       this.uniforms.uTint.value = skinTex ? 0 : 1;
     }
-    this.refreshUniforms();
     for (const o of m.meshes) {
       if (!o.userData.brows) continue;
       o.material.map = browTex ?? o.userData.baseMap;
@@ -634,7 +624,6 @@ export class Avatar {
     this.uniforms.uEyeMode.value = fx ? (fx.slit ? 2 : 1) : 0;
     this.uniforms.uEyeGlow.value = fx?.glow ?? 0;
     if (fx) this.uniforms.uEyeFx.value.set(fx.color);
-    this.refreshUniforms();
     // [archivo, qué es, color] (sin color: va con su textura, sin teñir)
     const parts = [
       [hairFile(m.type, LOOK_OPTIONS.hairStyle.includes(style) ? style : 'corto'), style, this.mats.hair],
@@ -649,7 +638,6 @@ export class Avatar {
     ].filter(Boolean);
     // La piel que tapan las prendas puestas no se dibuja
     hideBits(Object.values(outfit)).forEach((bits, i) => { this.uniforms[`uHide${i}`].value = bits; });
-    this.refreshUniforms();
     const key = parts.map((p) => p[0]).join('+');
     this.updateHairVisibility();
     if (m.hairKey === key) return;

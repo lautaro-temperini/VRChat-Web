@@ -159,8 +159,7 @@ mueble especial a cada cuenta nueva (`TEST_STARTER_EXTRA`). No edites `server/` 
   `Acc_*` = no se tiñe. Packs de la comunidad bajados en `E:\Proyectos\descargas-makehuman`; créditos CC-BY en
   `public/models/makehuman/CREDITOS.txt`. Regenerar: build.py + export.py con `GENDER` masc y fem (~2 min cada uno).
   Ojos: la textura trae **dos iris** (uno por ojo, en diagonal; centros en `eyeMaterial`); ojos de fantasía de premio
-  (`MH_EYES`) = modo del sombreador (`uEyeMode`, pupila rasgada, brillo). Uniforms agregados con `onBeforeCompile`:
-  después de cambiarlos llamar `refreshUniforms()` (three no los vuelve a subir solo).
+  (`MH_EYES`) = modo del sombreador (`uEyeMode`, pupila rasgada, brillo).
 - **Animaciones** en `src/player/anims.js`: se adaptan al esqueleto de Quaternius comparando con la pose
   de reposo (todas en pose T). Para sumar una de Mixamo: FBX Binary, Without Skin, 30 fps, en
   `public/models/anims/mixamo/` y agregarla en `GESTURE_CLIPS`.
