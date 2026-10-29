@@ -1,4 +1,5 @@
 // Íconos SVG simples (sin imágenes externas).
+import { ITEMS, RARITIES, rarityOf } from '../../server/shared.js';
 
 // Muebles (editor de salas): un sillón
 const FURNITURE_PATH = '<path d="M5 10V7a3 3 0 013-3h8a3 3 0 013 3v3a2 2 0 00-2 2v1H7v-1a2 2 0 00-2-2z"/><path d="M3 12a2 2 0 014 0v3h10v-3a2 2 0 014 0v6h-2v2h-2v-2H7v2H5v-2H3z"/>';
@@ -17,10 +18,27 @@ const ITEM_PATHS = {
   backpack: '<rect x="5" y="6" width="14" height="15" rx="4"/><path d="M9 6V4.5a3 3 0 016 0V6" fill="none" stroke="currentColor" stroke-width="2"/><rect x="8" y="13" width="8" height="4" rx="1.5" fill="rgba(0,0,0,.25)"/>',
 };
 
-// Ícono de un objeto con su color
+// Premios de MakeHuman (avatarCatalog.js): un ícono por lugar del cuerpo
+const PRIZE_PATHS = {
+  head: '<path d="M6 14c0-5 2.7-8 6-8s6 3 6 8z"/><ellipse cx="12" cy="15" rx="10" ry="2.6"/>',
+  face: '<path d="M2 10c3-2 6-2 10 0 4-2 7-2 10 0-.5 4-3 6-5.5 6-2 0-3-1.2-4.5-3-1.5 1.8-2.5 3-4.5 3C5 16 2.5 14 2 10z"/>',
+  cuernos: '<path d="M5 20c-2-5-1-11 3-15-1 5 0 8 3 10zM19 20c2-5 1-11-3-15 1 5 0 8-3 10z"/>',
+  cola: '<path d="M4 20c6 0 12-3 12-9 0-3 2-5 4-5-1 2-1 4 0 5-1 7-8 11-16 11z"/>',
+  back: '<path d="M12 8C9 3 4 3 2 6c2 0 3 2 3 4-1 1-1 4 1 5 1-2 3-3 6-3zM12 8c3-5 8-5 10-2-2 0-3 2-3 4 1 1 1 4-1 5-1-2-3-3-6-3z"/>',
+  pies: '<path d="M7 3h6v10l7 3v4H4V14z"/>',
+  piel: '<circle cx="12" cy="6" r="3.5"/><path d="M5 21c0-6 3-9 7-9s7 3 7 9z"/><circle cx="9" cy="16" r="1.2" fill="rgba(0,0,0,.35)"/><circle cx="14" cy="18" r="1.2" fill="rgba(0,0,0,.35)"/>',
+  ears: '<path d="M6 21c-2-6-2-13 1-18 3 4 4 9 4 14zM18 21c2-6 2-13-1-18-3 4-4 9-4 14z"/>',
+  hocico: '<ellipse cx="12" cy="14" rx="8" ry="6"/><ellipse cx="9" cy="13" rx="1.4" ry="1.8" fill="rgba(0,0,0,.4)"/><ellipse cx="15" cy="13" rx="1.4" ry="1.8" fill="rgba(0,0,0,.4)"/>',
+  ojos: '<path d="M2 12c3-5 7-7 10-7s7 2 10 7c-3 5-7 7-10 7s-7-2-10-7z"/><ellipse cx="12" cy="12" rx="1.6" ry="5" fill="rgba(0,0,0,.6)"/>',
+};
+
+// Ícono de un objeto con su color (los premios de MakeHuman, con el color de su rareza)
 export function itemIcon(type, color) {
+  const def = Object.hasOwn(ITEMS, type) ? ITEMS[type] : null;
+  const prize = def?.mh ? PRIZE_PATHS[def.slot] : null;
+  if (prize) color = RARITIES[rarityOf(type)].color;
   const dark = isLight(color) ? '#1d1500' : '#ffffff';
-  return `<span class="ico" style="background:${color};color:${dark}"><svg viewBox="0 0 24 24" fill="${dark}">${ITEM_PATHS[type] ?? FURNITURE_PATH}</svg></span>`;
+  return `<span class="ico" style="background:${color};color:${dark}"><svg viewBox="0 0 24 24" fill="${dark}">${prize ?? ITEM_PATHS[type] ?? FURNITURE_PATH}</svg></span>`;
 }
 
 function isLight(hex) {
