@@ -3,7 +3,7 @@ import { cleanName, cleanLines, nameKey, cleanLook, isImage, ITEMS, STARTER_ITEM
 import { setupWorks, worksMethods } from './works.js';
 import { setupDesigns, designsMethods } from './designs.js';
 import { setupRooms, roomsMethods } from './rooms.js';
-import { sessionState } from './sessions.js';
+import { sessionState, SESSION_IDLE } from './sessions.js';
 import { setupMessages, messagesMethods } from './messages.js';
 import { setupProgress, progressMethods } from './progress.js';
 import { accountsEditorMethods } from './editor.js';
@@ -254,7 +254,24 @@ export class Accounts extends DurableObject {
     return token;
   }
 
+  // Mantenimiento (una vez por hora, lo dispara cualquier pedido): sesiones vencidas que nadie volvió a usar y
+  // cuentas de invitado sin sesión hace más de 30 días (ya nadie puede volver a entrar con ellas)
+  maintenance() {
+    const now = Date.now();
+    if (now - (this.lastMaintenance ?? 0) < HOUR) return;
+    this.lastMaintenance = now;
+    const old = now - SESSION_IDLE;
+    this.sql.exec('DELETE FROM sessions WHERE COALESCE(last_seen, created) < ?', old);
+    const gone = this.sql.exec(`SELECT id FROM users WHERE username IS NULL AND created < ?
+      AND id NOT IN (SELECT user_id FROM sessions) AND id NOT IN (SELECT user_id FROM oauth_links)`, old).toArray().map((r) => r.id);
+    for (const id of gone) {
+      this.sql.exec('DELETE FROM presence WHERE user_id = ?', id);
+      this.sql.exec('DELETE FROM users WHERE id = ?', id);
+    }
+  }
+
   async userFromToken(token) {
+    this.maintenance();
     if (typeof token !== 'string' || token.length !== 64) return null;
     const hash = await sha256(token);
     const s = this.sql.exec('SELECT created, last_seen FROM sessions WHERE token = ?', hash).toArray()[0];
