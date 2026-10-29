@@ -12,6 +12,9 @@ import { ROOM_TEMPLATES, cleanText } from './shared.js';
 //   y se echa a quien esté adentro.
 
 export const ROOMS_MAX = 3;
+// Salas creadas por día por cuenta (PROVISORIO 29/10, contra crear y borrar en bucle; cada sala nueva es un
+// Durable Object)
+export const ROOMS_PER_DAY = 10;
 const randomHex = (n) => [...crypto.getRandomValues(new Uint8Array(n))].map((b) => b.toString(16).padStart(2, '0')).join('');
 const clean = (s, n) => cleanText(String(s ?? '').replace(/[<>]/g, ''), n);
 const PRIVACY = ['todos', 'amigos', 'cerrada'];
@@ -26,6 +29,8 @@ export function setupRooms(sql) {
       privacy TEXT NOT NULL DEFAULT 'todos', template TEXT, created INTEGER NOT NULL
     );
     CREATE INDEX IF NOT EXISTS rooms_owner ON rooms (owner, created);
+    CREATE TABLE IF NOT EXISTS room_creations (owner TEXT NOT NULL, created INTEGER NOT NULL);
+    CREATE INDEX IF NOT EXISTS room_creations_owner ON room_creations (owner, created);
   `);
   const ncols = sql.exec('PRAGMA table_info(notes)').toArray().map((c) => c.name);
   if (!ncols.includes('room')) {
@@ -111,6 +116,12 @@ export const roomsMethods = {
     if (this.isGuest(me)) return this.guestError();
     if (!roomTemplates().some((t) => t.id === template)) return { ok: false, error: 'Elegí una plantilla.' };
     if (this.roomsOf(me.id).length >= ROOMS_MAX) return { ok: false, error: `Podés tener hasta ${ROOMS_MAX} salas. Borrá una para crear otra.` };
+    const day = Date.now() - 86_400_000;
+    if (this.sql.exec('SELECT COUNT(*) AS n FROM room_creations WHERE owner = ? AND created > ?', me.id, day).one().n >= ROOMS_PER_DAY) {
+      return { ok: false, error: 'Creaste muchas salas hoy. Probá mañana.' };
+    }
+    this.sql.exec('DELETE FROM room_creations WHERE created < ?', day);
+    this.sql.exec('INSERT INTO room_creations (owner, created) VALUES (?, ?)', me.id, Date.now());
     // La primera vuelve a tener el id de la cuenta (si se había borrado); las demás, uno nuevo
     const id = this.roomRow(me.id) ? randomHex(8) : me.id;
     this.sql.exec('INSERT INTO rooms (id, owner, name, template, created) VALUES (?, ?, ?, ?, ?)', id, me.id, clean(name, 32), template, Date.now());

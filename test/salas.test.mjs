@@ -95,3 +95,16 @@ test('salas: los corazones son de cada sala y el perfil suma todos', async () =>
   assert.equal((await api(`profile?id=${a.user.id}`)).profile.hearts, 1);
   await cb.close();
 });
+
+test('salas: crear y borrar en bucle tiene tope por día', async () => {
+  const a = await account('sl');
+  await api('roomdelete', { method: 'POST', token: a.token, body: { id: a.user.id } });
+  let last;
+  for (let i = 0; i < 11; i++) {
+    last = await api('roomcreate', { method: 'POST', token: a.token, body: { template: 'loft' } });
+    if (!last.ok) break;
+    await api('roomdelete', { method: 'POST', token: a.token, body: { id: last.room.id } });
+  }
+  assert.equal(last.ok, false);
+  assert.match(last.error, /hoy/);
+});
