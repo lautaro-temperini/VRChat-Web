@@ -334,6 +334,10 @@ La música del DJ y el puente OSC ya están hechos. Falta:
 | Varias salas (27/10) | Corazones, atril y notas **por sala** (el perfil suma el total del dueño). Nombre, descripción y privacidad **por sala**. Se puede borrar la única sala y quedarse sin ninguna. Al borrar, los muebles especiales y lo puesto **vuelven a la mochila** |
 | Assets de MakeHuman instalados (29/10) | Se suman todos: cejas (11 formas), calzado nuevo, fedoras y ropa nueva. **Libres en el editor** (como la ropa de hoy). Se buscan además packs de la comunidad (CC0/CC-BY) para bajar, con OK previo |
 | Packs bajados (29/10) | **Premios** (inventario con rareza): pieles no humanas, partes animales (cuernos, colas, alas, orejas y bocas de animal), ropa exótica, sombreros/anteojos llamativos y máscaras. **En el editor** (libres): el resto (ropa común, calzado, sombreros y anteojos comunes, cejas). Nariz, mejillas y orejas van dentro de los presets de cara |
+| Comando de admin (29/10) | `/item <id>`: el admin se da a sí mismo cualquier objeto (premios, exóticos, muebles especiales, consumibles) |
+| Chat (29/10) | Cada mensaje se corre a izquierda/centro/derecha según dónde estaba quien lo escribió respecto de tu cámara. En celular, el chat tiene una cruz para cerrarlo |
+| Celular (29/10) | El cartel de acción ("Ver obra", "Tomar trago"…) se puede tocar para hacerla, además del botón Usar |
+| UX/UI (29/10) | Primero una revisión completa (PC y celular) con capturas y una propuesta de reagrupado; se cambia después de que el dueño decida |
 | Formas de cara (26/10) | Se eligen con **presets** (caras armadas), sin deslizadores por rasgo. Salen de los modificadores de MPFB |
 | Partes no humanas (26/10) | **Mezcla:** algunas libres en el editor (ej. colores de ojos) y las más vistosas (colas, orejas de duende, ojos de reptil…) como premios |
 | Orden de assets nuevos (26/10) | Primero otros assets de MakeHuman (lo más fácil), al final formas de cara, ojos de fantasía, orejas y colas, y premios 3D CC0. Después de terminar los hallazgos |

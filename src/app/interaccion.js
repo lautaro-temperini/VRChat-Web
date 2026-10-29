@@ -82,6 +82,8 @@ renderer.domElement.addEventListener('click', () => {
   else if (ctrl.enabled && !ctrl.paused && !isTouch) renderer.domElement.requestPointerLock?.();
 });
 $('btn-use').onclick = interact;
+// En celular el cartel ("Ver obra", "Tomar trago"…) también se toca
+$('prompt').addEventListener('click', (e) => { e.stopPropagation(); interact(); });
 $('btn-crouch').onclick = () => { ctrl.crouchToggle = !ctrl.crouchToggle; $('btn-crouch').classList.toggle('on', ctrl.crouchToggle); };
 $('btn-jump').addEventListener('touchstart', (e) => { e.preventDefault(); ctrl.jump(); }, { passive: false });
 $('btn-chat').onclick = () => (ctrl.typing ? G.closeChat() : G.openChat());

@@ -1,7 +1,7 @@
 // Una prueba por cada agujero cerrado (ver docs/ramas/seguridad.md), para que no vuelvan.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { account, guest, joined, Client, api, sleep, moveTo, BASE } from './helpers.mjs';
+import { account, guest, joined, Client, api, sleep, moveTo, BASE, inventory } from './helpers.mjs';
 
 // ---------- Sala (WebSocket) ----------
 
@@ -428,4 +428,13 @@ test('mensajes privados: si te ignoró no le llega (y no te enteras); si está c
   const th = await api(`dm?id=${a.user.id}`, { token: b.token });
   assert.ok(!th.messages.some((x) => x.text === 'no llega'));
   await cb.close();
+});
+
+test('/item: solo los admins se dan objetos', async () => {
+  const a = await account('it'), g = await guest();
+  for (const token of [a.token, g.token]) {
+    const r = await api('adminitem', { method: 'POST', token, body: { type: 'crown' } });
+    assert.equal(r.ok, false);
+  }
+  assert.ok(!(await inventory(a.token)).some((i) => i.type === 'crown'));
 });

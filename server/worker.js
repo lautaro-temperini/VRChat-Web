@@ -239,6 +239,7 @@ async function api(request, env, path) {
     case 'GET worksadmin': result = await accounts.worksAdmin(token); break;
     case 'POST workremove': result = await accounts.workRemove(token, body.id); break;
     case 'POST title': result = await accounts.setTitle(token, body.nick, body.title); break;
+    case 'POST adminitem': result = await accounts.adminItem(token, body.type); break;
     // Progresión
     case 'GET progress': result = await accounts.progress(token); break;
     case 'POST progressview': result = await accounts.progressView(token, body.id, body.fixed); break;

@@ -529,6 +529,19 @@ export class Accounts extends DurableObject {
     this.sql.exec('UPDATE users SET starter = 1 WHERE id = ?', userId);
   }
 
+  // /item <id> (solo admins): se da a sí mismo cualquier objeto del juego (premios, exóticos, muebles
+  // especiales, consumibles). Los diseños de artistas no (son de su autor)
+  async adminItem(token, type) {
+    const me = await this.userFromToken(token);
+    if (!me || !this.isAdmin(me.id)) return { ok: false, error: 'Solo para admins.' };
+    type = String(type ?? '');
+    const has = (o) => Object.hasOwn(o, type);
+    const def = has(ITEMS) ? ITEMS[type] : has(CONSUMABLES) ? CONSUMABLES[type] : has(FURNITURE) && FURNITURE[type].special && !FURNITURE[type].design ? FURNITURE[type] : null;
+    if (!def) return { ok: false, error: 'No existe ese objeto.' };
+    this.addItem(me.id, type, def.colors ? pick(def.colors) : def.color);
+    return { ok: true, name: def.name, items: this.items(me.id) };
+  }
+
   addItem(userId, type, color) {
     this.sql.exec('INSERT INTO items (iid, owner_id, type, color, created) VALUES (?, ?, ?, ?, ?)', randomHex(8), userId, type, color, Date.now());
   }

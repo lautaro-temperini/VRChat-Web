@@ -1,6 +1,7 @@
 // Chat de la sala y comandos (/ayuda, /ir, /bailar…).
+import * as THREE from 'three';
 import { api } from '../net/api.js';
-import { DANCES, PUBLIC_MAPS } from '../../server/shared.js';
+import { DANCES, PUBLIC_MAPS, ITEMS, CONSUMABLES, FURNITURE } from '../../server/shared.js';
 import { G, $, body } from './state.js';
 
 const { ctrl, social, net } = G;
@@ -12,9 +13,19 @@ function pushLine(el) {
   while (box.children.length > 60) box.firstChild.remove();
   box.scrollTop = box.scrollHeight;
 }
-function addMessage({ name: n, text }) {
+// Dónde estaba quien habló respecto de la cámara: a la izquierda, al medio o a la derecha (decisión 29/10)
+const _v = new THREE.Vector3();
+function sideOf(id) {
+  const r = id && id !== net.id ? G.remotes.get(id) : null;
+  if (!r) return 'center'; // yo, o alguien que ya no está (el historial al entrar)
+  r.avatar.root.getWorldPosition(_v);
+  _v.applyMatrix4(G.camera.matrixWorldInverse); // x: derecha de la cámara, z negativo: adelante
+  const x = _v.z < 0 ? _v.x / -_v.z : Math.sign(_v.x) * 2; // detrás: según de qué lado está
+  return x < -0.25 ? 'left' : x > 0.25 ? 'right' : 'center';
+}
+function addMessage({ name: n, text, id }) {
   const el = document.createElement('div');
-  el.className = 'msg';
+  el.className = `msg from-${sideOf(id)}`;
   const b = document.createElement('b');
   b.textContent = n;
   el.append(b, document.createTextNode(text));
@@ -89,6 +100,20 @@ function command(text) {
       });
       break;
     }
+    case 'item': {
+      // Solo admins: se da un objeto (por id o por nombre). Sin nada: la lista
+      const raw = rest.join(' ').trim();
+      const all = [...Object.entries(ITEMS).map(([id, d]) => [id, d.name]), ...Object.entries(CONSUMABLES).map(([id, d]) => [id, d.name]),
+        ...Object.entries(FURNITURE).filter(([, d]) => d.special && !d.design).map(([id, d]) => [id, d.name])];
+      if (!raw) return system(`Usá: /item <id>. Objetos: ${all.map(([id, n]) => `${id} (${n})`).join(' · ')}`);
+      const low = raw.toLowerCase();
+      const hit = all.find(([id, n]) => id.toLowerCase() === low || n.toLowerCase() === low);
+      api('adminitem', { method: 'POST', body: { type: hit?.[0] ?? raw } }).then((r) => {
+        system(r.ok ? `Te diste: ${r.name}. Está en tu mochila.` : r.error);
+        if (r.ok) social.loadInventory?.();
+      });
+      break;
+    }
     case 'salas':
       system(`Salas: Museo · ${Object.values(PUBLIC_MAPS).map((m) => m.name).join(' · ')} · Tu sala${friends.length ? ' · ' + friends.map((f) => `Sala de ${f.name}${f.room ? `  (${social.roomLabel(f.room).toLowerCase()})` : ''}`).join(' · ') : ''}`);
       break;
@@ -109,6 +134,8 @@ function command(text) {
   }
 }
 input.addEventListener('blur', () => { if (ctrl.typing) closeChat(); });
+// En celular: cruz para cerrar el chat
+$('chat-close').addEventListener('pointerdown', (e) => { e.preventDefault(); closeChat(); });
 
 
 Object.assign(G, { addMessage, system, openChat, closeChat });

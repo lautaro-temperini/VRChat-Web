@@ -83,6 +83,9 @@ body.targeting #crosshair { transform: scale(1.8); background: var(--primary); }
 #prompt kbd { margin: 0; background: var(--primary); color: var(--primary-ink); border-color: #b38f00; }
 body.targeting #prompt { display: flex; }
 body.touch #prompt kbd { display: none; }
+/* En celular el cartel también se toca (hace lo mismo que Usar) */
+body.touch #prompt { pointer-events: auto; cursor: pointer; padding: 10px 16px; font-size: 15px; }
+body.touch #prompt:active { background: var(--primary); color: var(--primary-ink); }
 
 body.auth #chat, body.auth #topbar, body.auth #dock, body.auth #voicebar, body.auth #touch, body.auth #hud { display: none; }
 
@@ -92,8 +95,13 @@ body.auth #chat, body.auth #topbar, body.auth #dock, body.auth #voicebar, body.a
 #messages .msg { padding: 3px 9px; border-radius: 9px; background: rgba(18, 13, 43, 0.62); width: fit-content; max-width: 100%; overflow-wrap: anywhere; user-select: text; }
 #messages .msg b { color: var(--primary); margin-right: 6px; font-weight: 800; }
 #messages .msg.sys { color: var(--muted); font-style: italic; background: rgba(18, 13, 43, 0.4); }
-#chat-form { display: none; margin-top: 6px; }
-body.typing #chat-form { display: block; }
+#messages .msg.from-center { align-self: center; }
+#messages .msg.from-right { align-self: flex-end; }
+#chat-form { display: none; margin-top: 6px; gap: 6px; align-items: center; }
+#chat-form #chat-input { flex: 1; min-width: 0; }
+#chat-close { display: none; flex: none; width: 40px; height: 40px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel); font-size: 18px; }
+body.touch #chat-close { display: block; }
+body.typing #chat-form { display: flex; }
 body.typing #chat { background: var(--panel); border: 1px solid var(--line); backdrop-filter: blur(12px); }
 #chat-input, .field input:not([type=range]), .field textarea, .field select {
   width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: rgba(10, 6, 30, 0.55);

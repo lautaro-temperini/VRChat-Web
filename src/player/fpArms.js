@@ -131,7 +131,8 @@ export class FPArms {
       // así las manos asoman abajo del cuadro, como en una cámara GoPro
       const tx = Math.PI / 2 + 0.08 + pump * 1.5 + reach * 0.3 + climb * 0.9 + air * 0.15;
       a.pivot.rotation.x = damp(a.pivot.rotation.x, tx, 14, dt);
-      a.pivot.rotation.z = damp(a.pivot.rotation.z, -a.side * (0.24 + air * 0.25), 14, dt);
+      // En el aire se abren un poco hacia los costados (si se cierran, las manos se pisan)
+      a.pivot.rotation.z = damp(a.pivot.rotation.z, -a.side * (0.24 - air * 0.12), 14, dt);
       a.pivot.position.z = damp(a.pivot.position.z, -0.03 - pump - reach * 0.14, 14, dt);
     }
   }

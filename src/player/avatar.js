@@ -240,6 +240,69 @@ class Rig {
   }
 }
 
+// ---------- Brazo con cinemática inversa (para llevar la mano a un punto: la boca, frente al pecho) ----------
+const _S = new THREE.Vector3(), _E = new THREE.Vector3(), _W = new THREE.Vector3(), _T = new THREE.Vector3(), _P = new THREE.Vector3();
+const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _qa = new THREE.Quaternion(), _qb = new THREE.Quaternion(), _m4 = new THREE.Matrix4();
+// Gira el hueso (en el mundo) para que la dirección "from" pase a ser "to"
+function rotateWorld(bone, from, to) {
+  _qa.setFromUnitVectors(from, to).multiply(bone.getWorldQuaternion(_qb));
+  bone.quaternion.copy(bone.parent.getWorldQuaternion(_qb).invert().multiply(_qa));
+  bone.updateWorldMatrix(false, true);
+}
+// Dos huesos (brazo y antebrazo) para que la muñeca llegue a "target" (mundo), con el codo hacia "pole".
+// w: cuánto (0..1, para entrar y salir suave)
+function armIK(rig, s, target, pole, w) {
+  const U = rig.bones[`upperarm_${s}`].bone, L = rig.bones[`lowerarm_${s}`].bone, H = rig.bones[`hand_${s}`].bone;
+  const u0 = U.quaternion.clone(), l0 = L.quaternion.clone();
+  U.updateWorldMatrix(true, true);
+  U.getWorldPosition(_S); L.getWorldPosition(_E); H.getWorldPosition(_W);
+  const a = _S.distanceTo(_E), b = _E.distanceTo(_W);
+  const dir = _T.copy(target).sub(_S);
+  const d = THREE.MathUtils.clamp(dir.length(), Math.abs(a - b) + 1e-3, a + b - 1e-3);
+  dir.normalize();
+  const x = (a * a - b * b + d * d) / (2 * d), h = Math.sqrt(Math.max(0, a * a - x * x));
+  const pd = _P.copy(pole).addScaledVector(dir, -pole.dot(dir)).normalize();
+  const elbow = _a.copy(_S).addScaledVector(dir, x).addScaledVector(pd, h);
+  rotateWorld(U, _b.copy(_E).sub(_S).normalize(), elbow.sub(_S).normalize());
+  L.getWorldPosition(_E); H.getWorldPosition(_W);
+  const wrist = _a.copy(_S).addScaledVector(dir, d);
+  rotateWorld(L, _b.copy(_W).sub(_E).normalize(), wrist.sub(_E).normalize());
+  U.quaternion.copy(u0.slerp(U.quaternion, w));
+  L.quaternion.copy(l0.slerp(L.quaternion, w));
+  U.updateWorldMatrix(false, true);
+}
+// Direcciones del personaje en el mundo (mira a +Z del modelo; su derecha es -X)
+function bodyAxes(root) {
+  const q = root.getWorldQuaternion(_qb);
+  return {
+    fwd: new THREE.Vector3(0, 0, 1).applyQuaternion(q),
+    right: new THREE.Vector3(-1, 0, 0).applyQuaternion(q),
+    up: new THREE.Vector3(0, 1, 0).applyQuaternion(q),
+    s: root.getWorldScale(_P).x,
+  };
+}
+// Centro del agarre de la mano (entre la muñeca y los nudillos, del lado de la palma)
+function gripPoint(rig, s, out) {
+  const hand = rig.bones[`hand_${s}`].bone.getWorldPosition(_S);
+  const knuckle = rig.bones[`middle_01_${s}`].bone.getWorldPosition(_E);
+  const index = rig.bones[`index_01_${s}`].bone.getWorldPosition(_W);
+  const pinky = rig.bones[`pinky_01_${s}`].bone.getWorldPosition(_T);
+  const fingers = _a.copy(knuckle).sub(hand);
+  const across = _b.copy(index).sub(pinky);
+  // Normal de la palma: perpendicular a los dedos y al ancho de la mano (del lado del pulgar al doblar)
+  const palm = new THREE.Vector3().crossVectors(across, fingers).normalize();
+  if (s === 'l') palm.negate();
+  return { pos: out.copy(hand).lerp(knuckle, 0.75), palm, fingers: fingers.normalize() };
+}
+// Pone un objeto (hijo de "parent") con posición y orientación dadas en el mundo; a tamaño real
+function placeWorld(obj, parent, pos, basisX, basisY, basisZ) {
+  _m4.makeBasis(basisX, basisY, basisZ);
+  const q = _qa.setFromRotationMatrix(_m4);
+  obj.quaternion.copy(parent.getWorldQuaternion(_qb).invert().multiply(q));
+  obj.position.copy(parent.worldToLocal(_T.copy(pos)));
+  obj.scale.setScalar(1 / parent.getWorldScale(_P).x);
+}
+
 export const POSE = { stand: 0, crouch: 1, sit: 2, climb: 3, air: 4, vault: 5 };
 export const VAULT_TIME = 0.6; // segundos que dura saltar una baranda
 // Pose del DJ (ángulos como en GESTURES; sz positivo = abrir el brazo hacia afuera)
@@ -466,17 +529,14 @@ export class Avatar {
     const anchors = { head: anchor('Head', def.head), face: anchor('Head', def.face), chest: anchor('spine_03', def.chest) };
     const model = { type, scene, rig, gltf, meshes, body, anchors, anim: null, legY: rig.bones.thigh_l.bone.getWorldPosition(new THREE.Vector3()).y };
     // Celular en la mano derecha (en pose T la mano apunta a -X; ver applyPhone)
-    const hand = rig.bones.hand_r.worldPos;
-    model.phone = rig.holder('hand_r', [hand.x - 0.06, hand.y - 0.035, hand.z]);
+    // Celular y vaso: se ubican cada cuadro en el agarre de la mano derecha (placeProps)
+    model.phone = new THREE.Group();
     model.phone.add(phoneMesh());
     model.phone.visible = false;
-    model.cup = rig.holder('hand_r', [hand.x - 0.06, hand.y - 0.02, hand.z + 0.02]);
-    // Medido con la pose de tomar (applyDrink): así el vaso queda parado frente a la boca
-    const cup = cupMesh();
-    cup.position.set(0.043, 0.111, -0.121);
-    cup.rotation.set(-1.953, -0.839, -1.167);
-    model.cup.add(cup);
+    model.cup = new THREE.Group();
+    model.cup.add(cupMesh());
     model.cup.visible = false;
+    scene.add(model.phone, model.cup);
     this.model = model;
     // Animaciones: hasta que cargan, el personaje se mueve con la animación hecha por código
     locomotionClips(type, rig).then((clips) => {
@@ -731,6 +791,7 @@ export class Avatar {
       if (this.phoneW > 0.001 && this.drinkW < 0.5) this.applyPhone(this.phoneW);
       this.model.cup.visible = this.drinkW > 0.35;
       if (this.drinkW > 0.001) this.applyDrink(this.drinkW, 0.5 + 0.5 * Math.sin(this.time * 2.4));
+      if (this.model.phone.visible || this.model.cup.visible) this.placeProps();
       if (this.kissW > 0.001) this.applyKiss(this.kissW);
       this.djW = damp(this.djW ?? 0, this.djing ? 1 : 0, 6, dt);
       if (this.djW > 0.001) this.applyDJ(this.djW);
@@ -753,16 +814,21 @@ export class Avatar {
   // Beso corto (el que llama gira al personaje hacia el otro)
   kiss() { this.kissT = 2.2; }
 
-  // Brazo derecho llevando el vaso a la boca; sip 0..1 = cuánto lo levanta
+  // Brazo derecho llevando el vaso a la boca; sip 0..1 = cuánto lo levanta (la mano llega a la boca por IK)
   applyDrink(w, sip) {
-    const R = this.model.rig;
-    const names = ['upperarm_r', 'lowerarm_r', 'neck_01'];
-    const saved = names.map((n) => R.bones[n].bone.quaternion.clone());
-    const side = -1; // derecho
-    R.set('upperarm_r', _q2.setFromEuler(_e.set(-1.05 - 0.2 * sip, 0.95, 0.32)).multiply(ARM_DOWN[side]));
-    R.set('lowerarm_r', _q3.copy(ARM_DOWN_INV[side]).multiply(qx(-2.45 - 0.2 * sip)).multiply(ARM_DOWN[side]));
+    const R = this.model.rig, X = bodyAxes(this.root);
+    const neck = R.bones.neck_01.bone, n0 = neck.quaternion.clone();
     R.euler('neck_01', -0.12 * sip, 0, 0);
-    names.forEach((n, k) => { const b = R.bones[n].bone; b.quaternion.copy(saved[k].slerp(b.quaternion, w)); });
+    neck.quaternion.copy(n0.slerp(neck.quaternion, w));
+    const head = R.bones.Head.bone;
+    head.updateWorldMatrix(true, false);
+    const mouth = head.getWorldPosition(new THREE.Vector3())
+      .addScaledVector(X.up, (0.02 - 0.16 * (1 - sip)) * X.s).addScaledVector(X.fwd, (0.1 + 0.08 * (1 - sip)) * X.s)
+      .addScaledVector(X.right, 0.02 * X.s);
+    // La muñeca queda un poco abajo y afuera del vaso (que está en la mano)
+    mouth.addScaledVector(X.up, -0.06 * X.s).addScaledVector(X.right, 0.03 * X.s);
+    armIK(R, 'r', mouth, new THREE.Vector3().addScaledVector(X.up, -1).addScaledVector(X.right, 0.8), w);
+    this.sip = sip;
   }
 
   // Inclinarse hacia adelante y estirar el cuello (el beso)
@@ -815,16 +881,40 @@ export class Avatar {
     g.scale.setScalar(1 / this.root.scale.x); // a tamaño real aunque el personaje sea más alto o más bajo
   }
 
-  // Brazo derecho sosteniendo el celular frente al pecho, cabeza mirándolo
+  // Brazo derecho sosteniendo el celular frente al pecho (por IK), cabeza mirándolo
   applyPhone(w) {
-    const R = this.model.rig;
-    const names = ['upperarm_r', 'lowerarm_r', 'neck_01'];
-    const saved = names.map((n) => R.bones[n].bone.quaternion.clone());
-    const side = -1; // derecho
-    R.set('upperarm_r', _q2.setFromEuler(_e.set(-0.5, 0, 0.32)).multiply(ARM_DOWN[side]));
-    R.set('lowerarm_r', _q3.copy(ARM_DOWN_INV[side]).multiply(qx(-1.65)).multiply(ARM_DOWN[side]));
+    const R = this.model.rig, X = bodyAxes(this.root);
+    const neck = R.bones.neck_01.bone, n0 = neck.quaternion.clone();
     R.euler('neck_01', 0.38, 0, 0);
-    names.forEach((n, k) => { const b = R.bones[n].bone; b.quaternion.copy(saved[k].slerp(b.quaternion, w)); });
+    neck.quaternion.copy(n0.slerp(neck.quaternion, w));
+    const chest = R.bones.spine_03.bone;
+    chest.updateWorldMatrix(true, false);
+    const target = chest.getWorldPosition(new THREE.Vector3())
+      .addScaledVector(X.fwd, 0.32 * X.s).addScaledVector(X.up, 0.15 * X.s).addScaledVector(X.right, 0.05 * X.s);
+    armIK(R, 'r', target, new THREE.Vector3().addScaledVector(X.up, -1).addScaledVector(X.right, 0.7).addScaledVector(X.fwd, -0.3), w);
+  }
+
+  // Celular y vaso en el agarre de la mano derecha: el celular con la pantalla hacia la cara, el vaso parado
+  // (inclinado hacia la boca al tomar)
+  placeProps() {
+    const m = this.model, R = m.rig, X = bodyAxes(this.root);
+    m.scene.updateMatrixWorld(true);
+    const grip = gripPoint(R, 'r', new THREE.Vector3());
+    const head = R.bones.Head.bone.getWorldPosition(new THREE.Vector3()).addScaledVector(X.up, 0.08 * X.s);
+    if (m.phone.visible) {
+      // Pantalla (+X del celular) hacia los ojos; el largo (+Z) para arriba
+      const pos = grip.pos.clone().addScaledVector(grip.palm, 0.012 * X.s);
+      const toEye = head.clone().sub(pos).normalize();
+      const up = X.up.clone().addScaledVector(toEye, -X.up.dot(toEye)).normalize();
+      placeWorld(m.phone, m.scene, pos, toEye, new THREE.Vector3().crossVectors(up, toEye), up);
+    }
+    if (m.cup.visible) {
+      // Vaso parado (+Z del grupo = arriba del vaso), en la palma; al tomar se inclina hacia la boca
+      const pos = grip.pos.clone().addScaledVector(grip.palm, 0.035 * X.s);
+      const up = X.up.clone().addScaledVector(X.fwd, -0.9 * (this.sip ?? 0)).normalize();
+      const side = X.right.clone().addScaledVector(up, -X.right.dot(up)).normalize();
+      placeWorld(m.cup, m.scene, pos, side, new THREE.Vector3().crossVectors(up, side), up);
+    }
   }
 
   // Con las animaciones cargadas: mezcla según velocidad y pose, más el gesto encima
