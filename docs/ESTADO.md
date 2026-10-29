@@ -75,6 +75,8 @@ privacidad, favoritas, personaje con animaciones de Mixamo, inventario e interca
   corrido según dónde está quien habla; postura (hombros menos caídos); revisión de UX/UI con propuesta
   ([ui-auditoria.md](ui-auditoria.md), falta que el dueño elija); menos llamadas de dibujo en mapas y salas
   (Plaza 335 → 130); textos limpios en todas partes; tope de 64 KB a los pedidos JSON.
+- **Auditoría general (29/10):** [auditoria-29-10.md](auditoria-29-10.md) — arreglos (ropa que no seguía el cuerpo,
+  color de ojos, rendimiento, textos, memoria) y decisiones provisorias para revisar. `npm test`: 103 pruebas.
 - **Pendiente:** decidir la propuesta de UX/UI; premios 3D CC0 (Poly Pizza / Kenney / Quaternius) si se quieren;
   revisar rarezas y nombres de los premios (`server/avatarCatalog.js`).
 
