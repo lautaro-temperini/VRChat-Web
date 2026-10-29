@@ -1,4 +1,5 @@
 // Validaciones y catálogos compartidos entre el servidor y el cliente.
+import { MH_GARMENTS, MH_ACCESSORIES, MH_SKINS, MH_MORPHS, MH_FACE, MH_BROWS } from './avatarCatalog.js';
 
 // Objetos equipables. slot: dónde se ponen (uno por lugar).
 export const ITEMS = {
@@ -11,6 +12,15 @@ export const ITEMS = {
   chain: { slot: 'neck', name: 'Cadena', colors: ['#ffd23f', '#d9d9d9'] },
   backpack: { slot: 'back', name: 'Mochila', colors: ['#e63946', '#3a7bd5', '#2a9d8f', '#ffd23f', '#1d1d22'] },
 };
+// Premios de MakeHuman (avatarCatalog.js, decisión del 29/10): sombreros, anteojos y máscaras llamativos,
+// cuernos, colas, alas, calzado exótico, pieles no humanas y orejas/hocicos de animal. No se tiñen.
+// mh: qué es para el personaje ('acc' accesorio, 'cloth' calzado que reemplaza al elegido, 'skin' piel, 'morph' forma)
+export const PRIZE_COLOR = '#ffffff';
+for (const [id, a] of Object.entries(MH_ACCESSORIES)) if (a.prize) ITEMS[id] = { slot: a.slot, name: a.name, colors: [PRIZE_COLOR], mh: 'acc' };
+for (const [id, g] of Object.entries(MH_GARMENTS)) if (g.prize) ITEMS[id] = { slot: 'pies', name: g.name, colors: [PRIZE_COLOR], mh: 'cloth' };
+for (const [id, k] of Object.entries(MH_SKINS)) ITEMS[id] = { slot: 'piel', name: k.name, colors: [PRIZE_COLOR], mh: 'skin' };
+for (const [id, m] of Object.entries(MH_MORPHS)) ITEMS[id] = { slot: m.slot === 'orejas' ? 'ears' : m.slot, name: m.name, colors: [PRIZE_COLOR], mh: 'morph' };
+
 // Lo que recibe cada cuenta nueva (se eligen 3 al azar, sin repetir)
 export const STARTER_ITEMS = ['cap', 'beanie', 'headphones', 'sunglasses', 'glasses', 'chain', 'backpack'];
 
@@ -94,9 +104,15 @@ export const HAIR_STYLES = ['corto', 'flequillo', 'largo', 'rapado', 'rulos', 'c
 // Barba: un interruptor sí/no y, si está en sí, el tipo
 export const BEARD_STYLES = ['completa', 'tupida', 'candado', 'bigote'];
 // Ropa con volumen (modelos de MakeHuman). "buzo" es del editor viejo: se ve como manga larga.
-export const TOPS = ['remera', 'mangalarga', 'camisa', 'campera', 'buzo'];
-export const BOTTOMS = ['jean', 'short', 'calza', 'pollera'];
-export const FEET = ['zapatillas', 'botas', 'zapatos'];
+// Las que se eligen en el editor salen del catálogo (las de premio no)
+const editorGarments = (slot) => Object.keys(MH_GARMENTS).filter((k) => MH_GARMENTS[k].slot === slot && !MH_GARMENTS[k].prize);
+export const TOPS = [...editorGarments('top'), 'buzo'];
+export const BOTTOMS = editorGarments('bottom');
+export const FEET = editorGarments('feet');
+// Sombrero y anteojos del editor ('' = ninguno), cejas y presets de cara (por zona: { cara, ojos, nariz, mejillas, orejas })
+export const HATS = Object.keys(MH_ACCESSORIES).filter((k) => MH_ACCESSORIES[k].slot === 'hat');
+export const GLASSES = Object.keys(MH_ACCESSORIES).filter((k) => MH_ACCESSORIES[k].slot === 'glasses');
+export const BROWS = MH_BROWS;
 export const BODIES = ['masc', 'fem'];
 // Tipos de cuerpo del editor básico: cada uno es un punto de los deslizadores del avanzado
 // (peso 0..1 y músculo 0..1; promedio = 0,5 / 0,5). Se combinan como en MakeHuman:
@@ -147,6 +163,16 @@ export function cleanLook(look) {
   if (BODIES.includes(look.body)) out.body = look.body;
   if (typeof look.beard === 'boolean') out.beard = look.beard;
   if (BEARD_STYLES.includes(look.beardStyle)) out.beardStyle = look.beardStyle;
+  if (look.hat === '' || HATS.includes(look.hat)) out.hat = look.hat;
+  if (look.glasses === '' || GLASSES.includes(look.glasses)) out.glasses = look.glasses;
+  if (BROWS.includes(look.brows)) out.brows = look.brows;
+  if (look.face && typeof look.face === 'object') {
+    out.face = {};
+    for (const [zone, z] of Object.entries(MH_FACE)) {
+      const v = look.face[zone];
+      if (typeof v === 'string' && Object.hasOwn(z.options, v)) out.face[zone] = v;
+    }
+  }
   const num = (v, lo, hi) => (Number.isFinite(Number(v)) ? Math.min(hi, Math.max(lo, Number(v))) : undefined);
   const height = num(look.height, 1.55, 1.95);
   // build (contextura) es del editor viejo: se sigue aceptando pero el personaje ya no lo usa
@@ -191,6 +217,10 @@ export const ITEM_RARITY = {
   // Consumibles (también salen como premio)
   trago: 'basico', cafe: 'basico',
 };
+// Premios de MakeHuman: su rareza está en el catálogo (provisoria, 29/10)
+for (const list of [MH_ACCESSORIES, MH_GARMENTS, MH_SKINS, MH_MORPHS]) {
+  for (const [id, it] of Object.entries(list)) if (it.prize) ITEM_RARITY[id] = it.prize;
+}
 // Consumibles: se toman y durante BOOST_TIME la stamina no se gasta (no se puede tomar otro mientras dura)
 export const CONSUMABLES = {
   trago: { name: 'Trago', color: '#ff7a3d' },

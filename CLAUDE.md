@@ -151,6 +151,13 @@ mueble especial a cada cuenta nueva (`TEST_STARTER_EXTRA`). No edites `server/` 
   (bilineal) según peso y músculo. Pelo, barba y ropa en gris: el juego los tiñe. Material del cuerpo: `Body`.
   Ropa: `clothes/<cuerpo>/<prenda>.gltf` (arriba/abajo/calzado, `outfitOf(look)`); el cuerpo trae `_cover` (bits
   en el orden de `GARMENT_BITS`) y el sombreador descarta la piel tapada por lo puesto (`uHide`). Medias: material `Socks*`, sin teñir.
+  **Catálogo** (`server/avatarCatalog.js` → `node scripts/catalogo.mjs` → `assets-src/makehuman/catalogo.json`, que lee
+  build.py): prendas (`_cover0..3`, 16 bits cada uno, en el orden del catálogo: agregar siempre al final), accesorios
+  (`acc/<cuerpo>/<id>.gltf`: sombrero y anteojos del editor, premios de cabeza/cara/cuernos/cola/alas), pieles de premio
+  (`textures/skin_<id>.jpg`, `uTint = 0`), 12 cejas (`textures/brows_<id>.png`), presets de cara por zona (`look.face`,
+  formas `f_<zona>_<id>`) y formas de animal de premio (`a_<id>`). Los premios son `ITEMS` con `mh` (shared.js); material
+  `Acc_*` = no se tiñe. Packs de la comunidad bajados en `E:\Proyectos\descargas-makehuman`; créditos CC-BY en
+  `public/models/makehuman/CREDITOS.txt`. Regenerar: build.py + export.py con `GENDER` masc y fem (~2 min cada uno).
 - **Animaciones** en `src/player/anims.js`: se adaptan al esqueleto de Quaternius comparando con la pose
   de reposo (todas en pose T). Para sumar una de Mixamo: FBX Binary, Without Skin, 30 fps, en
   `public/models/anims/mixamo/` y agregarla en `GESTURE_CLIPS`.

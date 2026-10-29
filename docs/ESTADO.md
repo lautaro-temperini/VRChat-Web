@@ -65,6 +65,10 @@ privacidad, favoritas, personaje con animaciones de Mixamo, inventario e interca
   cada uno con su prueba (`npm test`: 97 pruebas).
 - **Varias salas por persona:** hasta 3, plantilla fija al crear, ajustes/corazones/notas por sala, borrar con
   confirmación desde el Mapa (`server/rooms.js`).
+- **Assets de MakeHuman (29/10):** 15 packs de la comunidad bajados e instalados; en el juego: 61 prendas (en el
+  editor: 16 de arriba, 15 de abajo, 24 calzados), sombreros y anteojos, 12 cejas, presets de cara por zona (forma,
+  ojos, nariz, mejillas, orejas) y 63 premios nuevos (accesorios, calzado exótico, 18 pieles, 12 formas de animal).
+  Catálogo en `server/avatarCatalog.js`; rarezas provisorias.
 - **Pendiente:** subir online (`npm run deploy`). Después: assets de MakeHuman, caras (presets), ojos de fantasía,
   orejas y colas, premios 3D CC0 (en ese orden; decisiones en ROADMAP).
 

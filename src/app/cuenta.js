@@ -2,6 +2,7 @@
 // de personaje (básico con muestras, avanzado con RGB). Acá viven el nombre, la bio y el look propios.
 import { api, session } from '../net/api.js';
 import { DEFAULT_LOOK, LOOK_OPTIONS, outfitOf } from '../player/avatar.js';
+import { MH_GARMENTS, MH_ACCESSORIES, MH_FACE, MH_BROWS } from '../../server/avatarCatalog.js';
 import { colorPicker } from '../ui/colorpicker.js';
 import { setRegister } from '../ui/guest.js';
 import { BODY_TYPES } from '../../server/shared.js';
@@ -136,7 +137,7 @@ const BASIC = [
 const ADVANCED = [
   ['hairStyle', 'Peinado'], ['hair', 'Color de pelo'], ['beardStyle', 'Tipo de barba'], ['eyes', 'Color de ojos'], ['skin', 'Piel'],
   ['top', 'Arriba'], ['shirt', 'Color de arriba'], ['bottom', 'Abajo'], ['pants', 'Color de abajo'],
-  ['feet', 'Calzado'], ['shoes', 'Color del calzado'],
+  ['feet', 'Calzado'], ['shoes', 'Color del calzado'], ['hat', 'Sombrero'], ['glasses', 'Anteojos'], ['brows', 'Cejas'], ['face', 'Cara'],
 ];
 const CHIP_LABELS = {
   masc: 'masculino', fem: 'femenino', false: 'sin barba', true: 'con barba', flequillo: 'corto con flequillo',
@@ -186,7 +187,10 @@ function colorGroup(key, title, palette, rerender) {
   return group;
 }
 const selected = (key) => (v) => (key in outfitOf(look) ? outfitOf(look)[key] : look[key]) === v;
-const labelOf = (v) => CHIP_LABELS[v] ?? v;
+const labelOf = (v) => CHIP_LABELS[v] ?? MH_GARMENTS[v]?.name.toLowerCase() ?? MH_ACCESSORIES[v]?.name.toLowerCase()
+  ?? (MH_BROWS.includes(v) ? `cejas ${MH_BROWS.indexOf(v) + 1}` : v === '' ? 'ninguno' : v);
+// Ropa en el básico: las de siempre (y la elegida en el avanzado, si es otra)
+const BASIC_CLOTHES = { top: ['remera', 'mangalarga', 'camisa', 'campera'], bottom: ['jean', 'short', 'calza', 'pollera'], feet: ['zapatillas', 'botas', 'zapatos'] };
 const pickKey = (key) => (v) => setLook({ ...look, [key]: v });
 
 function renderSwatches() {
@@ -201,8 +205,9 @@ function renderSwatches() {
       root.append(colorGroup(key, title, LOOK_OPTIONS[key].slice(0, BASIC_COLORS), renderSwatches));
     } else {
       // Peinado: los principales (y el elegido en el avanzado, si es otro)
-      const values = key === 'hairStyle' && !BASIC_HAIR.includes(look.hairStyle) && LOOK_OPTIONS.hairStyle.includes(look.hairStyle)
-        ? [...BASIC_HAIR, look.hairStyle] : key === 'hairStyle' ? BASIC_HAIR : LOOK_OPTIONS[key];
+      const basic = key === 'hairStyle' ? BASIC_HAIR : BASIC_CLOTHES[key];
+      const cur = key in outfitOf(look) ? outfitOf(look)[key] : look[key];
+      const values = !basic ? LOOK_OPTIONS[key] : basic.includes(cur) || !LOOK_OPTIONS[key].includes(cur) ? basic : [...basic, cur];
       root.append(swatchGroup(title, values, selected(key), labelOf, pickKey(key)));
     }
   }
@@ -213,7 +218,14 @@ function renderAdvanced() {
   const root = $('rgb-colors');
   root.innerHTML = '';
   for (const [key, title] of ADVANCED) {
-    if (key === 'beardStyle') {
+    if (key === 'face') {
+      // Presets de cara: uno por zona (forma, ojos, nariz, mejillas, orejas); "normal" = sin cambio
+      for (const [zone, z] of Object.entries(MH_FACE)) {
+        root.append(swatchGroup(z.name, ['', ...Object.keys(z.options)], (v) => (look.face?.[zone] ?? '') === v,
+          (v) => (v === '' ? 'normal' : z.options[v].name.toLowerCase()),
+          (v) => setLook({ ...look, face: { ...look.face, [zone]: v || undefined } }), renderAdvanced));
+      }
+    } else if (key === 'beardStyle') {
       // Barba: sin barba o cualquiera de los tipos
       root.append(swatchGroup('Barba', [false, ...LOOK_OPTIONS.beardStyle], (v) => (v === false ? !look.beard : look.beard && (look.beardStyle ?? 'completa') === v),
         (v) => (v === false ? CHIP_LABELS.false : labelOf(v)), (v) => setLook(v === false ? { ...look, beard: false } : { ...look, beard: true, beardStyle: v }), renderAdvanced));

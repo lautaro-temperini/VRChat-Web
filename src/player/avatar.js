@@ -3,7 +3,8 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { buildAccessory } from './accessories.js';
-import { ITEMS, EMOTES, STAMP_SIZES } from '../../server/shared.js';
+import { ITEMS, EMOTES, STAMP_SIZES, TOPS, BOTTOMS, FEET, HATS, GLASSES, BROWS } from '../../server/shared.js';
+import { MH_GARMENTS, MH_ACCESSORIES, MH_FACE, faceKey, morphKey } from '../../server/avatarCatalog.js';
 import { loadGLTF } from '../loaders.js';
 import { fitDesignModel } from '../world/designModel.js';
 import { designFileUrl } from '../net/api.js';
@@ -20,7 +21,7 @@ import { LOCO, locomotionClips, gestureClip } from './anims.js';
 export const DEFAULT_LOOK = {
   body: 'masc', skin: '#d9a07a', hair: '#3b2416', hairStyle: 'corto', beard: false, beardStyle: 'completa', eyes: '#4a3020',
   top: 'remera', bottom: 'jean', feet: 'zapatillas', shirt: '#ff7a3d', pants: '#2b3445', shoes: '#f4f4f4',
-  height: 1.75, weight: 0.5, muscle: 0.5,
+  height: 1.75, weight: 0.5, muscle: 0.5, hat: '', glasses: '', brows: 'eyebrow001', face: {},
 };
 
 export const LOOK_OPTIONS = {
@@ -31,9 +32,12 @@ export const LOOK_OPTIONS = {
   beard: [false, true],
   beardStyle: ['completa', 'tupida', 'candado', 'bigote'],
   eyes: ['#4a3020', '#2e6b8a', '#3d7a3d', '#8a6a2a', '#1d1d1d', '#8a4be2'],
-  top: ['remera', 'mangalarga', 'camisa', 'campera'],
-  bottom: ['jean', 'short', 'calza', 'pollera'],
-  feet: ['zapatillas', 'botas', 'zapatos'],
+  top: TOPS.filter((t) => t !== 'buzo'),
+  bottom: BOTTOMS,
+  feet: FEET,
+  hat: ['', ...HATS],
+  glasses: ['', ...GLASSES],
+  brows: BROWS,
   shirt: ['#f4f4f4', '#1d1d22', '#ff7a3d', '#3a7bd5', '#e63946', '#2a9d8f', '#ffd23f', '#8a4be2', '#ff6fb5', '#5ad17a'],
   pants: ['#2b3445', '#1d1d22', '#4b6a8f', '#7a6a55', '#3d5a3a', '#e8e1d0', '#8a3a3a'],
   shoes: ['#f4f4f4', '#1d1d22', '#ff7a3d', '#3a7bd5', '#e63946', '#ffd23f'],
@@ -53,16 +57,43 @@ const BODIES = {
 const hairFile = (type, style) => `hair/${type}/${style}.gltf`;
 const beardFile = (type, style) => `hair/${type}/barba_${style}.gltf`;
 const clothFile = (type, garment) => `clothes/${type}/${garment}.gltf`;
-// Orden de los bits de "_cover" (igual que GARMENTS en assets-src/makehuman/build.py)
-const GARMENT_BITS = ['remera', 'mangalarga', 'camisa', 'campera', 'jean', 'short', 'calza', 'pollera', 'zapatillas', 'botas', 'zapatos'];
+const accFile = (type, id) => `acc/${type}/${id}.gltf`;
+// Orden de los bits de "_cover0..3" (16 por atributo; el mismo orden que el catálogo y build.py)
+const GARMENT_BITS = Object.keys(MH_GARMENTS);
+const COVER_ATTRS = 4;
+// Bits de las prendas puestas, por atributo
+function hideBits(garments) {
+  const out = new Array(COVER_ATTRS).fill(0);
+  for (const g of garments) {
+    const i = GARMENT_BITS.indexOf(g);
+    if (i >= 0) out[i >> 4] |= 1 << (i & 15);
+  }
+  return out;
+}
+// Premios equipados que cambian al personaje: { acc: [ids], feet, skin, morphs: [ids], head, face }
+function prizesOf(equip = []) {
+  const out = { acc: [], feet: null, skin: null, morphs: [], head: false, face: false };
+  for (const it of equip) {
+    const def = ITEMS[it.type];
+    if (!def) continue;
+    if (def.mh === 'acc') out.acc.push(it.type);
+    else if (def.mh === 'cloth') out.feet = it.type;
+    else if (def.mh === 'skin') out.skin = it.type;
+    else if (def.mh === 'morph') out.morphs.push(it.type);
+    if (def.slot === 'head') out.head = true;
+    if (def.slot === 'face') out.face = true;
+  }
+  return out;
+}
 // Prenda de cada lugar según el look (con los valores viejos que ya no se ofrecen)
 const LEGACY_TOP = { buzo: 'mangalarga' };
 const pick = (list, v, fallback) => (list.includes(v) ? v : fallback);
-export function outfitOf(L) {
+export function outfitOf(L, equip) {
   return {
     top: pick(LOOK_OPTIONS.top, LEGACY_TOP[L.top] ?? L.top, 'remera'),
     bottom: pick(LOOK_OPTIONS.bottom, L.bottom, 'jean'),
-    feet: pick(LOOK_OPTIONS.feet, L.feet, 'zapatillas'),
+    // El calzado de premio (equipado) reemplaza al elegido en el editor
+    feet: (equip && prizesOf(equip).feet) || pick(LOOK_OPTIONS.feet, L.feet, 'zapatillas'),
   };
 }
 
@@ -70,6 +101,19 @@ export function outfitOf(L) {
 const manager = new THREE.LoadingManager();
 const loader = new GLTFLoader(manager);
 const cache = new Map();
+const texLoader = new THREE.TextureLoader(manager);
+const texCache = new Map();
+// Texturas sueltas (cejas, pieles de premio), como las de los glTF: sin dar vuelta y en sRGB
+function loadTex(name) {
+  if (!texCache.has(name)) {
+    texCache.set(name, texLoader.loadAsync(`${BASE}textures/${name}`).then((t) => {
+      t.flipY = false;
+      t.colorSpace = THREE.SRGBColorSpace;
+      return t;
+    }));
+  }
+  return texCache.get(name);
+}
 let lowRes = false;
 // En calidad baja (celulares) se usan las texturas de 1K en lugar de las de 2K
 export function setTextureQuality(quality) { lowRes = quality === 'low'; }
@@ -99,19 +143,22 @@ function bodyMaterial(base, uniforms) {
     Object.assign(shader.uniforms, uniforms);
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', `#include <common>
-        attribute float _cover;
-        uniform int uHide;
+        attribute float _cover0, _cover1, _cover2, _cover3;
+        uniform int uHide0, uHide1, uHide2, uHide3;
         varying float vHidden;`)
       .replace('#include <begin_vertex>', `#include <begin_vertex>
-        vHidden = (int(_cover + 0.5) & uHide) != 0 ? 1.0 : 0.0;`);
+        vHidden = ((int(_cover0 + 0.5) & uHide0) | (int(_cover1 + 0.5) & uHide1)
+          | (int(_cover2 + 0.5) & uHide2) | (int(_cover3 + 0.5) & uHide3)) != 0 ? 1.0 : 0.0;`);
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', `#include <common>
         uniform vec3 uSkin, uRefSkin;
+        uniform float uTint;
         varying float vHidden;`)
       .replace('#include <map_fragment>', `
         if (vHidden > 0.5) discard;
         vec4 texel = texture2D(map, vMapUv);
-        diffuseColor.rgb *= texel.rgb / uRefSkin * uSkin;`);
+        // Piel teñida con el color elegido; las pieles de premio van con su textura (uTint = 0)
+        diffuseColor.rgb *= mix(texel.rgb, texel.rgb / uRefSkin * uSkin, uTint);`);
   };
   m.customProgramCacheKey = () => 'avatar-body';
   return m;
@@ -302,7 +349,7 @@ export class Avatar {
     this.uniforms = {
       uSkin: { value: M.skin.color }, uShirt: { value: M.shirt.color }, uPants: { value: M.pants.color },
       uShoes: { value: M.shoes.color }, uEye: { value: M.eyes.color }, uRefSkin: { value: REF_SKIN.masc },
-      uHide: { value: 0 },
+      uHide0: { value: 0 }, uHide1: { value: 0 }, uHide2: { value: 0 }, uHide3: { value: 0 }, uTint: { value: 1 },
     };
 
     // Caja invisible para apuntarle con la E / el click (más barata que la malla animada)
@@ -321,7 +368,8 @@ export class Avatar {
       a.group.traverse((o) => { if (o.isMesh) { o.geometry.dispose(); o.material.dispose(); } });
     }
     this.equip = list;
-    this.accessories = list.filter((it) => ITEMS[it.type]).map((it) => {
+    // Los premios de MakeHuman no se arman por código: se cargan con la ropa (syncHair)
+    this.accessories = list.filter((it) => ITEMS[it.type] && !ITEMS[it.type].mh).map((it) => {
       const a = buildAccessory(it.type, it.color);
       a.group.traverse((o) => { if (o.isMesh) o.raycast = noRaycast; });
       return { ...a, type: it.type };
@@ -404,7 +452,12 @@ export class Avatar {
       const name = o.material.name;
       if (isBodyMaterial(name)) { o.material = bodyMaterial(o.material, this.uniforms); body = o; }
       else if (/Eyes/i.test(name)) o.material = eyeMaterial(o.material, this.uniforms);
-      else { o.material = o.material.clone(); o.material.color = this.mats.hair.color; o.userData.hair = true; } // cejas
+      else {  // cejas y pestañas
+        o.material = o.material.clone();
+        o.material.color = this.mats.hair.color;
+        o.userData.hair = true;
+        if (/^Brows/.test(name)) { o.userData.brows = true; o.userData.baseMap = o.material.map; }
+      }
       meshes.push(o);
     });
     this.uniforms.uRefSkin.value = REF_SKIN[type] ?? REF_SKIN.masc;
@@ -437,8 +490,36 @@ export class Avatar {
     this.root.add(scene);
     this.attachAccessories();
     this.applyStamp();
+    this.baseSkin = body?.material.map ?? null;
     this.applyShape();
     this.syncHair();
+  }
+
+  // Piel de premio y cejas: cambian la textura (las cejas siguen teñidas con el color del pelo)
+  async applyTextures() {
+    const m = this.model;
+    if (!m) return;
+    const L = this.look;
+    const skin = prizesOf(this.equip).skin;
+    const brows = BROWS.includes(L.brows) && L.brows !== BROWS[0] ? L.brows : null;
+    const key = `${skin}|${brows}`;
+    if (m.texKey === key) return;
+    m.texKey = key;
+    const [skinTex, browTex] = await Promise.all([
+      skin ? loadTex(`skin_${skin}.jpg`).catch(() => null) : null,
+      brows ? loadTex(`brows_${brows}.png`).catch(() => null) : null,
+    ]);
+    if (this.model !== m || m.texKey !== key) return;
+    if (m.body) {
+      m.body.material.map = skinTex ?? this.baseSkin;
+      m.body.material.needsUpdate = true;
+      this.uniforms.uTint.value = skinTex ? 0 : 1;
+    }
+    for (const o of m.meshes) {
+      if (!o.userData.brows) continue;
+      o.material.map = browTex ?? o.userData.baseMap;
+      o.material.needsUpdate = true;
+    }
   }
 
   // Peinado, barba y ropa: se cargan aparte y se enganchan al esqueleto del cuerpo
@@ -447,17 +528,23 @@ export class Avatar {
     if (!m) return;
     const L = this.look;
     const style = LEGACY_HAIR[L.hairStyle] ?? L.hairStyle;
-    const outfit = outfitOf(L);
-    // [archivo, qué es, color]
+    const outfit = outfitOf(L, this.equip);
+    const prizes = prizesOf(this.equip);
+    this.applyTextures();
+    // [archivo, qué es, color] (sin color: va con su textura, sin teñir)
     const parts = [
       [hairFile(m.type, LOOK_OPTIONS.hairStyle.includes(style) ? style : 'corto'), style, this.mats.hair],
       L.beard ? [beardFile(m.type, pick(LOOK_OPTIONS.beardStyle, L.beardStyle, 'completa')), 'barba', this.mats.hair] : null,
       [clothFile(m.type, outfit.top), 'top', this.mats.shirt],
       [clothFile(m.type, outfit.bottom), 'bottom', this.mats.pants],
-      [clothFile(m.type, outfit.feet), 'feet', this.mats.shoes],
+      [clothFile(m.type, outfit.feet), 'feet', prizes.feet ? null : this.mats.shoes],
+      // Sombrero y anteojos del editor (un premio en la cabeza o en la cara los reemplaza)
+      L.hat && HATS.includes(L.hat) && !prizes.head ? [accFile(m.type, L.hat), 'hat', null] : null,
+      L.glasses && GLASSES.includes(L.glasses) && !prizes.face ? [accFile(m.type, L.glasses), 'acc', null] : null,
+      ...prizes.acc.map((id) => [accFile(m.type, id), ITEMS[id].slot === 'head' ? 'hat' : 'acc', null]),
     ].filter(Boolean);
     // La piel que tapan las prendas puestas no se dibuja
-    this.uniforms.uHide.value = Object.values(outfit).reduce((bits, g) => bits | (1 << GARMENT_BITS.indexOf(g)), 0);
+    hideBits(Object.values(outfit)).forEach((bits, i) => { this.uniforms[`uHide${i}`].value = bits; });
     const key = parts.map((p) => p[0]).join('+');
     this.updateHairVisibility();
     if (m.hairKey === key) return;
@@ -474,7 +561,7 @@ export class Avatar {
         const mesh = new THREE.SkinnedMesh(o.geometry, o.material.clone());
         // La textura viene en gris: se tiñe con el color elegido (las medias quedan blancas)
         const socks = /^Socks/.test(o.material.name);
-        if (!socks) mesh.material.color = mat.color;
+        if (!socks && mat && !/^Acc_/.test(o.material.name)) mesh.material.color = mat.color;
         // Con calza las medias atraviesan la tela en los tobillos: van tapadas
         mesh.userData.hidden = socks && outfit.bottom === 'calza';
         mesh.castShadow = true;
@@ -493,8 +580,13 @@ export class Avatar {
 
   // Con gorra o gorro no se ve el pelo corto (como en el personaje anterior)
   updateHairVisibility() {
-    const hat = (this.equip ?? []).some((it) => ITEMS[it.type]?.slot === 'head' && it.type !== 'crown');
-    for (const h of this.hairMeshes) h.visible = !h.userData.hidden && !(hat && h.userData.style === 'corto');
+    const hat = (this.equip ?? []).some((it) => ITEMS[it.type]?.slot === 'head' && it.type !== 'crown') || !!this.look.hat;
+    // Capuchas y la bolsa tapan todo el pelo (no la barba)
+    const covered = (this.equip ?? []).some((it) => MH_ACCESSORIES[it.type]?.hideHair);
+    const isHair = (style) => LOOK_OPTIONS.hairStyle.includes(style);
+    for (const h of this.hairMeshes) {
+      h.visible = !h.userData.hidden && !(hat && h.userData.style === 'corto') && !(covered && isHair(h.userData.style));
+    }
   }
 
   // Tipo de cuerpo (peso y músculo, 0..1; 0,5 = promedio), como los macros de MakeHuman: hay una forma
@@ -504,6 +596,12 @@ export class Avatar {
     const m = this.model;
     if (!m) return;
     const infl = shapeInfluences(this.look.weight, this.look.muscle);
+    // Presets de cara (uno por zona) y formas de animal de premio
+    for (const [zone, z] of Object.entries(MH_FACE)) {
+      const v = this.look.face?.[zone];
+      if (v && Object.hasOwn(z.options, v)) infl[faceKey(zone, v)] = 1;
+    }
+    for (const id of prizesOf(this.equip).morphs) infl[morphKey(id)] = 1;
     for (const o of [...m.meshes, ...this.hairMeshes]) {
       const dict = o.morphTargetDictionary;
       if (!dict) continue;
