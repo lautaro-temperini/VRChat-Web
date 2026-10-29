@@ -316,6 +316,18 @@ export class Room extends DurableObject {
     if (!current || current > next || current < now) await this.ctx.storage.setAlarm(Math.max(next, now + 200));
   }
 
+  // Lo que se guarda en memoria por persona se limpia cuando ya no hace falta (si no, en una sala con mucha
+  // gente que entra y sale crece sin límite hasta que la sala se duerme)
+  prune(now, present) {
+    for (const [k, at] of this.announced) if (now - at > ANNOUNCE_EVERY) this.announced.delete(k);
+    for (const [k, c] of this.ignoring) if (now - c.at > 30_000) this.ignoring.delete(k);
+    for (const map of [this.ginvites, this.kisses]) for (const [k, at] of map) if (now - at > 120_000) map.delete(k);
+    for (const [u, times] of this.chatTimes) if (!present.has(u) && !times.some((t) => now - t < FLOOD_WINDOW)) this.chatTimes.delete(u);
+    for (const [u, last] of this.lastText) if (!present.has(u) && now - last.at > REPEAT_WINDOW) this.lastText.delete(u);
+    // Última posición de quien se fue: alcanza con unos minutos (para validar si vuelve a entrar enseguida)
+    if (this.lastPos.size > 200) for (const u of this.lastPos.keys()) if (!present.has(u)) this.lastPos.delete(u);
+  }
+
   async alarm() {
     await this.load();
     const now = Date.now();
@@ -347,6 +359,7 @@ export class Room extends DurableObject {
       } else alive.push(m.userId);
     }
     if (alive.length) await this.accounts().presence(await this.roomName(), [...new Set(alive)]);
+    this.prune(now, new Set(alive));
     await roomEventTick(this); // progresión: asistir a eventos
     await this.scheduleAlarm();
   }

@@ -69,8 +69,14 @@ privacidad, favoritas, personaje con animaciones de Mixamo, inventario e interca
   editor: 16 de arriba, 15 de abajo, 24 calzados), sombreros y anteojos, 12 cejas, presets de cara por zona (forma,
   ojos, nariz, mejillas, orejas) y 63 premios nuevos (accesorios, calzado exótico, 18 pieles, 12 formas de animal).
   Catálogo en `server/avatarCatalog.js`; rarezas provisorias.
-- **Pendiente:** subir online (`npm run deploy`). Después: assets de MakeHuman, caras (presets), ojos de fantasía,
-  orejas y colas, premios 3D CC0 (en ese orden; decisiones en ROADMAP).
+- **Online (29/10):** deploy con hallazgos, salas y assets de MakeHuman.
+- **Después del deploy (29/10, sin subir todavía):** `/item <id>` para admins; celular y trago bien agarrados (brazo
+  por cinemática inversa); manos de 1ª persona al saltar; cartel de acción tocable y cruz del chat en celular; chat
+  corrido según dónde está quien habla; postura (hombros menos caídos); revisión de UX/UI con propuesta
+  ([ui-auditoria.md](ui-auditoria.md), falta que el dueño elija); menos llamadas de dibujo en mapas y salas
+  (Plaza 335 → 130); textos limpios en todas partes; tope de 64 KB a los pedidos JSON.
+- **Pendiente:** decidir la propuesta de UX/UI; premios 3D CC0 (Poly Pizza / Kenney / Quaternius) si se quieren;
+  revisar rarezas y nombres de los premios (`server/avatarCatalog.js`).
 
 ## Qué falta
 
