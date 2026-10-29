@@ -17,7 +17,7 @@ function pushLine(el) {
 const _v = new THREE.Vector3();
 function sideOf(id) {
   const r = id && id !== net.id ? G.remotes.get(id) : null;
-  if (!r) return 'center'; // yo, o alguien que ya no está (el historial al entrar)
+  if (!r) return id === net.id ? 'center' : 'left'; // yo al medio; el historial al entrar (sin posición), a la izquierda
   r.avatar.root.getWorldPosition(_v);
   _v.applyMatrix4(G.camera.matrixWorldInverse); // x: derecha de la cámara, z negativo: adelante
   const x = _v.z < 0 ? _v.x / -_v.z : Math.sign(_v.x) * 2; // detrás: según de qué lado está

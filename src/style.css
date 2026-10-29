@@ -401,7 +401,9 @@ body.roompanel #roompanel, body.mundi #mundi, body.kicked #kicked, body.controls
 .gesture-list { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .gesture-list .act { padding: 12px; }
 .gesture-list .sub-h { grid-column: 1 / -1; }
-#gestures .gesture-list { overflow-y: auto; }
+#gestures .gesture-list { overflow-y: auto; overflow-x: hidden; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+/* Bloques del panel del DJ: aire entre el texto y cada campo */
+.dj-block { display: flex; flex-direction: column; gap: 10px; }
 .panel.wide { width: min(460px, calc(100vw - 32px)); }
 .sub-h { font: 400 16px var(--display); text-transform: uppercase; letter-spacing: .5px; margin: 6px 0 0; color: var(--muted); }
 .check { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 14px; cursor: pointer; }
