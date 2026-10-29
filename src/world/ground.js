@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { buildAccessory } from '../player/accessories.js';
-import { ITEMS, FURNITURE, CONSUMABLES } from '../../server/shared.js';
+import { ITEMS, FURNITURE, CONSUMABLES, RARITIES, rarityOf } from '../../server/shared.js';
 import { miniFurniture } from './furniture.js';
 import { loadGLTF } from '../loaders.js';
 import { fitDesignModel } from './designModel.js';
@@ -30,12 +30,13 @@ export class Ground {
     // Diseños: su imagen o su modelo; muebles especiales: una versión chiquita del mueble
     const a = g.design ? { group: designMini(g.design) }
       : CONSUMABLES[g.type] ? { group: drinkMini(g.type) }
+      : ITEMS[g.type]?.mh ? { group: prizeMini(g.type) }
       : FURNITURE[g.type] ? { group: miniFurniture(g.type, g.color) } : buildAccessory(g.type, g.color);
     // Centrar el modelo (algunos están armados a la altura del pecho)
     const center = new THREE.Box3().setFromObject(a.group).getCenter(new THREE.Vector3());
     a.group.position.sub(center);
     spin.add(a.group);
-    spin.scale.setScalar(FURNITURE[g.type] || g.design || CONSUMABLES[g.type] ? 1 : 2.2);
+    spin.scale.setScalar(FURNITURE[g.type] || g.design || CONSUMABLES[g.type] || ITEMS[g.type]?.mh ? 1 : 2.2);
     const ring = new THREE.Mesh(this.ringGeo, new THREE.MeshBasicMaterial({ color: 0xffd60a, transparent: true, opacity: 0.55, depthWrite: false }));
     ring.position.y = 0.02;
     group.add(ring);
@@ -126,5 +127,24 @@ function drinkMini(type) {
     g.add(new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.08, 0.26, 24), new THREE.MeshStandardMaterial({ color, roughness: 0.2, transparent: true, opacity: 0.9 })));
     g.add(new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.09, 0.3, 24, 1, true), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.05, transparent: true, opacity: 0.3 })));
   }
+  return g;
+}
+
+// Premios de MakeHuman en el piso (sombreros, colas, pieles…): un paquete de regalo del color de su rareza
+function prizeMini(type) {
+  const g = new THREE.Group();
+  const color = new THREE.Color(RARITIES[rarityOf(type)].color);
+  const box = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.22, 0.26), new THREE.MeshStandardMaterial({ color, roughness: 0.5 }));
+  box.position.y = 0.11;
+  const ribbon = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.4 });
+  for (const [w, d] of [[0.27, 0.05], [0.05, 0.27]]) {
+    const band = new THREE.Mesh(new THREE.BoxGeometry(w, 0.225, d), ribbon);
+    band.position.y = 0.11;
+    g.add(band);
+  }
+  const bow = new THREE.Mesh(new THREE.TorusGeometry(0.045, 0.015, 8, 16), ribbon);
+  bow.position.y = 0.24;
+  g.add(box, bow);
+  g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
   return g;
 }
