@@ -83,6 +83,11 @@ mueble especial a cada cuenta nueva (`TEST_STARTER_EXTRA`). No edites `server/` 
 - **Salas personales y editor** (`src/world/rooms.js`, `templates.js`, `furniture.js`, `editor.js`; servidor
   `server/editor.js`): el diseño de cada sala vive en el storage de su Room (clave `layout`); catálogos
   `ROOM_TEMPLATES` y `FURNITURE` en `server/shared.js`. Muebles especiales puestos: `items.owner_id = 'room:<id>'`.
+- **Varias salas por persona** (`server/rooms.js` mezclado en `Accounts`, tabla `rooms`): hasta 3, `u-<id de sala>`; la
+  primera tiene el id de la cuenta. Plantilla fija (se elige al crear; la primera, al entrar por primera vez). Nombre,
+  privacidad, corazones (`hearts.owner` = sala) y notas del atril (`notes.room`) son de cada sala. Rutas `myrooms`,
+  `rooms?owner=`, `roomcreate`, `roomdelete` (la sala echa a todos y devuelve los especiales: `destroy`), `myroom` (con
+  `id`). La sala pregunta su dueño a la cuenta (`roomInfo`/`ownerId`); los invitados no tienen sala (`noroom`).
 - **Mapas públicos** (`PUBLIC_MAPS` en `server/shared.js`): salas sin dueño con plantilla (`ROOM_TEMPLATES` con
   `public: true`, cascarón en `templates.js`) y muebles fijos; el servidor arma su diseño en `layout()` (editor.js) y
   nadie lo edita. El cliente los arma con `rooms.js` (como las salas personales, sin editor). Salas válidas: `isRoomName`.
@@ -108,7 +113,7 @@ mueble especial a cada cuenta nueva (`TEST_STARTER_EXTRA`). No edites `server/` 
   `npm run dev` comunes corren juntos, el segundo NO toma el 8787 y su página habla con el primero.
 - **Red social** (`src/ui/phone.js`, `notes.js`, `gallery.js`, `src/world/lectern.js`): el celular es el
   panel `#friends`; mensaje de sala `phone` (el personaje lo saca). Rutas: `photos`, `photo` (archivo),
-  `notes`/`note`, `hearts`/`heart`, `roominfo`/`myroom`, `favorites`/`favorite`, `search`, `notifications`.
+  `notes`/`note`, `hearts`/`heart`, `roominfo`/`myroom`/`myrooms`, `favorites`/`favorite`, `search`, `notifications`.
   Las fotos se guardan en SQLite del Durable Object de cuentas (no R2, para no necesitar tarjeta).
 - **PowerShell 5.1** lee UTF-8 sin BOM como ANSI y rompe los acentos: para editar archivos con
   scripts usar `[IO.File]::ReadAllText/WriteAllText` con UTF-8, o las herramientas de edición.
@@ -135,7 +140,7 @@ mueble especial a cada cuenta nueva (`TEST_STARTER_EXTRA`). No edites `server/` 
   en ingreso y cuentas nuevas (`limits`); salas válidas: `isRoomName` (`museo`, los mapas públicos y `u-<16 hex>`).
 - **Catálogos compartidos** (objetos, peinados, validaciones) en `server/shared.js`, importados
   también por el cliente.
-- **Admins:** `wrangler.jsonc` → `vars.ADMIN_IDS`. El dueño de una sala `u-<id>` es esa cuenta. Los
+- **Admins:** `wrangler.jsonc` → `vars.ADMIN_IDS`. El dueño de una sala `u-<id>` está en la tabla `rooms`. Los
   admins entran también a salas cerradas.
 - La interfaz de avatar (`setLook`, `setEquip`, `gesture(nombre)`, `update(dt, {speed, pose, turn, landing})`,
   `root`, `scale`, `phase`, `mats.skin/shirt`) la usan el controlador, los jugadores remotos y los brazos

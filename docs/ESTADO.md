@@ -60,6 +60,14 @@ privacidad, favoritas, personaje con animaciones de Mixamo, inventario e interca
   copias ilimitadas para regalar; título Diseñador (solo reconocimiento).
 - **Stamina:** cualquier consumible o gesto con consentimiento → 2 minutos sin gastar.
 
+### 26 al 29/10
+- **Hallazgos de las pruebas con agentes** (docs/hallazgos.md): todos cerrados según docs/decisiones-hallazgos.md,
+  cada uno con su prueba (`npm test`: 97 pruebas).
+- **Varias salas por persona:** hasta 3, plantilla fija al crear, ajustes/corazones/notas por sala, borrar con
+  confirmación desde el Mapa (`server/rooms.js`).
+- **Pendiente:** subir online (`npm run deploy`). Después: assets de MakeHuman, caras (presets), ojos de fantasía,
+  orejas y colas, premios 3D CC0 (en ese orden; decisiones en ROADMAP).
+
 ## Qué falta
 
 ### Online ✅ (24/10)

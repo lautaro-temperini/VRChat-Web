@@ -44,17 +44,13 @@ test('solo moderan los mods: en el Museo nadie que no sea admin', async () => {
   await ca.close(); await cb.close();
 });
 
-test('el dueño no puede moderar a un admin ni el invitado es dueño de "su" sala', async () => {
+test('el invitado no tiene sala propia (no es dueño de "su" sala)', async () => {
   const g = await guest(), b = await account('mo');
-  const cg = await joined(g.token, `u-${g.user.id}`);
-  assert.equal(cg.welcome.room.mod, false, 'un invitado no modera');
-  const cb = await joined(b.token, `u-${g.user.id}`).catch(() => null);
-  if (cb) {
-    cg.send({ t: 'mod', op: 'kick', target: cb.id });
-    await cg.wait((m) => m.t === 'notice' && /permisos/.test(m.text));
-    await cb.close();
+  for (const token of [g.token, b.token]) {
+    const c = new Client(token, `u-${g.user.id}`);
+    assert.equal((await c.join()).code, 'noroom');
+    await c.close();
   }
-  await cg.close();
 });
 
 test('antiflood general: una ráfaga de posiciones no se reenvía entera', async () => {

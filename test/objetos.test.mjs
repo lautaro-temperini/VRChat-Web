@@ -2,7 +2,7 @@
 // (objetos ajenos, doble aceptación, cosas que cambian de dueño a mitad, acciones a la vez).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { account, guest, joined, inventory, moveTo, sleep, api } from './helpers.mjs';
+import { account, guest, joined, inventory, moveTo, sleep, api, Client } from './helpers.mjs';
 
 // Abre un intercambio entre dos clientes ya conectados
 async function openTrade(ca, cb) {
@@ -210,9 +210,9 @@ test('editor: solo edita el dueño, y los invitados no tienen sala para editar',
   const cb = await joined(b.token, `u-${a.user.id}`);
   cb.send({ t: 'edit', op: 'add', piece: { id: 'x1', type: 'silla', x: 0, z: 0 } });
   await cb.wait((m) => m.t === 'notice' && /dueño/.test(m.text));
-  const cg = await joined(g.token, `u-${g.user.id}`);
-  cg.send({ t: 'edit', op: 'template', template: 'club' });
-  assert.ok(await cg.none('layout'));
+  // El invitado no tiene sala: la suya no existe
+  const cg = new Client(g.token, `u-${g.user.id}`);
+  assert.equal((await cg.join()).code, 'noroom');
   await ca.close(); await cb.close(); await cg.close();
 });
 
