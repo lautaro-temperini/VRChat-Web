@@ -438,3 +438,12 @@ test('/item: solo los admins se dan objetos', async () => {
   }
   assert.ok(!(await inventory(a.token)).some((i) => i.type === 'crown'));
 });
+
+test('API: un pedido JSON gigante no se lee (413)', async () => {
+  const a = await account('gz');
+  const big = JSON.stringify({ text: 'x'.repeat(200_000) });
+  const r = await api('note', { method: 'POST', token: a.token, raw: big, headers: { 'content-type': 'application/json' } });
+  assert.equal(r.status, 413);
+  // Uno normal sigue andando
+  assert.ok((await api('note', { method: 'POST', token: a.token, body: { text: 'hola' } })).ok);
+});

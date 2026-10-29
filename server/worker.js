@@ -14,6 +14,27 @@ const FILE_HEADERS = { 'x-content-type-options': 'nosniff', 'content-security-po
 
 import { isRoomName } from './shared.js';
 
+// Lee el cuerpo como texto, cortando si pasa de max bytes (aunque no venga content-length): null si es más grande
+const JSON_MAX = 64_000;
+async function readLimited(request, max) {
+  if (Number(request.headers.get('content-length') ?? 0) > max) return null;
+  if (!request.body) return '';
+  const reader = request.body.getReader();
+  const parts = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > max) { reader.cancel().catch(() => {}); return null; }
+    parts.push(value);
+  }
+  const all = new Uint8Array(size);
+  let at = 0;
+  for (const p of parts) { all.set(p, at); at += p.byteLength; }
+  return new TextDecoder().decode(all);
+}
+
 // Direcciones a las que la vista previa no entra (la red propia, la del proveedor, etc.)
 const PRIVATE_HOST = /^(localhost|.*\.localhost|.*\.local|.*\.internal|0\.|127\.|10\.|192\.168\.|169\.254\.|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.|172\.(1[6-9]|2\d|3[01])\.|\[)/i;
 const PREVIEW_MAX = 2_000_000; // bytes de HTML que se leen como mucho
@@ -153,7 +174,11 @@ async function api(request, env, path) {
   const ip = request.headers.get('CF-Connecting-IP') ?? '';
   let body = {};
   if (request.method !== 'GET') {
-    try { body = await request.json(); } catch { body = {}; }
+    // Los pedidos JSON son chicos (textos de hasta unos cientos de caracteres): más de 64 KB no se lee
+    const raw = await readLimited(request, JSON_MAX);
+    if (raw === null) return json({ ok: false, error: 'Pedido demasiado grande.' }, 413);
+    try { body = JSON.parse(raw || '{}'); } catch { body = {}; }
+    if (!body || typeof body !== 'object') body = {};
   }
   let result;
   switch (`${request.method} ${path}`) {
