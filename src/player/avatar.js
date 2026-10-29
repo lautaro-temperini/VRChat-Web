@@ -187,6 +187,10 @@ function eyeMaterial(base, uniforms) {
 const _q = new THREE.Quaternion(), _qe = new THREE.Quaternion(), _e = new THREE.Euler();
 const qx = (a) => new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), a);
 const qz = (a) => new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), a);
+const _X = new THREE.Vector3(1, 0, 0), _Y = new THREE.Vector3(0, 1, 0);
+// Corrección de postura (radianes; ver posture())
+const POSTURE = { shoulders: 0.14, neck: 0.08 };
+if (import.meta.env.DEV) window.__POSTURE = POSTURE;
 // De pose T a brazos abajo
 const ARM_DOWN = { [-1]: qz(Math.PI / 2), 1: qz(-Math.PI / 2) };
 const ARM_DOWN_INV = { [-1]: ARM_DOWN[-1].clone().invert(), 1: ARM_DOWN[1].clone().invert() };
@@ -777,7 +781,7 @@ export class Avatar {
     J.tilt = damp(J.tilt, THREE.MathUtils.clamp(-turn * 0.07, -0.22, 0.22) * am + (gp.tilt ?? 0) * gw, 8, dt);
     J.roll = damp(J.roll, V.roll * vault, 16, dt); // de costado (solo al saltar una baranda)
     J.neck = damp(J.neck, -lean * 0.7, 10, dt);
-    if (this.model?.anim) this.animate(dt, speed, gw);
+    if (this.model?.anim) { this.animate(dt, speed, gw); this.posture(); }
     else this.applyPose(J, am);
     // Celular: pisa el brazo derecho y baja un poco la cabeza (también caminando)
     this.phoneW = damp(this.phoneW, this.phone ? 1 : 0, 8, dt);
@@ -856,6 +860,15 @@ export class Avatar {
     R.euler('spine_03', P.lean, 0, 0);
     R.euler('neck_01', P.neck + 0.12 * nod, 0, 0);
     names.forEach((n, k) => { const b = R.bones[n].bone; b.quaternion.copy(saved[k].slerp(b.quaternion, w)); });
+  }
+
+  // Postura: las animaciones adaptadas al esqueleto dejan los hombros caídos hacia adelante y la cabeza
+  // adelantada; se tiran las clavículas un poco hacia atrás y se endereza el cuello
+  posture() {
+    const R = this.model.rig, P = POSTURE;
+    R.add('clavicle_l', _qe.setFromAxisAngle(_Y, P.shoulders));
+    R.add('clavicle_r', _qe.setFromAxisAngle(_Y, -P.shoulders));
+    R.add('neck_01', _qe.setFromAxisAngle(_X, -P.neck));
   }
 
   // Brazo derecho doblado hacia adelante, la mano con la palma para arriba (para sostener un objeto)
