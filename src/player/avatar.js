@@ -652,6 +652,12 @@ export class Avatar {
       gltf.scene.traverse((o) => {
         if (!o.isSkinnedMesh) return;
         const mesh = new THREE.SkinnedMesh(o.geometry, o.material.clone());
+        // Los nombres de las formas (w0_m0, f_cara_…) los pone el cargador en la malla, no en la geometría:
+        // sin esto la malla nueva solo tiene "0", "1"… y no sigue el peso, el músculo ni la cara
+        if (o.morphTargetDictionary) {
+          mesh.morphTargetDictionary = { ...o.morphTargetDictionary };
+          mesh.morphTargetInfluences = new Array(o.morphTargetInfluences.length).fill(0);
+        }
         // La textura viene en gris: se tiñe con el color elegido (las medias quedan blancas)
         const socks = /^Socks/.test(o.material.name);
         if (!socks && mat && !/^Acc_/.test(o.material.name)) mesh.material.color = mat.color;

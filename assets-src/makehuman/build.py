@@ -272,7 +272,11 @@ for key, o in parts.items():
     pc = np.empty(len(o.data.vertices) * 3)
     o.data.vertices.foreach_get('co', pc)
     pc = pc.reshape(-1, 3)
-    near = np.array([[j for _, j, _ in kd.find_n(Vector(c), 4)] for c in pc])
+    found = [kd.find_n(Vector(c), 8) for c in pc]
+    near = np.array([[j for _, j, _ in f] for f in found])
+    # Peso por distancia (el punto de piel de abajo manda más que los de al lado)
+    wts = np.array([[1.0 / max(dist, 1e-4) for _, _, dist in f] for f in found])
+    wts /= wts.sum(axis=1, keepdims=True)
     o.shape_key_add(name='Basis')
     shapes = dict(states)
     if key in head_parts:
@@ -281,7 +285,11 @@ for key, o in parts.items():
         if k == 'w5_m5':
             continue
         delta = st[idx] - base
-        d = delta[near].mean(axis=1)
+        d = (delta[near] * wts[:, :, None]).sum(axis=1)
+        # Lo que va sobre la cabeza (pelo, sombreros…) se corre un poco más que la piel en las formas de la cara:
+        # así el cuero cabelludo no lo atraviesa cuando la cabeza se agranda
+        if key in head_parts and key not in ('eyes', 'brows', 'lashes') and k in extra:
+            d *= 1.15
         if not np.abs(d).max() > 1e-5:
             continue  # esta forma no mueve esta parte: no se guarda
         o.shape_key_add(name=k, from_mix=False).data.foreach_set('co', (pc + d).ravel())

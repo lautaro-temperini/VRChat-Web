@@ -158,7 +158,7 @@ export const MH_FACE = {
       cuadrada: { name: 'Cuadrada', targets: [['sys:head/head-square', 1], ['sys:chin/chin-width-incr', 0.4]] },
       corazon: { name: 'Corazón', targets: [['sys:head/head-invertedtriangular', 1], ['sys:chin/chin-triangle', 0.6]] },
       diamante: { name: 'Diamante', targets: [['sys:head/head-diamond', 1]] },
-      alargada: { name: 'Alargada', targets: [['sys:head/head-rectangular', 1], ['sys:head/head-scale-vert-incr', 0.4]] },
+      alargada: { name: 'Alargada', targets: [['sys:head/head-rectangular', 1], ['sys:head/head-scale-vert-incr', 0.2]] },
     },
   },
   ojos: {

@@ -1143,10 +1143,14 @@
 			"extras":{
 				"targetNames":[
 					"w0_m0",
-					"w10_m0"
+					"w0_m5",
+					"w0_m10",
+					"w5_m10",
+					"w10_m0",
+					"w10_m10"
 				]
 			},
-			"name":"maleflipflops1.012",
+			"name":"maleflipflops1.003",
 			"primitives":[
 				{
 					"attributes":{
@@ -1164,11 +1168,27 @@
 						},
 						{
 							"POSITION":7
+						},
+						{
+							"POSITION":8
+						},
+						{
+							"POSITION":9
+						},
+						{
+							"POSITION":10
+						},
+						{
+							"POSITION":11
 						}
 					]
 				}
 			],
 			"weights":[
+				0,
+				0,
+				0,
+				0,
 				0,
 				0
 			]
@@ -1189,7 +1209,7 @@
 	],
 	"skins":[
 		{
-			"inverseBindMatrices":8,
+			"inverseBindMatrices":12,
 			"joints":[
 				52,
 				51,
@@ -1300,14 +1320,14 @@
 			"componentType":5126,
 			"count":15093,
 			"max":[
-				0.003778010606765747,
-				0.0020561181008815765,
-				-0.0003390461206436157
+				0.0037598758935928345,
+				0.002024702727794647,
+				-0.000362202525138855
 			],
 			"min":[
-				-0.0037802010774612427,
-				-7.479265332221985e-05,
-				-0.003219044068828225
+				-0.0037581920623779297,
+				-1.8015503883361816e-05,
+				-0.0031068138778209686
 			],
 			"type":"VEC3"
 		},
@@ -1315,17 +1335,17 @@
 			"componentType":5126,
 			"count":15093,
 			"max":[
-				0.0014092996716499329,
-				0.00029574334621429443,
-				0.0011428222060203552
+				7.97957181930542e-05,
+				2.0153820514678955e-06,
+				0.00014705955982208252
 			],
 			"min":[
-				-0.0016131848096847534,
-				-0.0009655728936195374,
-				-0.0007639825344085693
+				-1.6391277313232422e-07,
+				0,
+				0
 			],
 			"sparse":{
-				"count":5825,
+				"count":58,
 				"indices":{
 					"bufferView":7,
 					"componentType":5123
@@ -1337,7 +1357,107 @@
 			"type":"VEC3"
 		},
 		{
-			"bufferView":9,
+			"componentType":5126,
+			"count":15093,
+			"max":[
+				8.13603401184082e-05,
+				2.0563602447509766e-06,
+				0.0001501142978668213
+			],
+			"min":[
+				-1.7136335372924805e-07,
+				0,
+				0
+			],
+			"sparse":{
+				"count":58,
+				"indices":{
+					"bufferView":9,
+					"componentType":5123
+				},
+				"values":{
+					"bufferView":10
+				}
+			},
+			"type":"VEC3"
+		},
+		{
+			"componentType":5126,
+			"count":15093,
+			"max":[
+				7.975846529006958e-05,
+				2.0153820514678955e-06,
+				0.0001560002565383911
+			],
+			"min":[
+				-1.6391277313232422e-07,
+				0,
+				0
+			],
+			"sparse":{
+				"count":58,
+				"indices":{
+					"bufferView":11,
+					"componentType":5123
+				},
+				"values":{
+					"bufferView":12
+				}
+			},
+			"type":"VEC3"
+		},
+		{
+			"componentType":5126,
+			"count":15093,
+			"max":[
+				0.001182548701763153,
+				0.00017052888870239258,
+				0.0007078275084495544
+			],
+			"min":[
+				-0.0013900995254516602,
+				-0.0007171295583248138,
+				-0.0006492026150226593
+			],
+			"sparse":{
+				"count":6879,
+				"indices":{
+					"bufferView":13,
+					"componentType":5123
+				},
+				"values":{
+					"bufferView":14
+				}
+			},
+			"type":"VEC3"
+		},
+		{
+			"componentType":5126,
+			"count":15093,
+			"max":[
+				7.983297109603882e-05,
+				1.5236437320709229e-06,
+				0.00013765692710876465
+			],
+			"min":[
+				-1.2665987014770508e-07,
+				0,
+				0
+			],
+			"sparse":{
+				"count":58,
+				"indices":{
+					"bufferView":15,
+					"componentType":5123
+				},
+				"values":{
+					"bufferView":16
+				}
+			},
+			"type":"VEC3"
+		},
+		{
+			"bufferView":17,
 			"componentType":5126,
 			"count":53,
 			"type":"MAT4"
@@ -1388,18 +1508,58 @@
 		},
 		{
 			"buffer":0,
-			"byteLength":11650,
+			"byteLength":116,
 			"byteOffset":1106400
 		},
 		{
 			"buffer":0,
-			"byteLength":69900,
-			"byteOffset":1118052
+			"byteLength":696,
+			"byteOffset":1106516
+		},
+		{
+			"buffer":0,
+			"byteLength":116,
+			"byteOffset":1107212
+		},
+		{
+			"buffer":0,
+			"byteLength":696,
+			"byteOffset":1107328
+		},
+		{
+			"buffer":0,
+			"byteLength":116,
+			"byteOffset":1108024
+		},
+		{
+			"buffer":0,
+			"byteLength":696,
+			"byteOffset":1108140
+		},
+		{
+			"buffer":0,
+			"byteLength":13758,
+			"byteOffset":1108836
+		},
+		{
+			"buffer":0,
+			"byteLength":82548,
+			"byteOffset":1122596
+		},
+		{
+			"buffer":0,
+			"byteLength":116,
+			"byteOffset":1205144
+		},
+		{
+			"buffer":0,
+			"byteLength":696,
+			"byteOffset":1205260
 		},
 		{
 			"buffer":0,
 			"byteLength":3392,
-			"byteOffset":1187952
+			"byteOffset":1205956
 		}
 	],
 	"samplers":[
@@ -1410,7 +1570,7 @@
 	],
 	"buffers":[
 		{
-			"byteLength":1191344,
+			"byteLength":1209348,
 			"uri":"ojotas.bin"
 		}
 	]
