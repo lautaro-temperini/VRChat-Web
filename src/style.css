@@ -347,6 +347,16 @@ body.touch #stamina { bottom: 160px; }
 .item.equipped::after { content: 'PUESTO'; position: absolute; top: 4px; right: 4px; font: 400 9px var(--display); letter-spacing: .6px; color: var(--primary); }
 .item.offered { border-color: var(--accent-2); background: rgba(255, 79, 216, 0.12); }
 .item.rare .ico { box-shadow: inset 0 -6px 0 rgba(0, 0, 0, 0.25), 0 0 12px rgba(255, 214, 10, 0.6); }
+/* Mochila: cantidad, el elegido y su ficha (ocupa la fila entera, debajo del objeto) */
+#inv-grid { grid-auto-flow: row dense; }
+#inv-filters:empty { display: none; }
+.item .qty { position: absolute; bottom: 4px; right: 6px; font: 800 11px var(--font); color: var(--muted); }
+.item.picked { border-color: var(--accent); background: rgba(25, 211, 255, 0.12); }
+.inv-detail { grid-column: 1 / -1; display: flex; gap: 12px; align-items: flex-start; padding: 10px; border-radius: 12px;
+  border: 1px solid var(--accent); background: rgba(25, 211, 255, 0.06); }
+.inv-detail .item { flex: none; width: 96px; cursor: default; }
+.inv-detail .info { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.inv-detail .meta { font-size: 12.5px; }
 .items .empty { grid-column: 1 / -1; color: var(--muted); font-size: 13px; padding: 10px; border: 1px dashed var(--line); border-radius: 12px; text-align: center; }
 
 /* ---------- Amigos ---------- */

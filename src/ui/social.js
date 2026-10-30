@@ -54,7 +54,7 @@ export function createSocial({ net, ui, me, room, onEquip, onDrop }) {
     return b;
   }
 
-  // Pestañas del inventario: Mochila (ropa, accesorios y consumibles) y Mobiliario (muebles especiales)
+  // Pestañas de la mochila: Objetos (ropa, accesorios y consumibles) y Muebles (muebles especiales)
   let invTab = 'mochila';
   for (const b of document.querySelectorAll('#inv-tabs [data-inv]')) {
     b.onclick = () => {
@@ -65,64 +65,126 @@ export function createSocial({ net, ui, me, room, onEquip, onDrop }) {
   }
   const isFurniture = (it) => !ITEMS[it.type] && !CONSUMABLES[it.type] && !!FURNITURE[it.type];
 
+  // Mochila: los repetidos van juntos (×N), filtros por tipo y, al tocar un objeto, su ficha con lo que se puede
+  // hacer (ponerse, tomar, soltar, copiar). Así no se suelta nada sin querer.
+  const KINDS = { todo: 'Todo', ropa: 'Ropa', premios: 'Premios', disenos: 'Diseños', consumibles: 'Para tomar' };
+  const kindOf = (it) => (it.design ? 'disenos' : CONSUMABLES[it.type] ? 'consumibles' : rarityOf(it.type) === 'basico' ? 'ropa' : 'premios');
+  const RARITY_NAMES = { basico: 'Común', raro: 'Raro', exotico: 'Exótico' };
+  let invKind = 'todo';
+  let picked = null; // clave del grupo con la ficha abierta
+  const groupKey = (it) => [it.type, it.color, it.design?.id ?? '', it.equipped ? 1 : 0].join('|');
+
+  async function useItem(it) {
+    // Consumible: se toma (la sala controla que no tengas otro efecto activo)
+    if (CONSUMABLES[it.type]) { net.send({ t: 'consume', from: 'item', iid: it.iid }); ui.closeOverlays(); return; }
+    // Diseños: la estampa se pone en la ropa; los objetos 3D chicos, en la mano
+    const wearable = it.type === 'estampa' || (it.type === 'disenoObjeto' && designHoldable(it.design));
+    if (it.type === 'disenoObjeto' && !wearable) return toast(`Es más grande que ${HAND_MAX * 100} cm: se pone en tu sala con "Editar sala" (G) o se suelta al piso.`);
+    if (!ITEMS[it.type] && !wearable) return toast('Los muebles se ponen en tu sala, con "Editar sala" (G).');
+    const r = await api('equip', { method: 'POST', body: { iid: it.iid, on: !it.equipped } });
+    if (!r.ok) return toast(r.error);
+    items = r.items;
+    onEquip(r.equip);
+    picked = groupKey(items.find((x) => x.iid === it.iid) ?? it);
+    renderInventory();
+  }
+
+  function detail(group) {
+    const it = group[0];
+    const box = document.createElement('div');
+    box.className = 'inv-detail';
+    const c = card(it, { credit: true });
+    c.disabled = false;
+    c.tabIndex = -1;
+    const info = document.createElement('div');
+    info.className = 'info';
+    const def = ITEMS[it.type] ?? FURNITURE[it.type] ?? CONSUMABLES[it.type];
+    const title = document.createElement('b');
+    title.textContent = it.design?.title || def?.name || it.type;
+    const meta = document.createElement('span');
+    meta.className = 'meta';
+    meta.textContent = [it.design ? 'Diseño' : RARITY_NAMES[rarityOf(it.type)], group.length > 1 ? `tenés ${group.length}` : '', it.equipped ? 'puesto' : '']
+      .filter(Boolean).join(' · ');
+    const acts = document.createElement('div');
+    acts.className = 'actions';
+    const btn = (label, fn, cls = 'act') => { const b = document.createElement('button'); b.className = cls; b.textContent = label; b.onclick = fn; acts.append(b); return b; };
+    if (!isFurniture(it)) {
+      const label = CONSUMABLES[it.type] ? 'Tomar' : it.equipped ? 'Sacármelo' : 'Ponérmelo';
+      btn(label, () => useItem(it), 'act on');
+    }
+    // Soltar en el suelo (lo pueden juntar otros a los 5 s; a los 60 s se pierde)
+    btn('Soltar', () => {
+      onDrop?.(it);
+      items = items.filter((x) => x.iid !== it.iid);
+      renderInventory();
+    }).title = 'Soltar en el suelo';
+    // Hacer copia: solo quien hizo el diseño
+    if (it.design && it.design.author?.id === me()?.id) {
+      btn('Hacer una copia', async () => {
+        const r = await api('designcopy', { method: 'POST', body: { iid: it.iid } });
+        if (!r.ok) return toast(r.error);
+        items = r.items;
+        renderInventory();
+        toast('Hiciste una copia más. Regalala intercambiándola o soltándola al piso.');
+      });
+    }
+    const hint = document.createElement('span');
+    hint.className = 'meta';
+    hint.textContent = 'Para regalarlo o cambiarlo: tocá a alguien → Intercambiar.';
+    info.append(title, meta, acts, hint);
+    box.append(c, info);
+    return box;
+  }
+
   function renderInventory() {
     const grid = $('inv-grid');
     grid.innerHTML = '';
     $('inv-hint').textContent = invTab === 'mobiliario'
-      ? 'Tus muebles especiales: se ponen en tu sala con "Editar sala" (G). También podés soltarlos o intercambiarlos.'
-      : 'Tocá un objeto para ponértelo o sacártelo. Uno por lugar del cuerpo.';
-    if (isGuest) { grid.innerHTML = '<div class="empty">Los invitados no tienen objetos. Creá tu cuenta (Personaje → Crear cuenta) y recibís tus primeros objetos.</div>'; return; }
-    const shown = items.filter((it) => isFurniture(it) === (invTab === 'mobiliario'));
+      ? 'Tus muebles especiales: se ponen en tu sala con "Editar sala" (G). Tocá uno para soltarlo.'
+      : 'Tocá un objeto para ver qué podés hacer. Uno por lugar del cuerpo.';
+    const filters = $('inv-filters');
+    filters.innerHTML = '';
+    if (isGuest) { grid.innerHTML = '<div class="empty">Los invitados no tienen objetos. Creá tu cuenta (Personaje → Perfil → Crear cuenta) y recibís tus primeros objetos.</div>'; return; }
+    let shown = items.filter((it) => isFurniture(it) === (invTab === 'mobiliario'));
+    // Filtros: solo los tipos que tenés (y si hay más de uno)
+    if (invTab === 'mochila') {
+      const have = new Set(shown.map(kindOf));
+      if (!have.has(invKind) && invKind !== 'todo') invKind = 'todo';
+      if (have.size > 1) {
+        for (const k of Object.keys(KINDS).filter((k) => k === 'todo' || have.has(k))) {
+          const b = document.createElement('button');
+          b.className = `chip${k === invKind ? ' sel' : ''}`;
+          b.textContent = KINDS[k];
+          b.onclick = () => { invKind = k; renderInventory(); };
+          filters.append(b);
+        }
+      }
+      if (invKind !== 'todo') shown = shown.filter((it) => kindOf(it) === invKind);
+    }
     if (!shown.length) grid.innerHTML = `<div class="empty">${invTab === 'mobiliario' ? 'No tenés muebles todavía.' : 'No tenés objetos todavía.'}</div>`;
-    for (const it of shown) {
-      const c = card(it, {
-        credit: true,
-        onClick: async () => {
-          // Consumible: se toma (la sala controla que no tengas otro efecto activo)
-          if (CONSUMABLES[it.type]) { net.send({ t: 'consume', from: 'item', iid: it.iid }); ui.closeOverlays(); return; }
-          // Diseños: la estampa se pone en la ropa; los objetos 3D chicos, en la mano
-          const wearable = it.type === 'estampa' || (it.type === 'disenoObjeto' && designHoldable(it.design));
-          if (it.type === 'disenoObjeto' && !wearable) return toast(`Es más grande que ${HAND_MAX * 100} cm: se pone en tu sala con "Editar sala" (G) o se suelta al piso.`);
-          if (!ITEMS[it.type] && !wearable) return toast('Los muebles se ponen en tu sala, con "Editar sala" (G).');
-          const r = await api('equip', { method: 'POST', body: { iid: it.iid, on: !it.equipped } });
-          if (!r.ok) return toast(r.error);
-          items = r.items;
-          onEquip(r.equip);
-          renderInventory();
-        },
-      });
-      // Soltar en el suelo (lo pueden juntar otros a los 5 s; a los 60 s se pierde)
-      const drop = document.createElement('span');
-      drop.className = 'drop';
-      drop.textContent = 'Soltar';
-      drop.title = 'Soltar en el suelo';
-      drop.onclick = (e) => {
-        e.stopPropagation();
-        onDrop?.(it);
-        items = items.filter((x) => x.iid !== it.iid);
-        renderInventory();
-      };
-      c.append(drop);
-      // Hacer copia: solo quien hizo el diseño
-      if (it.design && it.design.author?.id === me()?.id) {
-        const copy = document.createElement('span');
-        copy.className = 'copy';
-        copy.textContent = 'Copiar';
-        copy.title = 'Hacer otra copia de tu diseño';
-        copy.onclick = async (e) => {
-          e.stopPropagation();
-          const r = await api('designcopy', { method: 'POST', body: { iid: it.iid } });
-          if (!r.ok) return toast(r.error);
-          items = r.items;
-          renderInventory();
-          toast('Hiciste una copia más. Regalala intercambiándola o soltándola al piso.');
-        };
-        c.append(copy);
+    // Repetidos juntos (lo puesto primero)
+    const groups = new Map();
+    for (const it of [...shown].sort((a, b) => b.equipped - a.equipped)) {
+      const k = groupKey(it);
+      if (!groups.has(k)) groups.set(k, []);
+      groups.get(k).push(it);
+    }
+    if (picked && !groups.has(picked)) picked = null;
+    for (const [k, group] of groups) {
+      const it = group[0];
+      const c = card(it, { credit: true, onClick: () => { picked = picked === k ? null : k; renderInventory(); } });
+      if (k === picked) c.classList.add('picked');
+      if (group.length > 1) {
+        const n = document.createElement('b');
+        n.className = 'qty';
+        n.textContent = `×${group.length}`;
+        c.append(n);
       }
       // Arrastrar a la escena para soltarlo en ese lugar (PC)
       c.draggable = true;
       c.addEventListener('dragstart', (e) => { e.dataTransfer.setData('text/iid', it.iid); e.dataTransfer.effectAllowed = 'move'; });
       grid.append(c);
+      if (k === picked) grid.append(detail(group));
     }
   }
 
