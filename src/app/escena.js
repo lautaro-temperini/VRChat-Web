@@ -95,11 +95,9 @@ ctrl.onModeChange = (mode) => {
 };
 // Íconos en la barra superior (en pantallas chicas se ven solo los íconos)
 $('btn-cam').innerHTML = `${UI_ICONS.camera}<span class="lbl">3ª persona</span>`;
-for (const [id, icon] of [['btn-mic', 'mic'], ['btn-media', 'music'], ['btn-mundi', 'globe'], ['btn-gestures', 'hand'], ['btn-room', 'friends'], ['btn-look', 'user'], ['btn-inv', 'bag'], ['btn-friends', 'phone']]) {
+for (const [id, icon] of [['btn-mic', 'mic'], ['btn-media', 'music'], ['btn-mundi', 'globe'], ['btn-gestures', 'hand'], ['btn-room', 'friends'], ['btn-look', 'user'], ['btn-friends', 'phone'], ['btn-settings', 'menu']]) {
   $(id).insertAdjacentHTML('afterbegin', UI_ICONS[icon]);
 }
-// En celular, inventario, amigos y el mapa van arriba con el resto (abajo están los controles táctiles)
-if (isTouch) for (const b of [...$('dock').children]) $('topbar').insertBefore(b, $('btn-settings'));
 $('btn-cam').onclick = () => ctrl.setMode(ctrl.mode === 'first' ? 'third' : 'first');
 document.addEventListener('pointerlockchange', () => {
   body.classList.toggle('locked', document.pointerLockElement === renderer.domElement);

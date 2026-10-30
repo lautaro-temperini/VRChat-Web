@@ -27,7 +27,6 @@ async function openDJPanel() {
   if (G.account?.guest) return guestGate('pasar música');
   const live = !!rtc.djStream;
   $('djpanel').dataset.mode = live ? 'live' : 'setup';
-  $('dj-cancel').textContent = live ? 'Seguir pasando música' : 'Cancelar';
   $('dj-file').hidden = !window.showOpenFilePicker;
   if (!window.showOpenFilePicker) $('dj-file-name').textContent = 'Leer el track automáticamente funciona en Chrome o Edge.';
   G.openOverlay('djing');

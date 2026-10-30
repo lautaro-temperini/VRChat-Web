@@ -124,21 +124,18 @@ function renderAccount() {
 }
 
 // ---------- Editor de personaje ----------
-// Básico (para los que recién empiezan): una sola fila por cosa; los colores son unas pocas muestras y el
-// último botón abre el selector RGB. Avanzado: todos los tipos que existan (cada modelo nuevo de peinado,
-// barba o prenda que se sume a LOOK_OPTIONS aparece solo acá), color de ojos, paleta completa y deslizadores.
+// Una pestaña por zona (probador): en cada una, primero lo más usado. Cada modelo nuevo de peinado, barba o
+// prenda que se sume a LOOK_OPTIONS aparece solo, después de los principales. Los colores: la paleta y, al
+// final, un botón que abre el selector RGB.
 const BASIC_HAIR = ['corto', 'largo', 'rapado', 'rulos', 'coleta', 'trenza']; // peinados principales
-const BASIC_COLORS = 5; // muestras por fila de color en el básico (más el RGB)
-const BASIC = [
-  ['body', 'Cuerpo'], ['bodyType', 'Tipo de cuerpo'], ['skin', 'Piel'], ['hairStyle', 'Peinado'], ['hair', 'Color de pelo'],
-  ['beard', 'Barba'], ['top', 'Arriba'], ['shirt', 'Color de arriba'], ['bottom', 'Abajo'], ['pants', 'Color de abajo'],
-  ['feet', 'Calzado'], ['shoes', 'Color del calzado'],
-];
-const ADVANCED = [
-  ['hairStyle', 'Peinado'], ['hair', 'Color de pelo'], ['beardStyle', 'Tipo de barba'], ['eyes', 'Color de ojos'], ['skin', 'Piel'],
-  ['top', 'Arriba'], ['shirt', 'Color de arriba'], ['bottom', 'Abajo'], ['pants', 'Color de abajo'],
-  ['feet', 'Calzado'], ['shoes', 'Color del calzado'], ['hat', 'Sombrero'], ['glasses', 'Anteojos'], ['brows', 'Cejas'], ['face', 'Cara'],
-];
+const ZONES = {
+  cuerpo: [['body', 'Cuerpo'], ['bodyType', 'Tipo de cuerpo'], ['skin', 'Piel']], // + deslizadores
+  cara: [['eyes', 'Color de ojos'], ['face', 'Cara'], ['brows', 'Cejas']],
+  pelo: [['hairStyle', 'Peinado'], ['hair', 'Color de pelo'], ['beardStyle', 'Barba']],
+  ropa: [['top', 'Arriba'], ['shirt', 'Color de arriba'], ['bottom', 'Abajo'], ['pants', 'Color de abajo'], ['feet', 'Calzado'], ['shoes', 'Color del calzado']],
+  extras: [['hat', 'Sombrero'], ['glasses', 'Anteojos']],
+};
+let zone = 'cuerpo';
 const CHIP_LABELS = {
   masc: 'masculino', fem: 'femenino', false: 'sin barba', true: 'con barba', flequillo: 'corto con flequillo',
   despeinado: 'corto despeinado', melena: 'melena desmechada', revuelto: 'corto revuelto', carre: 'carré con flequillo',
@@ -154,7 +151,7 @@ const CHIP_LABELS = {
 // Tipo de cuerpo del básico: el que coincide con los deslizadores del avanzado (si no, ninguno)
 const bodyTypeOf = (L) => Object.keys(BODY_TYPES).find((k) => Math.abs(BODY_TYPES[k].weight - L.weight) < 0.005 && Math.abs(BODY_TYPES[k].muscle - L.muscle) < 0.005);
 // Una fila: título + botones (chips de texto o muestras de color). rerender: cómo redibujar al elegir.
-function swatchGroup(title, values, isSel, label, pick, rerender = renderSwatches) {
+function swatchGroup(title, values, isSel, label, pick, rerender = renderLook) {
   const group = document.createElement('div');
   group.className = 'group';
   group.innerHTML = `<h2>${title}</h2>`;
@@ -189,64 +186,58 @@ function colorGroup(key, title, palette, rerender) {
 const selected = (key) => (v) => (key in outfitOf(look) ? outfitOf(look)[key] : look[key]) === v;
 const labelOf = (v) => CHIP_LABELS[v] ?? MH_GARMENTS[v]?.name.toLowerCase() ?? MH_ACCESSORIES[v]?.name.toLowerCase()
   ?? (MH_BROWS.includes(v) ? `cejas ${MH_BROWS.indexOf(v) + 1}` : v === '' ? 'ninguno' : v);
-// Ropa en el básico: las de siempre (y la elegida en el avanzado, si es otra)
+// Ropa: las de siempre primero
 const BASIC_CLOTHES = { top: ['remera', 'mangalarga', 'camisa', 'campera'], bottom: ['jean', 'short', 'calza', 'pollera'], feet: ['zapatillas', 'botas', 'zapatos'] };
+const FIRST = { hairStyle: BASIC_HAIR, ...BASIC_CLOTHES };
 const pickKey = (key) => (v) => setLook({ ...look, [key]: v });
+const ordered = (key) => (FIRST[key] ? [...FIRST[key], ...LOOK_OPTIONS[key].filter((v) => !FIRST[key].includes(v))] : LOOK_OPTIONS[key]);
 
-function renderSwatches() {
-  const root = $('swatches');
+function renderLook() {
+  const root = $('look-groups');
   root.innerHTML = '';
-  for (const [key, title] of BASIC) {
+  $('look-sliders').hidden = zone !== 'cuerpo';
+  $('look-profile').hidden = zone !== 'perfil';
+  $('weight').value = look.weight;
+  $('muscle').value = look.muscle;
+  for (const [key, title] of ZONES[zone] ?? []) {
     if (key === 'bodyType') {
       const type = bodyTypeOf(look);
       root.append(swatchGroup(title, Object.keys(BODY_TYPES), (v) => v === type, (v) => BODY_TYPES[v].name,
         (v) => setLook({ ...look, weight: BODY_TYPES[v].weight, muscle: BODY_TYPES[v].muscle })));
-    } else if (String(DEFAULT_LOOK[key]).startsWith('#')) {
-      root.append(colorGroup(key, title, LOOK_OPTIONS[key].slice(0, BASIC_COLORS), renderSwatches));
-    } else {
-      // Peinado: los principales (y el elegido en el avanzado, si es otro)
-      const basic = key === 'hairStyle' ? BASIC_HAIR : BASIC_CLOTHES[key];
-      const cur = key in outfitOf(look) ? outfitOf(look)[key] : look[key];
-      const values = !basic ? LOOK_OPTIONS[key] : basic.includes(cur) || !LOOK_OPTIONS[key].includes(cur) ? basic : [...basic, cur];
-      root.append(swatchGroup(title, values, selected(key), labelOf, pickKey(key)));
-    }
-  }
-}
-function renderAdvanced() {
-  $('weight').value = look.weight;
-  $('muscle').value = look.muscle;
-  const root = $('rgb-colors');
-  root.innerHTML = '';
-  for (const [key, title] of ADVANCED) {
-    if (key === 'face') {
+    } else if (key === 'face') {
       // Presets de cara: uno por zona (forma, ojos, nariz, mejillas, orejas); "normal" = sin cambio
-      for (const [zone, z] of Object.entries(MH_FACE)) {
-        root.append(swatchGroup(z.name, ['', ...Object.keys(z.options)], (v) => (look.face?.[zone] ?? '') === v,
+      for (const [part, z] of Object.entries(MH_FACE)) {
+        root.append(swatchGroup(z.name, ['', ...Object.keys(z.options)], (v) => (look.face?.[part] ?? '') === v,
           (v) => (v === '' ? 'normal' : z.options[v].name.toLowerCase()),
-          (v) => setLook({ ...look, face: { ...look.face, [zone]: v || undefined } }), renderAdvanced));
+          (v) => setLook({ ...look, face: { ...look.face, [part]: v || undefined } })));
       }
     } else if (key === 'beardStyle') {
       // Barba: sin barba o cualquiera de los tipos
-      root.append(swatchGroup('Barba', [false, ...LOOK_OPTIONS.beardStyle], (v) => (v === false ? !look.beard : look.beard && (look.beardStyle ?? 'completa') === v),
-        (v) => (v === false ? CHIP_LABELS.false : labelOf(v)), (v) => setLook(v === false ? { ...look, beard: false } : { ...look, beard: true, beardStyle: v }), renderAdvanced));
+      root.append(swatchGroup(title, [false, ...LOOK_OPTIONS.beardStyle], (v) => (v === false ? !look.beard : look.beard && (look.beardStyle ?? 'completa') === v),
+        (v) => (v === false ? CHIP_LABELS.false : labelOf(v)), (v) => setLook(v === false ? { ...look, beard: false } : { ...look, beard: true, beardStyle: v })));
     } else if (String(DEFAULT_LOOK[key]).startsWith('#')) {
-      root.append(colorGroup(key, title, LOOK_OPTIONS[key], renderAdvanced));
+      root.append(colorGroup(key, title, LOOK_OPTIONS[key], renderLook));
     } else {
-      root.append(swatchGroup(title, LOOK_OPTIONS[key], selected(key), labelOf, pickKey(key), renderAdvanced));
+      root.append(swatchGroup(title, ordered(key), selected(key), labelOf, pickKey(key)));
     }
   }
 }
+function showZone(z) {
+  zone = z;
+  G.ctrl.closeUp = ['cara', 'pelo', 'extras'].includes(z);
+  for (const b of $('look-tabs').children) b.classList.toggle('active', b.dataset.ltab === z);
+  $('editor').scrollTop = 0;
+  renderLook();
+}
 $('look-tabs').onclick = (e) => {
   const tab = e.target.closest('[data-ltab]')?.dataset.ltab;
-  if (!tab) return;
-  for (const b of $('look-tabs').children) b.classList.toggle('active', b.dataset.ltab === tab);
-  for (const el of $('editor').querySelectorAll(':scope > [data-ltab]')) el.hidden = el.dataset.ltab !== tab;
-  if (tab === 'basic') renderSwatches(); else renderAdvanced();
+  if (tab) showZone(tab);
 };
 for (const key of ['height', 'weight', 'muscle']) {
   $(key).oninput = (e) => {
     setLook({ ...look, [key]: Number(e.target.value) });
     if (key === 'height') $('height-val').textContent = `${look.height.toFixed(2)} m`;
+    else renderLook(); // el tipo de cuerpo marcado sigue a los deslizadores
   };
 }
 
@@ -257,8 +248,9 @@ function openEditor() {
   $('height').value = look.height;
   $('height-val').textContent = `${look.height.toFixed(2)} m`;
   $('btn-enter').textContent = G.joined ? 'Guardar' : 'Entrar al museo';
-  renderSwatches();
-  renderAdvanced();
+  $('editor-close').hidden = !G.joined; // antes de entrar se sale con "Entrar al museo"
+  for (const b of document.querySelectorAll('.yo-tabs')) b.hidden = !G.joined;
+  renderLook();
   renderAccount();
   G.openOverlay('editing');
   G.ctrl.showcase = G.joined; // vitrina hasta que el personaje se mueva
@@ -279,6 +271,7 @@ async function closeEditor() {
 }
 $('btn-look').onclick = () => (body.classList.contains('editing') ? closeEditor() : openEditor());
 $('btn-enter').onclick = () => closeEditor();
+$('editor-close').onclick = () => closeEditor();
 $('name').addEventListener('keydown', (e) => {
   if (e.key !== 'Enter') return;
   e.stopPropagation(); // que el mismo Enter no abra el chat

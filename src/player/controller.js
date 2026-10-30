@@ -27,6 +27,8 @@ export class PlayerController {
     this.dom = dom;
     this.enabled = false;  // false = vitrina (editor de personaje antes de entrar)
     this.showcase = false; // vitrina con el editor abierto: se apaga al empezar a moverse
+    this.framing = false;  // el panel del personaje está abierto: la imagen se corre al lado libre
+    this.closeUp = false;  // probador: de cerca a la cabeza (pestañas de cara, pelo y accesorios)
     this.typing = false;   // true mientras se escribe en el chat
     this.paused = false;   // true con un panel abierto (obra, perfil, ajustes)
     this.mode = 'third';
@@ -420,9 +422,19 @@ export class PlayerController {
     const sprintKick = THREE.MathUtils.clamp((this.speed - 5.2) / 1.5, 0, 1) * 6;
     let fov;
     if (!this.enabled || this.showcase) {
-      // Cámara de vitrina para el editor de personaje
-      cam.position.set(p.x - 1.9, p.y + 1.2 * s, p.z + 0.55);
-      cam.lookAt(p.x, p.y + 0.95 * s, p.z + 0.5);
+      // Cámara de vitrina (probador): de frente al personaje, del lado de donde lo mirabas. En celular, más
+      // lejos para que entre entero arriba de la hoja del panel.
+      const narrow = this.framing && innerWidth <= 560;
+      const close = this.framing && this.closeUp;
+      const center = new THREE.Vector3(p.x, p.y + (close ? 1.6 : 0.95) * s, p.z);
+      const back = new THREE.Vector3(Math.sin(this.yaw), close ? 0 : 0.1, Math.cos(this.yaw)).normalize();
+      let dist = (close ? (narrow ? 1.4 : 0.9) : narrow ? 5.4 : 2.4) * s;
+      this.ray.set(center, back);
+      this.ray.far = dist + 0.3;
+      const hitWall = this.ray.intersectObjects(this.world.blockers, false)[0];
+      if (hitWall) dist = Math.max(0.8, hitWall.distance - 0.3);
+      cam.position.copy(center).addScaledVector(back, dist);
+      cam.lookAt(center);
       fov = FOV_3P;
     } else if (this.mode === 'first') {
       cam.rotation.set(this.pitch, this.yaw, 0, 'YXZ');
@@ -452,6 +464,13 @@ export class PlayerController {
       cam.position.y = THREE.MathUtils.clamp(cam.position.y, this.world.bounds.minY, this.world.bounds.maxY);
       fov = FOV_3P + sprintKick;
     }
+    // Con el panel del personaje abierto, el centro de la imagen se corre al lado libre de la pantalla
+    // (PC: a la izquierda del panel; celular: arriba de la hoja)
+    const W = innerWidth, H = innerHeight;
+    if (this.framing && (!this.enabled || this.showcase)) {
+      if (W <= 560) cam.setViewOffset(W, H, 0, Math.round(H * 0.19), W, H);
+      else cam.setViewOffset(W, H, Math.round(Math.min(350, W - 32) / 2 + 16), 0, W, H);
+    } else if (cam.view?.enabled) cam.clearViewOffset();
     const nextFov = damp(cam.fov, fov, 10, dt);
     if (Math.abs(nextFov - cam.fov) > 0.01) { cam.fov = nextFov; cam.updateProjectionMatrix(); }
   }

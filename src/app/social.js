@@ -247,7 +247,15 @@ const social = createSocial({
   onEquip: (equip) => { G.setEquip(equip); net.send({ t: 'look' }); },
   onDrop: (it, at) => dropItem(it, at),
 });
-$('btn-inv').onclick = () => (body.classList.contains('inventory') ? G.closeOverlays() : social.openInventory());
+// Personaje y Mochila: dos pestañas del mismo botón (P · I)
+for (const b of document.querySelectorAll('.yo-tabs [data-yo]')) {
+  b.onclick = async () => {
+    if (b.dataset.yo === 'inv' && !body.classList.contains('inventory')) {
+      if (body.classList.contains('editing')) await G.closeEditor();
+      social.openInventory();
+    } else if (b.dataset.yo === 'look' && !body.classList.contains('editing')) G.openEditor();
+  };
+}
 // Subir diseños propios (estampas, cuadros, objetos 3D): botón del inventario (ui/designs.js)
 const designUp = createDesignUpload({ ui: G.ui, me: () => G.account, onDone: (items, kind) => social.showItems(items, kind === 'estampa' ? 'mochila' : 'mobiliario') });
 $('btn-design-up').onclick = () => designUp.open();

@@ -337,6 +337,7 @@ La música del DJ y el puente OSC ya están hechos. Falta:
 | Tope de salas creadas (29/10, PROVISORIO) | Hasta 10 salas creadas por día por cuenta (contra crear y borrar en bucle). Lo puso Claude sin consultar: revisar |
 | Ojos de fantasía (29/10, PROVISORIO) | Premios hechos por sombreador (sin modelos): reptil, gato, demonio, brillantes y hielo (`MH_EYES` en avatarCatalog.js). Nombres, colores y rarezas los puso Claude: revisar |
 | Ojos humanos en el editor (30/10) | Los ojos de fantasía son todos premios (ninguno libre). El editor suma solo variantes humanas: más colores (marrón claro, miel, ámbar, verde agua, celeste, gris) y formas (asiáticos, abiertos, chicos, separados, juntos) |
+| Revisión de UX/UI (30/10) | El dueño delegó la propuesta de `docs/ui-auditoria.md` (A–G): Claude aplica lo que recomienda, buscando consistencia, sin esperar confirmación. Se revisa después |
 | Comando de admin (29/10) | `/item <id>`: el admin se da a sí mismo cualquier objeto (premios, exóticos, muebles especiales, consumibles) |
 | Chat (29/10) | Cada mensaje se corre a izquierda/centro/derecha según dónde estaba quien lo escribió respecto de tu cámara. En celular, el chat tiene una cruz para cerrarlo |
 | Celular (29/10) | El cartel de acción ("Ver obra", "Tomar trago"…) se puede tocar para hacerla, además del botón Usar |

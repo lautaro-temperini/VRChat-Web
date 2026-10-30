@@ -34,7 +34,6 @@ function openMenu() {
   G.openOverlay('settings');
 }
 $('btn-settings').onclick = () => (body.classList.contains('settings') ? G.closeOverlays() : openMenu());
-$('btn-settings-close').onclick = G.closeOverlays;
 $('btn-logout-menu').onclick = async () => { await api('logout', { method: 'POST' }); session.token = null; location.reload(); };
 
 

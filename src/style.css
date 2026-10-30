@@ -21,7 +21,7 @@
 html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); touch-action: none; user-select: none; -webkit-user-select: none; }
 #app canvas { display: block; }
 .labels { position: fixed; inset: 0; pointer-events: none; z-index: 0; }
-#hud, #topbar, #dock, #voicebar, #chat, #touch, #prompt, #crosshair { z-index: 5; }
+#top, #dock, #voicebar, #chat, #touch, #prompt, #crosshair { z-index: 5; }
 .panel { z-index: 10; }
 .overlay { z-index: 20; }
 button { font: inherit; color: inherit; cursor: pointer; }
@@ -56,15 +56,16 @@ button.pill.icon { padding: 7px 10px; display: grid; place-items: center; }
 .link { background: none; border: 0; color: var(--muted); font-size: 13px; text-decoration: underline; }
 
 /* ---------- HUD ---------- */
-#hud {
-  position: fixed; top: 12px; left: 12px; padding: 6px 12px 6px 8px;
-  font-size: 13px; display: flex; align-items: center; gap: 8px;
-}
+#top { position: fixed; top: 12px; left: 12px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; max-width: calc(100vw - 24px); }
+#hud { padding: 6px 12px 6px 8px; font-size: 13px; display: flex; align-items: center; gap: 8px; }
 #hud b { font-weight: 800; }
 .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--danger); }
 .dot.on { background: #3dff9a; box-shadow: 0 0 8px #3dff9a; }
-#topbar { position: fixed; top: 12px; right: 12px; display: flex; gap: 8px; }
-#dock { position: fixed; bottom: 12px; right: 12px; display: flex; gap: 8px; }
+#topbar { display: flex; gap: 8px; }
+/* Barra de navegación: abajo al centro */
+#dock { position: fixed; bottom: 12px; left: 50%; transform: translateX(-50%); display: flex; gap: 8px; }
+#dock button.pill, #topbar button.pill, #voicebar button.pill { display: flex; align-items: center; gap: 6px; }
+#dock kbd, #topbar kbd, #voicebar kbd { margin-left: 0; }
 #voicebar { position: fixed; left: 12px; bottom: 12px; display: flex; gap: 8px; }
 
 #crosshair {
@@ -87,7 +88,7 @@ body.touch #prompt kbd { display: none; }
 body.touch #prompt { pointer-events: auto; cursor: pointer; padding: 10px 16px; font-size: 15px; }
 body.touch #prompt:active { background: var(--primary); color: var(--primary-ink); }
 
-body.auth #chat, body.auth #topbar, body.auth #dock, body.auth #voicebar, body.auth #touch, body.auth #hud { display: none; }
+body.auth #chat, body.auth #top, body.auth #dock, body.auth #voicebar, body.auth #touch, body.auth #hud { display: none; }
 
 /* ---------- Chat ---------- */
 #chat { position: fixed; left: 12px; bottom: 56px; width: min(380px, calc(100vw - 24px)); border-radius: 14px; padding: 8px; font-size: 14px; }
@@ -133,6 +134,11 @@ body.typing #chat { background: var(--panel); border: 1px solid var(--line); bac
 }
 body.editing #editor, body.settings #settings { display: flex; }
 .panel h1 { margin: 0; font-size: 28px; }
+/* Cabecera de todos los paneles: título y ✕ */
+.panel-head { display: flex; align-items: center; gap: 10px; }
+.panel-head h1 { flex: 1; min-width: 0; }
+.panel-head .close { position: static; flex: none; }
+.panel-head .close[hidden] { display: none; }
 .tabs { display: flex; gap: 6px; }
 .tab {
   flex: 1; padding: 8px; border-radius: 10px; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--line);
@@ -152,12 +158,11 @@ input[type=range] { accent-color: var(--primary); }
 .panel .cta { margin-top: auto; }
 /* Personaje: el botón Guardar queda siempre a la vista; lo demás se desplaza */
 #editor #btn-enter { position: sticky; bottom: 0; z-index: 1; flex-shrink: 0; box-shadow: 0 -10px 18px rgba(0, 0, 0, 0.45); }
-#look-advanced { display: flex; flex-direction: column; gap: 14px; }
-#look-advanced[hidden] { display: none; }
+#look-groups, #look-sliders, #look-profile { display: flex; flex-direction: column; gap: 14px; }
+#look-sliders[hidden], #look-profile[hidden] { display: none; }
+.zone-tabs { display: grid; grid-template-columns: repeat(3, 1fr); }
+.yo-tabs[hidden] { display: none; }
 .range-ends { font-weight: 600; font-size: 11px; opacity: .7; }
-#swatches { display: flex; flex-direction: column; gap: 12px; }
-#swatches[hidden] { display: none; }
-#rgb-colors { display: flex; flex-direction: column; gap: 6px; }
 .rgb-row { display: flex; align-items: center; gap: 10px; padding: 4px; border: 0; border-radius: 10px; background: none;
   font-size: 13px; font-weight: 600; color: var(--muted); text-align: left; }
 .rgb-row:hover { background: rgba(255, 255, 255, 0.05); }
@@ -269,11 +274,9 @@ body.touch.targeting #btn-use { background: var(--primary); color: var(--primary
   #inspect .media img { max-height: 40vh; }
   #inspect h1 { font-size: 26px; }
 }
-@media (max-width: 760px) {
-  #topbar { top: 52px; left: 12px; right: auto; flex-wrap: wrap; }
-}
 @media (max-width: 560px) {
   .panel { top: auto; left: 8px; right: 8px; bottom: 8px; width: auto; max-height: 60vh; padding: 14px; gap: 10px; }
+  #editor { max-height: 50vh; } /* el personaje se ve arriba, entre la barra y la hoja */
 }
 
 /* ---------- Cámara: en PC se cambia con la rueda; el botón solo en celular ---------- */
@@ -299,7 +302,7 @@ body:not(.touch) #btn-cam { display: none; }
 
 /* ---------- Stamina ---------- */
 #stamina {
-  position: fixed; left: 50%; bottom: 22px; width: 220px; height: 10px; transform: translateX(-50%) skewX(var(--skew));
+  position: fixed; left: 50%; bottom: 60px; width: 220px; height: 10px; transform: translateX(-50%) skewX(var(--skew));
   border-radius: 6px; background: rgba(18, 13, 43, 0.6); border: 1px solid var(--line); overflow: hidden;
   opacity: 0; transition: opacity .4s; z-index: 5; pointer-events: none;
 }
@@ -380,8 +383,13 @@ body.trading #trade, body.viewing #screenview { display: flex; }
 /* En celular todo va arriba con íconos (abajo están el joystick y los botones de acción) */
 body.touch #topbar .lbl { display: none; }
 body.touch #topbar button.pill { padding: 7px 10px; }
-body.touch #dock { display: none; }
-body.touch .panel { bottom: 16px; } /* en táctil esos botones van arriba */
+/* En celular la barra va arriba, debajo del estado, con el nombre chico debajo del ícono */
+body.touch #dock { top: 54px; bottom: auto; left: 8px; right: 8px; transform: none; justify-content: space-between; gap: 4px; }
+body.touch #dock button.pill { flex: 1; flex-direction: column; gap: 2px; padding: 5px 2px; transform: none; border-radius: 10px; position: relative; }
+body.touch #dock button.pill > * { transform: none; }
+body.touch #dock .lbl { display: block; font-size: 10px; }
+body.touch .panel { bottom: 16px; }
+@media (min-width: 561px) { body.touch .panel { top: 108px; } }
 @media (max-width: 700px) {
   .trade-cols { grid-template-columns: 1fr; }
 }
@@ -446,14 +454,14 @@ body.roompanel #roompanel, body.mundi #mundi, body.kicked #kicked, body.controls
 .item { padding-bottom: 22px; }
 /* ---------- Celular (red social) ---------- */
 .phone {
-  /* Arriba de los botones de abajo a la derecha (Inventario, Amigos, Mapa), así no los tapa */
+  /* A la derecha, arriba de la barra de abajo */
   position: fixed; right: 18px; bottom: 64px; z-index: 10; display: none; flex-direction: column;
   width: min(360px, calc(100vw - 24px)); height: min(680px, calc(100vh - 136px));
   border-radius: 38px; padding: 12px 10px 10px; background: #0c0a14;
   border: 3px solid #2b2840; box-shadow: 0 0 0 2px #05040a, 0 30px 70px rgba(0, 0, 0, 0.6);
   animation: phone-up .28s cubic-bezier(.2, .9, .3, 1.2);
 }
-body.touch .phone { bottom: 18px; height: min(680px, calc(100vh - 90px)); } /* en táctil esos botones van arriba */
+body.touch .phone { bottom: 12px; height: min(680px, calc(100vh - 124px)); } /* en táctil la barra va arriba: no la tapa */
 @keyframes phone-up { from { transform: translateY(40px) rotate(4deg); opacity: 0; } }
 .phone-status { display: flex; justify-content: space-between; align-items: center; padding: 2px 16px 8px; font: 800 12px var(--font); color: #fff; }
 .phone-notch { width: 86px; height: 20px; border-radius: 12px; background: #000; }
