@@ -168,6 +168,11 @@ export const MH_FACE = {
       almendrados: { name: 'Almendrados', targets: [...LR('corner1-up', 0.7), ...LR('corner2-up', 0.5)] },
       grandes: { name: 'Grandes', targets: [...LR('scale-incr', 0.7), ...LR('height2-incr', 0.5)] },
       caidos: { name: 'Caídos', targets: [...LR('corner1-down', 0.8), ...LR('corner2-down', 0.6)] },
+      asiaticos: { name: 'Asiáticos', targets: [...LR('epicanthus-in'), ...LR('eyefold-down'), ...LR('height2-decr', 0.4), ...LR('corner1-up', 0.4)] },
+      abiertos: { name: 'Abiertos', targets: [...LR('height1-incr', 0.6), ...LR('height2-incr', 0.8), ...LR('eyefold-up', 0.5)] },
+      chicos: { name: 'Chicos', targets: [...LR('scale-decr', 0.6), ...LR('height2-decr', 0.3)] },
+      separados: { name: 'Separados', targets: LR('trans-out', 0.7) },
+      juntos: { name: 'Juntos', targets: LR('trans-in', 0.7) },
     },
   },
   nariz: {

@@ -886,6 +886,119 @@
        0.6
       ]
      ]
+    },
+    "asiaticos": {
+     "name": "Asiáticos",
+     "targets": [
+      [
+       "sys:eyes/l-eye-epicanthus-in",
+       1
+      ],
+      [
+       "sys:eyes/r-eye-epicanthus-in",
+       1
+      ],
+      [
+       "sys:eyes/l-eye-eyefold-down",
+       1
+      ],
+      [
+       "sys:eyes/r-eye-eyefold-down",
+       1
+      ],
+      [
+       "sys:eyes/l-eye-height2-decr",
+       0.4
+      ],
+      [
+       "sys:eyes/r-eye-height2-decr",
+       0.4
+      ],
+      [
+       "sys:eyes/l-eye-corner1-up",
+       0.4
+      ],
+      [
+       "sys:eyes/r-eye-corner1-up",
+       0.4
+      ]
+     ]
+    },
+    "abiertos": {
+     "name": "Abiertos",
+     "targets": [
+      [
+       "sys:eyes/l-eye-height1-incr",
+       0.6
+      ],
+      [
+       "sys:eyes/r-eye-height1-incr",
+       0.6
+      ],
+      [
+       "sys:eyes/l-eye-height2-incr",
+       0.8
+      ],
+      [
+       "sys:eyes/r-eye-height2-incr",
+       0.8
+      ],
+      [
+       "sys:eyes/l-eye-eyefold-up",
+       0.5
+      ],
+      [
+       "sys:eyes/r-eye-eyefold-up",
+       0.5
+      ]
+     ]
+    },
+    "chicos": {
+     "name": "Chicos",
+     "targets": [
+      [
+       "sys:eyes/l-eye-scale-decr",
+       0.6
+      ],
+      [
+       "sys:eyes/r-eye-scale-decr",
+       0.6
+      ],
+      [
+       "sys:eyes/l-eye-height2-decr",
+       0.3
+      ],
+      [
+       "sys:eyes/r-eye-height2-decr",
+       0.3
+      ]
+     ]
+    },
+    "separados": {
+     "name": "Separados",
+     "targets": [
+      [
+       "sys:eyes/l-eye-trans-out",
+       0.7
+      ],
+      [
+       "sys:eyes/r-eye-trans-out",
+       0.7
+      ]
+     ]
+    },
+    "juntos": {
+     "name": "Juntos",
+     "targets": [
+      [
+       "sys:eyes/l-eye-trans-in",
+       0.7
+      ],
+      [
+       "sys:eyes/r-eye-trans-in",
+       0.7
+      ]
+     ]
     }
    }
   },
