@@ -7,9 +7,12 @@ import { G, $, body } from './state.js';
 const { ctrl, social, net } = G;
 
 // ---------- Chat ----------
+// En celular, con el chat cerrado, se ven solo los últimos mensajes y se desvanecen (style.css: .old)
+const FADE_AFTER = 12000;
 function pushLine(el) {
   const box = $('messages');
   box.append(el);
+  setTimeout(() => el.classList.add('old'), FADE_AFTER);
   while (box.children.length > 60) box.firstChild.remove();
   box.scrollTop = box.scrollHeight;
 }

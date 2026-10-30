@@ -144,7 +144,7 @@ export function createSocial({ net, ui, me, room, onEquip, onDrop }) {
       : 'Tocá un objeto para ver qué podés hacer. Uno por lugar del cuerpo.';
     const filters = $('inv-filters');
     filters.innerHTML = '';
-    if (isGuest) { grid.innerHTML = '<div class="empty">Los invitados no tienen objetos. Creá tu cuenta (Personaje → Perfil → Crear cuenta) y recibís tus primeros objetos.</div>'; return; }
+    if (isGuest) { grid.innerHTML = '<div class="empty">Los invitados no tienen objetos. Creá tu cuenta (Menú → Cuenta → Crear cuenta) y recibís tus primeros objetos.</div>'; return; }
     let shown = items.filter((it) => isFurniture(it) === (invTab === 'mobiliario'));
     // Filtros: solo los tipos que tenés (y si hay más de uno)
     if (invTab === 'mochila') {

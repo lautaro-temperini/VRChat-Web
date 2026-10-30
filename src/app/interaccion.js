@@ -274,9 +274,12 @@ addEventListener('keydown', (e) => {
   } else if (e.code === 'KeyY') {
     G.toggleMundi();
   } else if (e.code === 'KeyR') {
+    if (e.repeat) return;
+    rDown = body.classList.contains('gestures') ? 0 : performance.now(); // abrir: se mide cuánto se mantiene
     G.toggleGestures();
   }
 });
+let rDown = 0;
 let tabHeld = null;
 function releaseTab() {
   if (!tabHeld) return;
@@ -290,6 +293,7 @@ function releaseTab() {
 addEventListener('keyup', (e) => {
   if (e.code === 'KeyV') G.talk(false);
   if (e.code === 'Tab') releaseTab();
+  if (e.code === 'KeyR' && rDown) { G.releaseGestures(performance.now() - rDown); rDown = 0; }
 });
 addEventListener('blur', () => { G.talk(false); releaseTab(); }); // si la ventana pierde el foco con una tecla apretada
 

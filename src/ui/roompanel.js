@@ -163,7 +163,20 @@ export function createRoomPanel({ net, rtc, remotes, ui, me, roomTitle, openProf
     // Funciones de la sala (solo los moderadores las pueden cambiar)
     const box = $('rp-settings');
     box.innerHTML = '';
+    if (!room.mod) {
+      // Quien no modera solo lo ve, en una línea (lo apagado, tachado)
+      const line = document.createElement('p');
+      line.className = 'meta perms';
+      line.append('En esta sala: ');
+      SETTINGS.forEach(([key, label], i) => {
+        const s = document.createElement(room.settings[key] !== false ? 'span' : 's');
+        s.textContent = label;
+        line.append(...(i ? [' · ', s] : [s]));
+      });
+      box.append(line);
+    }
     const grid = document.createElement('div');
+    grid.hidden = !room.mod;
     grid.className = 'toggles';
     for (const [key, label] of SETTINGS) {
       const l = document.createElement('label');

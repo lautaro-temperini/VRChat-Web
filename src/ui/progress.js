@@ -73,7 +73,7 @@ export function createProgress({ net, me, openPhone }) {
     box.innerHTML = '';
     if (!state) { box.append(el('p', 'meta', 'Cargando…')); return; }
     if (state.guest) {
-      box.append(el('div', 'guest-note', 'Los invitados no suman progreso. Creá tu cuenta (Personaje → Crear cuenta) para subir de nivel, ganar insignias y objetos.'));
+      box.append(el('div', 'guest-note', 'Los invitados no suman progreso. Creá tu cuenta (Menú → Cuenta → Crear cuenta) para subir de nivel, ganar insignias y objetos.'));
       return;
     }
     // Nivel (privado)
@@ -94,11 +94,11 @@ export function createProgress({ net, me, openPhone }) {
     if (!state.pathDone) {
       box.append(el('h2', 'pg-h', 'Para empezar'));
       const list = el('ol', 'pg-list');
-      for (const s of state.path) {
-        const li = el('li', s.done ? 'done' : s.current ? 'current' : 'later', s.done || s.current ? s.text : '…');
-        list.append(li);
-      }
+      for (const s of state.path.filter((x) => x.done || x.current)) list.append(el('li', s.done ? 'done' : 'current', s.text));
       box.append(list);
+      // Los que siguen se descubren de a uno: en vez de renglones vacíos, cuántos faltan
+      const later = state.path.filter((x) => !x.done && !x.current).length;
+      if (later) box.append(el('p', 'meta', `${later === 1 ? 'Falta 1 paso más' : `Faltan ${later} pasos más`}. Terminalo y ganás un objeto raro.`));
     }
 
     // Diarias

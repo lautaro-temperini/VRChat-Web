@@ -32,7 +32,7 @@ export class PlayerController {
     this.typing = false;   // true mientras se escribe en el chat
     this.paused = false;   // true con un panel abierto (obra, perfil, ajustes)
     this.mode = 'third';
-    this.sens = 1;         // multiplicador de sensibilidad (Ajustes)
+    this.sens = 1;         // multiplicador de sensibilidad (Menú → General)
 
     this.pos = new THREE.Vector3(world.spawn.x + (Math.random() - 0.5) * 2, 0, world.spawn.z + (Math.random() - 0.5) * 2);
     this.vel = new THREE.Vector2(); // velocidad horizontal (x, z)

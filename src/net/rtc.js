@@ -39,7 +39,7 @@ export class RTC {
     this.onScreen = () => {};
     this.onMic = () => {};    // ('off' | 'on') cuando empiezo o dejo de hablar
     this.talking = false;     // apretando V
-    this.voiceEnabled = true; // chat de voz activado en Ajustes
+    this.voiceEnabled = true; // chat de voz activado en Menú → Audio
     this.mediaMuted = false;  // M: música / pantalla de la sala en silencio
     this.mutedUsers = new Set(); // ids de jugadores muteados por mí
     this.volumes = { master: 1, voices: 1, media: 1 };
@@ -475,7 +475,7 @@ export class RTC {
   // Pulsar para hablar: mientras se mantiene V, el micrófono transmite
   async talk(on) {
     if (on === this.talking) return { ok: true };
-    if (on && !this.voiceEnabled) return { ok: false, error: 'El chat de voz está desactivado en Ajustes.' };
+    if (on && !this.voiceEnabled) return { ok: false, error: 'El chat de voz está desactivado en Menú → Audio.' };
     this.audio();
     this.talking = on;
     if (on && !this.mic) {

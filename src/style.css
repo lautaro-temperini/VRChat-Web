@@ -265,6 +265,10 @@ body.touch.playing #touch { display: block; }
 #btn-chat { right: 110px; bottom: 100px; }
 #btn-crouch.on { background: var(--accent); color: #04212b; }
 body.touch #chat { bottom: 214px; width: min(300px, calc(100vw - 24px)); }
+/* Celular: con el chat cerrado, solo los últimos 3 y se desvanecen; al abrirlo, todo el historial */
+body.touch:not(.typing) #messages .msg:not(:nth-last-child(-n+3)) { display: none; }
+body.touch:not(.typing) #messages .msg { transition: opacity 1.2s; }
+body.touch:not(.typing) #messages .msg.old { opacity: 0; }
 body.touch #voicebar { bottom: 170px; }
 body.touch.targeting #btn-use { background: var(--primary); color: var(--primary-ink); }
 
@@ -398,6 +402,11 @@ body.touch #dock { top: 54px; bottom: auto; left: 8px; right: 8px; transform: no
 body.touch #dock button.pill { flex: 1; flex-direction: column; gap: 2px; padding: 5px 2px; transform: none; border-radius: 10px; position: relative; }
 body.touch #dock button.pill > * { transform: none; }
 body.touch #dock .lbl { display: block; font-size: 10px; }
+/* Arriba, en una sola fila: el estado se achica antes que empujar el botón de Sala abajo */
+body.touch #top { flex-wrap: nowrap; }
+body.touch #hud { min-width: 0; }
+body.touch #status { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+body.touch #hud .lvlbar .track { display: none; }
 body.touch .panel { bottom: 16px; }
 @media (min-width: 561px) { body.touch .panel { top: 108px; } }
 @media (max-width: 700px) {
@@ -411,15 +420,28 @@ body.roompanel #roompanel, body.mundi #mundi, body.kicked #kicked, body.controls
 .part-row.mine { outline: 1px solid var(--accent); }
 .part-row .act { padding: 7px 12px; font-size: 12.5px; white-space: nowrap; }
 #artistpanel code { font-size: 12px; background: rgba(255, 255, 255, 0.08); padding: 1px 5px; border-radius: 5px; user-select: text; }
-#artistpanel summary { cursor: pointer; font-weight: 700; font-size: 13.5px; }
+#artistpanel summary, #djpanel summary { cursor: pointer; font-weight: 700; font-size: 13.5px; }
+#djpanel details .meta { margin-top: 6px; }
 .field select option { background: #1a1433; }
 #djpanel[data-mode=setup] #dj-live, #djpanel[data-mode=setup] #dj-stop { display: none; }
 #djpanel[data-mode=live] #dj-setup, #djpanel[data-mode=live] #dj-start { display: none; }
 #djpanel .dj-track .meta { margin: 4px 0; }
-.gesture-list { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.gesture-list .act { padding: 12px; }
-.gesture-list .sub-h { grid-column: 1 / -1; }
-#gestures .gesture-list { overflow-y: auto; overflow-x: hidden; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+/* Rueda de gestos: centrada, adentro los gestos y afuera los bailes */
+#gestures { position: fixed; inset: 0; z-index: 10; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+  background: radial-gradient(circle at center, rgba(18, 13, 43, 0.55), transparent 62%); pointer-events: none; }
+#gestures > * { pointer-events: auto; }
+.wheel { position: relative; width: 440px; height: 440px; flex: none; }
+@media (max-width: 460px) { .wheel { transform: scale(0.8); margin: -44px; } }
+.wheel::before, .wheel::after { content: ''; position: absolute; border-radius: 50%; border: 1px solid var(--line); pointer-events: none; }
+.wheel::before { inset: 0; background: rgba(22, 16, 54, 0.6); backdrop-filter: blur(8px); }
+.wheel::after { inset: 110px; background: rgba(22, 16, 54, 0.7); }
+.wheel .act { position: absolute; width: 104px; margin: -17px 0 0 -52px; padding: 8px 4px; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; z-index: 1; }
+.wheel .act.dance { background: rgba(255, 79, 216, 0.12); }
+.wheel .act.hot { background: var(--primary); color: var(--primary-ink); border-color: var(--primary); }
+.wheel-center { position: absolute; left: 50%; top: 50%; width: 52px; height: 52px; margin: -26px 0 0 -26px; border-radius: 50%; z-index: 1;
+  border: 1px solid var(--line); background: var(--panel); font-size: 18px; }
+.wheel-hint { background: var(--panel); padding: 6px 12px; border-radius: 10px; }
+body.touch .wheel-hint { display: none; }
 /* Bloques del panel del DJ: aire entre el texto y cada campo */
 .dj-block { display: flex; flex-direction: column; gap: 10px; }
 .panel.wide { width: min(460px, calc(100vw - 32px)); }
@@ -444,16 +466,21 @@ body.roompanel #roompanel, body.mundi #mundi, body.kicked #kicked, body.controls
 .player-row .act { padding: 5px 9px; font-size: 12px; }
 .act.danger:hover { background: rgba(255, 107, 138, 0.2); border-color: var(--danger); }
 .toggles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.toggles[hidden] { display: none; }
+.perms s { opacity: .55; }
 .toggles .check { padding: 8px 10px; border-radius: 10px; background: rgba(255, 255, 255, 0.05); font-size: 13px; }
 .toggles .check input:disabled + span { opacity: .6; }
 .controls-card { width: min(520px, 100%); padding: 24px; display: flex; flex-direction: column; gap: 14px; max-height: calc(100vh - 32px); overflow-y: auto; }
 .controls-card h1 { margin: 0; font-size: 28px; }
 .kicked-card { width: min(420px, 100%); padding: 24px; display: flex; flex-direction: column; gap: 12px; text-align: center; }
 .kicked-card h1 { margin: 0; font-size: 28px; }
-.mundi-room { display: flex; align-items: center; gap: 10px; padding: 12px; border-radius: 14px; background: rgba(255, 255, 255, 0.05); margin-bottom: 8px; }
-.mundi-room .who { flex: 1; }
-.mundi-room .who b { display: block; font-size: 15px; }
-.mundi-room .who span { color: var(--muted); font-size: 12.5px; }
+.mundi-room { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 12px; background: rgba(255, 255, 255, 0.05); margin-bottom: 6px; }
+.mundi-room .who { flex: 1; min-width: 0; }
+.mundi-room .who b { display: block; font-size: 14.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Una sola línea: el texto entero aparece al pasar el mouse */
+.mundi-room .who span { display: block; color: var(--muted); font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#mundi-search { margin-bottom: 2px; }
+.mundi-room[hidden], #mundi-list .sub-h[hidden], #mundi-list .room-desc[hidden] { display: none; }
 .mundi-room.here { border: 1px solid var(--accent); }
 
 /* Objetos en el suelo: etiqueta flotante */
@@ -651,3 +678,11 @@ body.designing #design-up { display: flex; }
 /* Editor: botón "+" al final de cada fila de colores (abre el selector RGB) */
 .swatch.rgb-btn { background: conic-gradient(#ff4d4d, #ffd23f, #5ad17a, #3a7bd5, #8a4be2, #ff6fb5, #ff4d4d); color: #fff;
   font: 900 16px var(--font); text-shadow: 0 1px 2px rgba(0, 0, 0, .6); line-height: 1; }
+
+/* Selector de archivo (postular obra, subir diseño) con el estilo de los botones del juego */
+.field input[type=file] { padding: 6px; font: 600 13px var(--font); color: var(--muted); cursor: pointer; }
+.field input[type=file]::file-selector-button {
+  margin-right: 10px; padding: 8px 12px; border-radius: 10px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.07);
+  color: var(--text); font: 800 13px var(--font); cursor: pointer;
+}
+.field input[type=file]::file-selector-button:hover { background: rgba(25, 211, 255, 0.14); border-color: var(--accent); }

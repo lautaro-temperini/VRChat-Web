@@ -279,4 +279,4 @@ $('name').addEventListener('keydown', (e) => {
 });
 
 
-Object.assign(G, { showAuth, finishOAuth, useAccount, openEditor, closeEditor, saveProfile });
+Object.assign(G, { showAuth, finishOAuth, useAccount, openEditor, closeEditor, saveProfile, showZone });

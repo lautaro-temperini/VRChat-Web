@@ -77,7 +77,12 @@ privacidad, favoritas, personaje con animaciones de Mixamo, inventario e interca
   (Plaza 335 → 130); textos limpios en todas partes; tope de 64 KB a los pedidos JSON.
 - **Auditoría general (29/10):** [auditoria-29-10.md](auditoria-29-10.md) — arreglos (ropa que no seguía el cuerpo,
   color de ojos, rendimiento, textos, memoria) y decisiones provisorias para revisar. `npm test`: 103 pruebas.
-- **Pendiente:** decidir la propuesta de UX/UI; premios 3D CC0 (Poly Pizza / Kenney / Quaternius) si se quieren;
+- **30/10:** UX/UI aplicada (A–G, ver "Aplicado" en [ui-auditoria.md](ui-auditoria.md)): barra única, paneles con ✕,
+  personaje como probador por zonas, mochila agrupada con ficha, rueda de gestos, menú Cuenta. Ojos humanos en el
+  editor (6 colores y 5 formas nuevas, modelos regenerados). Kenney Furniture Kit bajado (CC0, 5,1 MB) en
+  `E:\Proyectos\descargas-3d\kenney-furniture-kit` (sin meter en el juego todavía).
+- **Pendiente:** el dueño revisa la UI aplicada; Kenney: ¿estilo y cómo se consiguen (catálogo libre / premios /
+  mezcla)?; Quaternius (House Interior, Fantasy Props) no bajó: Google Drive dio "Quota exceeded", reintentar;
   revisar rarezas y nombres de los premios (`server/avatarCatalog.js`).
 
 ## Qué falta

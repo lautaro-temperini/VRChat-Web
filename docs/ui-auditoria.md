@@ -2,7 +2,7 @@
 
 Recorrido de todas las pantallas en PC (1280×800) y celular (375×812, táctil), con capturas en
 [ui-auditoria/](ui-auditoria/). Primero lo que está mal (problemas), después una **propuesta de reagrupado** para
-que decidas. No se cambió nada de diseño: solo se arreglaron tres bugs chicos (al final).
+que decidas. Lo aplicado está en "Aplicado (30/10)".
 
 ---
 
@@ -96,6 +96,31 @@ jugadores primero.
 ¿Cuáles querés? Se pueden hacer de a una (A y B son las que más ordenan).
 
 ---
+
+## Aplicado (30/10)
+
+El dueño delegó la decisión: se aplicó lo recomendado, buscando consistencia. Para revisar:
+
+- **A.** Barra única abajo al centro: Mapa · Celular · Personaje · Gestos · Menú (en celular arriba, ícono + nombre).
+  Arriba a la izquierda: estado (sala, conectados, nivel), Sala y, en tu sala, Editar sala. Voz abajo a la izquierda.
+  "Personaje" y "Mochila" son dos pestañas del mismo panel (P · I).
+- **B.** Todos los paneles: título + ✕ arriba a la derecha; sin "CERRAR" / "LISTO" / "VOLVER AL JUEGO". El celular
+  cierra con "✕ Cerrar". La cabina DJ ya no tiene "Cancelar" (se cierra con la ✕).
+- **C.** Personaje como probador: pestañas Cuerpo · Cara · Pelo · Ropa · Accesorios · Perfil (sin básico/avanzado; en
+  cada una, lo más usado primero). La cámara pone al personaje del lado libre (PC: a la izquierda del panel; celular:
+  arriba de la hoja) y se acerca a la cabeza en Cara, Pelo y Accesorios.
+- **D.** Mochila: repetidos juntos (×N), filtros (Todo · Ropa · Premios · Diseños · Para tomar, solo los que tenés) y
+  una ficha al tocar un objeto con Ponérmelo/Sacármelo/Tomar, Soltar y Hacer una copia. Pestañas Objetos / Muebles.
+- **E.** Chat en celular: con el chat cerrado, los últimos 3 mensajes y se desvanecen a los 12 s; al abrirlo, todo.
+- **F.** Sala (Tab): quien no modera ve los permisos en una línea (lo apagado, tachado) y enseguida los jugadores.
+- **G.** Menú: pestaña **Cuenta** (con qué nickname entraste, Editar perfil, Crear cuenta si sos invitado, Salir).
+  **No** se sumó selector de calidad gráfica: ya estaba decidido que es siempre automática (ROADMAP).
+- **Mapa:** filas de una línea (el texto entero al pasar el mouse) y buscador de salas y amigos.
+- **Progreso:** en vez de renglones "…", "Faltan N pasos más".
+- **Cabina DJ:** primero la entrada de audio; las explicaciones, plegadas ("¿Cuál elijo?").
+- **Postular obra / subir diseño:** el botón de elegir archivo con el estilo del juego.
+- **Gestos:** rueda centrada (adentro los gestos, afuera los bailes). PC: mantené R, apuntá y soltá; un toque corto la
+  deja abierta para hacer clic.
 
 ## Arreglado en esta revisión (bugs, no diseño)
 

@@ -189,12 +189,20 @@
       <button class="tab active" data-mtab="general">General</button>
       <button class="tab" data-mtab="audio">Audio</button>
       <button class="tab" data-mtab="controls">Controles</button>
+      <button class="tab" data-mtab="account">Cuenta</button>
     </div>
     <div class="mtab" data-mtab="general">
       <label class="field">Sensibilidad del mouse <span id="sens-val"></span>
         <input id="sens" type="range" min="0.2" max="3" step="0.05" />
       </label>
-      <button class="act" id="btn-logout-menu">Salir de la cuenta</button>
+    </div>
+    <div class="mtab" data-mtab="account" hidden>
+      <p class="meta" id="menu-account"></p>
+      <div class="actions">
+        <button class="act" id="btn-profile-menu">Editar perfil</button>
+        <button class="act" id="btn-register-menu">Crear cuenta</button>
+        <button class="act" id="btn-logout-menu">Salir de la cuenta</button>
+      </div>
     </div>
     <div class="mtab" data-mtab="audio" hidden>
       <label class="check"><input type="checkbox" id="voice-enabled" /> Chat de voz activado</label>
@@ -222,9 +230,9 @@
         <dt>Tab (mantener)</dt><dd>Jugadores e info de la sala</dd>
         <dt>Y</dt><dd>Mapa: salas</dd>
         <dt>G</dt><dd>Editar tu sala (en tu sala)</dd>
-        <dt>R</dt><dd>Gestos</dd>
+        <dt>R (mantener)</dt><dd>Gestos: apuntá y soltá</dd>
         <dt>Esc</dt><dd>Este menú</dd>
-        <dt>P · I · F</dt><dd>Personaje · Inventario · Amigos</dd>
+        <dt>P · I · F</dt><dd>Personaje · Mochila · Celular</dd>
         <dt>Enter</dt><dd>Chat · /ayuda para ver comandos · /controls para ver esto</dd>
       </dl>
     </div>
@@ -244,29 +252,36 @@
   <!-- Mapa: salas -->
   <aside id="mundi" class="panel">
     <h1 class="display">Mapa</h1>
-    <p class="meta">Elegí a dónde ir. También podés escribir en el chat <b>/ir museo</b>, <b>/ir mi sala</b> o <b>/ir nombre</b>.</p>
+    <label class="field"><input id="mundi-search" type="search" maxlength="40" placeholder="Buscar sala o amigo" autocomplete="off" /></label>
     <div id="mundi-list"></div>
+    <p class="meta">También con el chat: <b>/ir museo</b>, <b>/ir mi sala</b> o <b>/ir nombre</b>.</p>
   </aside>
 
   <!-- E en la cabina: pasar música -->
   <aside id="djpanel" class="panel">
     <h1 class="display">Cabina DJ</h1>
     <div id="dj-setup" class="dj-block">
-      <p class="meta">Elegí de dónde sale la música: la salida de tu controladora o placa de sonido, o un
-        cable virtual (VB-Cable en Windows, BlackHole en Mac) desde Serato, Rekordbox, Traktor, VirtualDJ o
-        Spotify. Va en estéreo y suena por los parlantes del escenario.</p>
       <label class="field">Entrada de audio
         <select id="dj-source"></select>
       </label>
+      <details>
+        <summary>¿Cuál elijo?</summary>
+        <p class="meta">La salida de tu controladora o placa de sonido, o un cable virtual (VB-Cable en Windows,
+          BlackHole en Mac) desde Serato, Rekordbox, Traktor, VirtualDJ o Spotify. Va en estéreo y suena por los
+          parlantes del escenario.</p>
+      </details>
     </div>
     <div id="dj-live" class="dj-block">
       <p class="meta">Estás pasando música. ¿Terminar tu set? La cabina queda libre para otro DJ.</p>
     </div>
     <div class="field dj-track">Nombre del track (opcional)
-      <p class="meta">Elegí el archivo de texto donde tu programa escribe lo que suena (por ejemplo el
-        historial de VirtualDJ o el "now playing" para OBS). El juego lo lee solo cuando cambia.</p>
       <button class="act" id="dj-file">Elegir archivo</button>
       <span class="meta" id="dj-file-name">Sin archivo: no se muestra el track.</span>
+      <details>
+        <summary>¿Qué archivo?</summary>
+        <p class="meta">El archivo de texto donde tu programa escribe lo que suena (por ejemplo el historial de
+          VirtualDJ o el "now playing" para OBS). El juego lo lee solo cuando cambia.</p>
+      </details>
     </div>
     <button class="cta" id="dj-start">Empezar a pasar música</button>
     <button class="cta" id="dj-stop">Terminar mi set</button>
@@ -297,12 +312,13 @@
     </div>
   </aside>
 
-  <!-- R: gestos -->
-  <aside id="gestures" class="panel">
-    <h1 class="display">Gestos</h1>
-    <p class="meta">También con el chat: <b>/saludar</b>, <b>/aplaudir</b>, <b>/festejar</b>, <b>/señalar</b>, <b>/bailar</b> o <b>/bailar 3</b>.</p>
-    <div id="gesture-list" class="gesture-list"></div>
-  </aside>
+  <!-- R: rueda de gestos (adentro los gestos, afuera los bailes). PC: mantené R, apuntá y soltá -->
+  <div id="gestures">
+    <div class="wheel" id="gesture-list">
+      <button type="button" class="wheel-center" data-close-panel aria-label="Cerrar">✕</button>
+    </div>
+    <p class="meta wheel-hint">Mantené <b>R</b>, apuntá y soltá · en el chat: <b>/bailar 3</b></p>
+  </div>
 
   <!-- Expulsado / baneado -->
   <div id="kicked" class="overlay">
@@ -369,7 +385,7 @@
     </div>
   </div>
 
-  <!-- Inventario -->
+  <!-- Mochila (Personaje → Mochila, o la I) -->
   <aside id="inventory" class="panel">
     <h1 class="display">Mochila</h1>
     <div class="tabs yo-tabs"><button class="tab" data-yo="look">Personaje</button><button class="tab active" data-yo="inv">Mochila</button></div>

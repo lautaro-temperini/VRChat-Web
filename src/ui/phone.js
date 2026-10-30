@@ -44,7 +44,7 @@ export function createPhone({ social, me, go, room }) {
     $('mynotes-form').hidden = guest;
     if (name === 'notas') renderMyNotes();
     if (name === 'galeria' && me()) {
-      if (guest) $('phone-gallery').innerHTML = '<div class="guest-note">Los invitados no tienen galería. Creá tu cuenta (Personaje → Crear cuenta) para subir fotos y publicar en el muro.</div>';
+      if (guest) $('phone-gallery').innerHTML = '<div class="guest-note">Los invitados no tienen galería. Creá tu cuenta (Menú → Cuenta → Crear cuenta) para subir fotos y publicar en el muro.</div>';
       else renderGallery($('phone-gallery'), me().id);
     }
     if (name === 'avisos') renderNotifications(true);

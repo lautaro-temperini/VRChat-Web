@@ -90,6 +90,7 @@ async function openMundi() {
     b.textContent = title;
     const s = document.createElement('span');
     s.textContent = target === room ? `Estás acá${sub ? ` · ${sub}` : ''}` : sub;
+    who.title = s.textContent ? `${title}\n${s.textContent}` : title;
     who.append(b, s);
     el.append(who);
     if (target !== room) {
@@ -146,7 +147,23 @@ async function openMundi() {
     section('Estás en');
     add(G.roomTitle, '', room);
   }
+  filterMundi();
 }
+// Buscador del Mapa: deja las filas que coinciden (y los títulos de las secciones que quedan con algo)
+const fold = (t) => t.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
+function filterMundi() {
+  const q = fold($('mundi-search').value.trim());
+  let head = null, any = false;
+  const close = () => { if (head) head.hidden = !any; };
+  for (const el of $('mundi-list').children) {
+    if (el.classList.contains('sub-h')) { close(); head = el; any = false; continue; }
+    if (!el.classList.contains('mundi-room')) { el.hidden = !!q; continue; }
+    el.hidden = !!q && !fold(el.querySelector('.who').title).includes(q);
+    if (!el.hidden) any = true;
+  }
+  close();
+}
+$('mundi-search').oninput = filterMundi;
 
 // Ajustes de una sala propia: nombre, descripción, quién puede entrar, y borrarla (con confirmación)
 function roomForm(el, edit, r) {
@@ -214,7 +231,11 @@ function createForm(button, templates) {
   };
   button.replaceWith(form);
 }
-const toggleMundi = () => (body.classList.contains('mundi') ? G.closeOverlays() : openMundi());
+const toggleMundi = () => {
+  if (body.classList.contains('mundi')) return G.closeOverlays();
+  $('mundi-search').value = '';
+  openMundi();
+};
 $('btn-mundi').onclick = toggleMundi;
 
 // ---------- Gestos (R / comandos del chat) ----------
@@ -223,20 +244,33 @@ function gesture(name) {
   me.gesture(name);
   net.send({ t: 'emote', e: name });
 }
-for (const [title, dance] of [['Gestos', false], ['Bailes (siguen hasta que te movés)', true]]) {
-  const h = document.createElement('h2');
-  h.className = 'sub-h';
-  h.textContent = title;
-  $('gesture-list').append(h);
-  Object.entries(EMOTES).filter(([, g]) => !!g.dance === dance).forEach(([id, g], i) => {
+// Rueda: los gestos en el anillo de adentro y los bailes (siguen hasta que te movés) en el de afuera
+let hotGesture = null; // el que está bajo el mouse (al soltar la R se hace ese)
+for (const [dance, radius] of [[false, 82], [true, 168]]) {
+  const list = Object.entries(EMOTES).filter(([, g]) => !!g.dance === dance);
+  list.forEach(([id, g], i) => {
+    const a = (i / list.length) * Math.PI * 2 - Math.PI / 2 + (dance ? 0 : Math.PI / 4);
     const b = document.createElement('button');
-    b.className = 'act';
+    b.type = 'button';
+    b.className = `act${dance ? ' dance' : ''}`;
     b.textContent = dance ? `${i + 1}. ${g.name}` : g.name;
+    b.title = b.textContent;
+    b.style.left = `${220 + Math.cos(a) * radius}px`;
+    b.style.top = `${220 + Math.sin(a) * radius}px`;
     b.onclick = () => { G.closeOverlays(); gesture(id); };
+    b.onpointerenter = () => { hotGesture = id; b.classList.add('hot'); };
+    b.onpointerleave = () => { if (hotGesture === id) hotGesture = null; b.classList.remove('hot'); };
     $('gesture-list').append(b);
   });
 }
 const toggleGestures = () => (body.classList.contains('gestures') ? G.closeOverlays() : G.openOverlay('gestures'));
+// R mantenida: al soltarla se hace el gesto que está bajo el mouse (un toque corto deja la rueda abierta)
+function releaseGestures(heldMs) {
+  if (!body.classList.contains('gestures') || heldMs < 250) return;
+  const id = hotGesture;
+  G.closeOverlays();
+  if (id) gesture(id);
+}
 $('btn-gestures').onclick = toggleGestures;
 
 
@@ -274,4 +308,4 @@ $('btn-friends').onclick = togglePhone;
 for (const b of document.querySelectorAll('[data-close-panel]')) b.onclick = G.closeOverlays;
 
 
-Object.assign(G, { ground, social, phone, progress, gesture, openMundi, toggleMundi, toggleGestures, togglePhone });
+Object.assign(G, { ground, social, phone, progress, gesture, openMundi, toggleMundi, toggleGestures, releaseGestures, togglePhone });

@@ -52,7 +52,7 @@ export function createRoomEditor({ world, scene, camera, renderer, net, rtc, ctr
     if (e.code !== 'KeyG' || e.repeat || btn.hidden || ['INPUT', 'TEXTAREA'].includes(e.target.tagName)) return;
     btn.click();
   });
-  $('topbar').insertBefore(btn, $('btn-settings'));
+  $('topbar').insertBefore(btn, $('btn-cam')); // junto a Sala (arriba a la izquierda)
   for (const s of btn.querySelectorAll(':scope > *')) s.style.transform = 'skewX(calc(var(--skew) * -1))';
 
   const root = document.createElement('div');
